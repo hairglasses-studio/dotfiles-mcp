@@ -286,8 +286,11 @@ type GHOnboardReposOutput struct {
 // Tool 9: dotfiles_gh_list_org_repos
 
 type GHListOrgReposInput struct {
-	Org      string `json:"org" jsonschema:"required,description=GitHub organization name"`
-	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory to check clone status (default: ~/hairglasses-studio)"`
+	Org             string   `json:"org" jsonschema:"required,description=GitHub organization name"`
+	LocalDir        string   `json:"local_dir,omitempty" jsonschema:"description=Local directory to check clone status (default: ~/hairglasses-studio)"`
+	Languages       []string `json:"languages,omitempty" jsonschema:"description=Filter by language (e.g. Go or Python)"`
+	ExcludeArchived bool     `json:"exclude_archived,omitempty" jsonschema:"description=Exclude archived repos"`
+	OnlyMissing     bool     `json:"only_missing,omitempty" jsonschema:"description=Only show repos not cloned locally"`
 }
 
 type OrgRepoInfo struct {
@@ -355,10 +358,11 @@ type GHBulkSettingsInput struct {
 }
 
 type SettingsResult struct {
-	Repo     string   `json:"repo"`
-	Action   string   `json:"action"`
-	Applied  []string `json:"applied,omitempty"`
-	Message  string   `json:"message,omitempty"`
+	Repo     string          `json:"repo"`
+	Action   string          `json:"action"`
+	Applied  []string        `json:"applied,omitempty"`
+	Previous map[string]bool `json:"previous,omitempty"`
+	Message  string          `json:"message,omitempty"`
 }
 
 type GHBulkSettingsOutput struct {
@@ -397,11 +401,13 @@ type PullResult struct {
 }
 
 type GHPullAllOutput struct {
-	Total   int          `json:"total"`
-	Updated int          `json:"updated"`
-	Current int          `json:"current"`
-	Failed  int          `json:"failed"`
-	Results []PullResult `json:"results"`
+	Total    int          `json:"total"`
+	Updated  int          `json:"updated"`
+	Current  int          `json:"current"`
+	Dirty    int          `json:"dirty"`
+	Detached int          `json:"detached"`
+	Failed   int          `json:"failed"`
+	Results  []PullResult `json:"results"`
 }
 
 // Tool 15: dotfiles_gh_clean_stale
@@ -416,7 +422,46 @@ type GHCleanStaleOutput struct {
 	Results []TransferResult `json:"results"`
 }
 
-// Tool 16: dotfiles_eww_restart
+// Tool 16: dotfiles_gh_full_sync
+
+type GHFullSyncInput struct {
+	Org      string `json:"org" jsonschema:"required,description=GitHub organization name"`
+	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory (default: ~/hairglasses-studio)"`
+	Execute  bool   `json:"execute,omitempty" jsonschema:"description=Set true to clone missing repos (default: dry-run for clones)"`
+}
+
+type FullSyncDetail struct {
+	Repo   string `json:"repo"`
+	Action string `json:"action"`
+	Detail string `json:"detail,omitempty"`
+}
+
+type GHFullSyncOutput struct {
+	Pulled   int              `json:"pulled"`
+	Current  int              `json:"current"`
+	Dirty    int              `json:"dirty"`
+	Cloned   int              `json:"cloned"`
+	Orphaned int              `json:"orphaned"`
+	Failed   int              `json:"failed"`
+	Details  []FullSyncDetail `json:"details"`
+}
+
+// Tool 17: dotfiles_create_repo
+
+type CreateRepoInput struct {
+	Name     string `json:"name" jsonschema:"required,description=Repository name (e.g. my-new-tool)"`
+	Language string `json:"language,omitempty" jsonschema:"description=Primary language,enum=go,enum=node,enum=python,enum=shell"`
+	Private  bool   `json:"private,omitempty" jsonschema:"description=Create as private repo (default: true)"`
+}
+
+type CreateRepoOutput struct {
+	RepoPath string `json:"repo_path"`
+	RepoURL  string `json:"repo_url,omitempty"`
+	Status   string `json:"status"`
+	Output   string `json:"output"`
+}
+
+// Tool 18: dotfiles_eww_restart
 
 type EwwRestartInput struct{}
 
@@ -1487,6 +1532,26 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 						}
 					}
 
+					// Apply filters.
+					if input.ExcludeArchived && r.Archived {
+						continue
+					}
+					if input.OnlyMissing && r.LocalStatus != "missing" {
+						continue
+					}
+					if len(input.Languages) > 0 {
+						match := false
+						for _, lang := range input.Languages {
+							if strings.EqualFold(r.Language, lang) {
+								match = true
+								break
+							}
+						}
+						if !match {
+							continue
+						}
+					}
+
 					repos = append(repos, r)
 				}
 
@@ -1635,8 +1700,8 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					archiveCmd := exec.Command("gh", "api", "--method", "PATCH",
 						fmt.Sprintf("repos/%s/%s", input.Org, repo),
 						"-f", "archived=true", "--silent")
-					if err := archiveCmd.Run(); err != nil {
-						results = append(results, TransferResult{Repo: repo, Action: "failed", Message: "archive failed"})
+					if out, err := archiveCmd.CombinedOutput(); err != nil {
+						results = append(results, TransferResult{Repo: repo, Action: "failed", Message: "archive failed: " + strings.TrimSpace(string(out))})
 					} else {
 						results = append(results, TransferResult{Repo: repo, Action: "archived", Message: "archived " + input.Org + "/" + repo})
 					}
@@ -1710,12 +1775,42 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				var results []SettingsResult
 
 				for _, repo := range repos {
+					// Fetch current settings for before/after comparison.
+					jqFields := []string{}
+					for _, name := range settingNames {
+						jqFields = append(jqFields, name)
+					}
+					jqExpr := "{" + strings.Join(jqFields, ", ") + "}"
+					currentCmd := exec.Command("gh", "api", fmt.Sprintf("repos/%s/%s", input.Org, repo), "--jq", jqExpr)
+					var currentOut bytes.Buffer
+					currentCmd.Stdout = &currentOut
+					var previous map[string]bool
+					if err := currentCmd.Run(); err == nil {
+						json.Unmarshal(currentOut.Bytes(), &previous)
+					}
+
+					// Check if all settings already match.
+					allMatch := previous != nil && len(previous) == len(settings)
+					if allMatch {
+						for k, v := range settings {
+							if previous[k] != v {
+								allMatch = false
+								break
+							}
+						}
+					}
+					if allMatch {
+						results = append(results, SettingsResult{Repo: repo, Action: "already-correct", Applied: settingNames, Previous: previous})
+						continue
+					}
+
 					if dryRun {
 						results = append(results, SettingsResult{
-							Repo:    repo,
-							Action:  "dry-run",
-							Applied: settingNames,
-							Message: fmt.Sprintf("would apply %d settings to %s/%s", len(settings), input.Org, repo),
+							Repo:     repo,
+							Action:   "dry-run",
+							Applied:  settingNames,
+							Previous: previous,
+							Message:  fmt.Sprintf("would apply %d settings to %s/%s", len(settings), input.Org, repo),
 						})
 						continue
 					}
@@ -1732,10 +1827,10 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					args = append(args, "--silent")
 
 					patchCmd := exec.Command("gh", args...)
-					if err := patchCmd.Run(); err != nil {
-						results = append(results, SettingsResult{Repo: repo, Action: "failed", Message: "patch failed"})
+					if out, err := patchCmd.CombinedOutput(); err != nil {
+						results = append(results, SettingsResult{Repo: repo, Action: "failed", Message: "patch failed: " + strings.TrimSpace(string(out))})
 					} else {
-						results = append(results, SettingsResult{Repo: repo, Action: "applied", Applied: settingNames})
+						results = append(results, SettingsResult{Repo: repo, Action: "applied", Applied: settingNames, Previous: previous})
 					}
 				}
 
@@ -1815,7 +1910,7 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				}
 
 				var results []PullResult
-				var total, updated, current, failed int
+				var total, updated, current, dirty, detached, failed int
 
 				for _, e := range entries {
 					if !e.IsDir() {
@@ -1828,6 +1923,29 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 						continue // Not a git repo.
 					}
 					total++
+
+					// Check for detached HEAD.
+					headCmd := exec.Command("git", "symbolic-ref", "HEAD")
+					headCmd.Dir = repoPath
+					if err := headCmd.Run(); err != nil {
+						results = append(results, PullResult{Repo: e.Name(), Action: "detached", Message: "detached HEAD — skipped"})
+						detached++
+						continue
+					}
+
+					// Check for dirty working tree (only matters for pull, not fetch).
+					if !input.FetchOnly {
+						statusCmd := exec.Command("git", "status", "--porcelain")
+						statusCmd.Dir = repoPath
+						var statusOut bytes.Buffer
+						statusCmd.Stdout = &statusOut
+						statusCmd.Run()
+						if strings.TrimSpace(statusOut.String()) != "" {
+							results = append(results, PullResult{Repo: e.Name(), Action: "dirty", Message: "has uncommitted changes — skipped"})
+							dirty++
+							continue
+						}
+					}
 
 					var gitCmd *exec.Cmd
 					if input.FetchOnly {
@@ -1851,11 +1969,13 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				}
 
 				return GHPullAllOutput{
-					Total:   total,
-					Updated: updated,
-					Current: current,
-					Failed:  failed,
-					Results: results,
+					Total:    total,
+					Updated:  updated,
+					Current:  current,
+					Dirty:    dirty,
+					Detached: detached,
+					Failed:   failed,
+					Results:  results,
 				}, nil
 			},
 		),
@@ -1916,6 +2036,30 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 						continue // Matches an org repo, keep it.
 					}
 
+					// Safety: check for uncommitted changes.
+					statusCmd := exec.Command("git", "status", "--porcelain")
+					statusCmd.Dir = repoPath
+					var statusOut bytes.Buffer
+					statusCmd.Stdout = &statusOut
+					statusCmd.Run()
+					if strings.TrimSpace(statusOut.String()) != "" {
+						results = append(results, TransferResult{Repo: name, Action: "skipped", Message: "has uncommitted changes"})
+						continue
+					}
+
+					// Safety: check for unpushed commits.
+					unpushedCmd := exec.Command("git", "log", "@{u}..", "--oneline")
+					unpushedCmd.Dir = repoPath
+					var unpushedOut bytes.Buffer
+					unpushedCmd.Stdout = &unpushedOut
+					unpushedCmd.Run()
+					unpushedLines := strings.TrimSpace(unpushedOut.String())
+					if unpushedLines != "" {
+						count := len(strings.Split(unpushedLines, "\n"))
+						results = append(results, TransferResult{Repo: name, Action: "skipped", Message: fmt.Sprintf("has %d unpushed commits", count)})
+						continue
+					}
+
 					if dryRun {
 						results = append(results, TransferResult{Repo: name, Action: "dry-run", Message: "would remove " + repoPath})
 					} else {
@@ -1928,6 +2072,175 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				}
 
 				return GHCleanStaleOutput{Results: results}, nil
+			},
+		),
+
+		// ── dotfiles_gh_full_sync ─────────────────────
+		handler.TypedHandler[GHFullSyncInput, GHFullSyncOutput](
+			"dotfiles_gh_full_sync",
+			"One-command fleet sync: pulls all local repos, identifies missing org repos, clones them, and reports orphaned dirs. Set execute=true to clone missing repos (dry-run by default for clones; pull always runs).",
+			func(_ context.Context, input GHFullSyncInput) (GHFullSyncOutput, error) {
+				if input.Org == "" {
+					return GHFullSyncOutput{}, fmt.Errorf("[%s] org is required", handler.ErrInvalidParam)
+				}
+
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				var details []FullSyncDetail
+				var pulled, current, dirty, cloned, orphaned, failed int
+
+				// Step 1: Pull all local repos.
+				entries, err := os.ReadDir(localDir)
+				if err != nil {
+					return GHFullSyncOutput{}, fmt.Errorf("read dir: %v", err)
+				}
+
+				localDirs := make(map[string]bool)
+				for _, e := range entries {
+					if !e.IsDir() {
+						continue
+					}
+					repoPath := filepath.Join(localDir, e.Name())
+					gitDir := filepath.Join(repoPath, ".git")
+					if _, err := os.Stat(gitDir); err != nil {
+						continue
+					}
+					localDirs[e.Name()] = true
+
+					// Check detached HEAD.
+					headCmd := exec.Command("git", "symbolic-ref", "HEAD")
+					headCmd.Dir = repoPath
+					if err := headCmd.Run(); err != nil {
+						details = append(details, FullSyncDetail{Repo: e.Name(), Action: "detached", Detail: "detached HEAD — skipped pull"})
+						continue
+					}
+
+					// Check dirty.
+					statusCmd := exec.Command("git", "status", "--porcelain")
+					statusCmd.Dir = repoPath
+					var statusOut bytes.Buffer
+					statusCmd.Stdout = &statusOut
+					statusCmd.Run()
+					if strings.TrimSpace(statusOut.String()) != "" {
+						dirty++
+						details = append(details, FullSyncDetail{Repo: e.Name(), Action: "dirty", Detail: "uncommitted changes — skipped pull"})
+						continue
+					}
+
+					// Pull.
+					pullCmd := exec.Command("git", "pull", "--ff-only")
+					pullCmd.Dir = repoPath
+					out, err := pullCmd.CombinedOutput()
+					outStr := strings.TrimSpace(string(out))
+					if err != nil {
+						failed++
+						details = append(details, FullSyncDetail{Repo: e.Name(), Action: "pull-failed", Detail: outStr})
+					} else if strings.Contains(outStr, "Already up to date") || strings.Contains(outStr, "Already up-to-date") {
+						current++
+					} else {
+						pulled++
+						details = append(details, FullSyncDetail{Repo: e.Name(), Action: "pulled", Detail: outStr})
+					}
+				}
+
+				// Step 2: Cross-reference with org repos.
+				orgCmd := exec.Command("gh", "api", "--paginate",
+					fmt.Sprintf("/orgs/%s/repos?per_page=100", input.Org),
+					"--jq", ".[] | select(.archived == false) | .name")
+				var orgOut bytes.Buffer
+				orgCmd.Stdout = &orgOut
+				if err := orgCmd.Run(); err != nil {
+					return GHFullSyncOutput{}, fmt.Errorf("gh api failed: %v", err)
+				}
+
+				orgRepos := make(map[string]bool)
+				for _, name := range strings.Split(strings.TrimSpace(orgOut.String()), "\n") {
+					name = strings.TrimSpace(name)
+					if name != "" {
+						orgRepos[name] = true
+					}
+				}
+
+				// Step 3: Clone missing repos.
+				for name := range orgRepos {
+					if localDirs[name] {
+						continue
+					}
+
+					localPath := filepath.Join(localDir, name)
+					if !input.Execute {
+						details = append(details, FullSyncDetail{Repo: name, Action: "missing", Detail: "would clone to " + localPath})
+						continue
+					}
+
+					cloneCmd := exec.Command("gh", "repo", "clone", fmt.Sprintf("%s/%s", input.Org, name), localPath)
+					if out, err := cloneCmd.CombinedOutput(); err != nil {
+						failed++
+						details = append(details, FullSyncDetail{Repo: name, Action: "clone-failed", Detail: strings.TrimSpace(string(out))})
+					} else {
+						cloned++
+						details = append(details, FullSyncDetail{Repo: name, Action: "cloned", Detail: localPath})
+					}
+				}
+
+				// Step 4: Report orphaned local dirs.
+				for name := range localDirs {
+					if !orgRepos[name] {
+						orphaned++
+						details = append(details, FullSyncDetail{Repo: name, Action: "orphaned", Detail: "local dir has no matching org repo"})
+					}
+				}
+
+				return GHFullSyncOutput{
+					Pulled:   pulled,
+					Current:  current,
+					Dirty:    dirty,
+					Cloned:   cloned,
+					Orphaned: orphaned,
+					Failed:   failed,
+					Details:  details,
+				}, nil
+			},
+		),
+
+		// ── dotfiles_create_repo ──────────────────────
+		handler.TypedHandler[CreateRepoInput, CreateRepoOutput](
+			"dotfiles_create_repo",
+			"Scaffold a new hairglasses-studio repo with standard files (CI, LICENSE, .editorconfig, pre-commit hooks). Auto-detects or uses specified language for templates.",
+			func(_ context.Context, input CreateRepoInput) (CreateRepoOutput, error) {
+				if input.Name == "" {
+					return CreateRepoOutput{}, fmt.Errorf("[%s] name is required", handler.ErrInvalidParam)
+				}
+
+				scriptArgs := []string{input.Name}
+				if input.Language != "" {
+					scriptArgs = append(scriptArgs, "--language="+input.Language)
+				}
+				if input.Private {
+					scriptArgs = append(scriptArgs, "--private")
+				}
+
+				script := filepath.Join(dotfilesDir(), "scripts", "hg-new-repo.sh")
+				cmd := exec.Command(script, scriptArgs...)
+				var stdout, stderr bytes.Buffer
+				cmd.Stdout = &stdout
+				cmd.Stderr = &stderr
+
+				err := cmd.Run()
+				status := "ok"
+				if err != nil {
+					status = "fail"
+				}
+
+				repoPath := filepath.Join(homeDir(), "hairglasses-studio", input.Name)
+				return CreateRepoOutput{
+					RepoPath: repoPath,
+					Status:   status,
+					Output:   stdout.String(),
+				}, nil
 			},
 		),
 	}
