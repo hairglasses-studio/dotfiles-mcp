@@ -639,6 +639,226 @@ func ghRecreateForks(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolR
 	return jsonResult(results)
 }
 
+// ---------------------------------------------------------------------------
+// Tool 8: dotfiles_eww_restart
+// ---------------------------------------------------------------------------
+
+type ewwRestartResult struct {
+	Killed    int    `json:"killed"`
+	WaybarOff bool   `json:"waybar_killed"`
+	DaemonPID string `json:"daemon_pid,omitempty"`
+	BarsOpen  []string `json:"bars_opened"`
+	Error     string `json:"error,omitempty"`
+}
+
+func ewwRestart(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	r := ewwRestartResult{}
+
+	// Kill waybar if running (legacy cleanup)
+	waybar := exec.Command("killall", "waybar")
+	if waybar.Run() == nil {
+		r.WaybarOff = true
+	}
+
+	// Count and kill existing eww processes
+	countCmd := exec.Command("pgrep", "-c", "eww")
+	var countOut bytes.Buffer
+	countCmd.Stdout = &countOut
+	if countCmd.Run() == nil {
+		fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &r.Killed)
+	}
+
+	exec.Command("killall", "-9", "eww").Run()
+
+	// Wait for processes to die
+	exec.Command("sleep", "1").Run()
+
+	// Remove stale socket
+	home := homeDir()
+	sockets, _ := filepath.Glob(filepath.Join("/run/user/1000", "eww-server_*"))
+	for _, s := range sockets {
+		os.Remove(s)
+	}
+
+	// Start daemon
+	daemon := exec.Command("eww", "daemon", "--restart")
+	daemon.Dir = home
+	if err := daemon.Start(); err != nil {
+		r.Error = fmt.Sprintf("daemon start failed: %v", err)
+		return jsonResult(r)
+	}
+
+	// Wait for daemon to initialize
+	exec.Command("sleep", "3").Run()
+
+	// Verify daemon is responsive
+	ping := exec.Command("eww", "ping")
+	var pingOut bytes.Buffer
+	ping.Stdout = &pingOut
+	if err := ping.Run(); err != nil {
+		r.Error = "daemon started but not responding to ping"
+		return jsonResult(r)
+	}
+
+	// Get daemon PID
+	pidCmd := exec.Command("pgrep", "-o", "eww")
+	var pidOut bytes.Buffer
+	pidCmd.Stdout = &pidOut
+	if pidCmd.Run() == nil {
+		r.DaemonPID = strings.TrimSpace(pidOut.String())
+	}
+
+	// Open bars
+	bars := []string{"bar", "bar-secondary"}
+	for _, bar := range bars {
+		openCmd := exec.Command("eww", "open", bar)
+		if err := openCmd.Run(); err == nil {
+			r.BarsOpen = append(r.BarsOpen, bar)
+		}
+	}
+
+	return jsonResult(r)
+}
+
+// ---------------------------------------------------------------------------
+// Tool 9: dotfiles_eww_status
+// ---------------------------------------------------------------------------
+
+type ewwBarStatus struct {
+	DaemonRunning bool              `json:"daemon_running"`
+	DaemonCount   int               `json:"daemon_count"`
+	WaybarRunning bool              `json:"waybar_running"`
+	Windows       []string          `json:"windows"`
+	Layers        []ewwLayerInfo    `json:"layers"`
+	Variables     map[string]string `json:"variables,omitempty"`
+}
+
+type ewwLayerInfo struct {
+	Monitor   string `json:"monitor"`
+	Namespace string `json:"namespace"`
+	Position  string `json:"position"`
+}
+
+func ewwStatus(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	st := ewwBarStatus{
+		Variables: make(map[string]string),
+	}
+
+	// Check eww daemon count
+	countCmd := exec.Command("pgrep", "-c", "eww")
+	var countOut bytes.Buffer
+	countCmd.Stdout = &countOut
+	if countCmd.Run() == nil {
+		fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &st.DaemonCount)
+		st.DaemonRunning = st.DaemonCount > 0
+	}
+
+	// Check waybar
+	waybarCmd := exec.Command("pgrep", "-x", "waybar")
+	st.WaybarRunning = waybarCmd.Run() == nil
+
+	// List open eww windows
+	winCmd := exec.Command("eww", "active-windows")
+	var winOut bytes.Buffer
+	winCmd.Stdout = &winOut
+	if winCmd.Run() == nil {
+		for _, line := range strings.Split(strings.TrimSpace(winOut.String()), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			// Format: "bar: bar" — extract the window name (before colon)
+			if parts := strings.SplitN(line, ":", 2); len(parts) > 0 {
+				st.Windows = append(st.Windows, strings.TrimSpace(parts[0]))
+			}
+		}
+	}
+
+	// Get layer info from hyprctl
+	layerCmd := exec.Command("hyprctl", "layers")
+	var layerOut bytes.Buffer
+	layerCmd.Stdout = &layerOut
+	if layerCmd.Run() == nil {
+		var currentMonitor string
+		for _, line := range strings.Split(layerOut.String(), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "Monitor ") {
+				currentMonitor = strings.TrimSuffix(strings.TrimPrefix(line, "Monitor "), ":")
+			}
+			if strings.Contains(line, "namespace:") {
+				parts := strings.Split(line, "namespace: ")
+				if len(parts) == 2 {
+					ns := strings.Split(parts[1], ",")[0]
+					xywh := ""
+					if xywhIdx := strings.Index(line, "xywh: "); xywhIdx >= 0 {
+						xywh = strings.Split(line[xywhIdx+6:], ",")[0]
+					}
+					st.Layers = append(st.Layers, ewwLayerInfo{
+						Monitor:   currentMonitor,
+						Namespace: ns,
+						Position:  xywh,
+					})
+				}
+			}
+		}
+	}
+
+	// Get key eww variable values
+	varsToCheck := []string{
+		"bar_workspaces_dp1", "bar_workspaces_dp2",
+		"bar_cpu", "bar_mem", "bar_vol", "bar_shader",
+	}
+	for _, v := range varsToCheck {
+		getCmd := exec.Command("eww", "get", v)
+		var getOut bytes.Buffer
+		getCmd.Stdout = &getOut
+		if getCmd.Run() == nil {
+			st.Variables[v] = strings.TrimSpace(getOut.String())
+		}
+	}
+
+	return jsonResult(st)
+}
+
+// ---------------------------------------------------------------------------
+// Tool 10: dotfiles_eww_get
+// ---------------------------------------------------------------------------
+
+func ewwGet(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	varName, _ := args["variable"].(string)
+
+	if varName == "" {
+		return errResult("variable name is required")
+	}
+
+	cmd := exec.Command("eww", "get", varName)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return errResult(fmt.Sprintf("eww get %s failed: %v: %s", varName, err, strings.TrimSpace(stderr.String())))
+	}
+
+	value := strings.TrimSpace(stdout.String())
+
+	// Try to parse as JSON for structured output
+	var parsed any
+	if json.Unmarshal([]byte(value), &parsed) == nil {
+		result := map[string]any{
+			"variable": varName,
+			"value":    parsed,
+		}
+		return jsonResult(result)
+	}
+
+	return jsonResult(map[string]string{
+		"variable": varName,
+		"value":    value,
+	})
+}
+
 // parseStringArray extracts a []string from an interface{} that may be []any.
 func parseStringArray(v any) ([]string, error) {
 	if v == nil {
@@ -774,6 +994,34 @@ func main() {
 			),
 		),
 		ghRecreateForks,
+	)
+
+	// Tool 8: dotfiles_eww_restart
+	s.AddTool(
+		mcp.NewTool("dotfiles_eww_restart",
+			mcp.WithDescription("Kill all eww and waybar processes, restart eww daemon, and open both bars (bar on DP-1, bar-secondary on DP-2). Use after editing eww config files."),
+		),
+		ewwRestart,
+	)
+
+	// Tool 9: dotfiles_eww_status
+	s.AddTool(
+		mcp.NewTool("dotfiles_eww_status",
+			mcp.WithDescription("Show eww bar status: daemon health, open windows, layer surfaces, key variable values, and whether waybar is incorrectly running."),
+		),
+		ewwStatus,
+	)
+
+	// Tool 10: dotfiles_eww_get
+	s.AddTool(
+		mcp.NewTool("dotfiles_eww_get",
+			mcp.WithDescription("Get the current value of an eww variable. Useful for debugging bar widgets (e.g. bar_workspaces_dp1, bar_cpu, bar_shader, rg_fleet)."),
+			mcp.WithString("variable",
+				mcp.Required(),
+				mcp.Description("eww variable name to query"),
+			),
+		),
+		ewwGet,
 	)
 
 	if err := server.ServeStdio(s); err != nil {
