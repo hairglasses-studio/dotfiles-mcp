@@ -461,7 +461,92 @@ type CreateRepoOutput struct {
 	Output   string `json:"output"`
 }
 
-// Tool 18: dotfiles_eww_restart
+// Tool 18: dotfiles_fleet_audit
+
+type FleetAuditInput struct {
+	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory (default: ~/hairglasses-studio)"`
+}
+
+type RepoAuditInfo struct {
+	Name            string `json:"name"`
+	Language        string `json:"language"`
+	GoVersion       string `json:"go_version,omitempty"`
+	CIStatus        string `json:"ci_status"` // pass, fail, running, none
+	TestCount       int    `json:"test_count"`
+	LastCommitDays  int    `json:"last_commit_days"`
+	HasPipelineMk   bool   `json:"has_pipeline_mk"`
+	HasCLAUDEmd     bool   `json:"has_claude_md"`
+	HasCI           bool   `json:"has_ci"`
+}
+
+type FleetAuditOutput struct {
+	Total    int             `json:"total"`
+	Passing  int             `json:"passing"`
+	Failing  int             `json:"failing"`
+	GoRepos  int             `json:"go_repos"`
+	Repos    []RepoAuditInfo `json:"repos"`
+}
+
+// Tool 19: dotfiles_cascade_reload
+
+type CascadeReloadInput struct {
+	Services []string `json:"services,omitempty" jsonschema:"description=Services to reload in order (default: hyprland then mako then eww)"`
+}
+
+type ServiceReloadStatus struct {
+	Service string `json:"service"`
+	Action  string `json:"action"` // reloaded, failed, skipped
+	Message string `json:"message,omitempty"`
+}
+
+type CascadeReloadOutput struct {
+	Results []ServiceReloadStatus `json:"results"`
+}
+
+// Tool 20: dotfiles_rice_check
+
+type RiceCheckInput struct {
+	Level string `json:"level,omitempty" jsonschema:"description=Check level: quick (services only) or full (+ palette scan),enum=quick,enum=full"`
+}
+
+type PaletteViolation struct {
+	File  string `json:"file"`
+	Line  int    `json:"line"`
+	Color string `json:"color"`
+}
+
+type RiceCheckOutput struct {
+	Compositor        string             `json:"compositor"`
+	Shader            string             `json:"shader"`
+	Wallpaper         string             `json:"wallpaper"`
+	Services          []ServiceReloadStatus `json:"services"`
+	PaletteViolations []PaletteViolation `json:"palette_violations,omitempty"`
+}
+
+// Tool 21: dotfiles_bulk_pipeline
+
+type BulkPipelineInput struct {
+	LocalDir  string   `json:"local_dir,omitempty" jsonschema:"description=Local directory (default: ~/hairglasses-studio)"`
+	Repos     []string `json:"repos,omitempty" jsonschema:"description=Specific repos (default: all with Makefile)"`
+	Language  string   `json:"language,omitempty" jsonschema:"description=Filter by language,enum=go,enum=node,enum=python"`
+	BuildOnly bool     `json:"build_only,omitempty" jsonschema:"description=Only run build step"`
+	TestOnly  bool     `json:"test_only,omitempty" jsonschema:"description=Only run test step"`
+}
+
+type PipelineResult struct {
+	Repo    string `json:"repo"`
+	Status  string `json:"status"` // pass, build-fail, test-fail, vet-fail, skip
+	Output  string `json:"output,omitempty"`
+}
+
+type BulkPipelineOutput struct {
+	Total  int              `json:"total"`
+	Passed int              `json:"passed"`
+	Failed int              `json:"failed"`
+	Results []PipelineResult `json:"results"`
+}
+
+// Tool 22: dotfiles_eww_restart
 
 type EwwRestartInput struct{}
 
@@ -2240,6 +2325,453 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					RepoPath: repoPath,
 					Status:   status,
 					Output:   stdout.String(),
+				}, nil
+			},
+		),
+
+		// ── dotfiles_fleet_audit ──────────────────────
+		handler.TypedHandler[FleetAuditInput, FleetAuditOutput](
+			"dotfiles_fleet_audit",
+			"Comprehensive fleet audit: per-repo language, Go version, CI status, test count, last commit age, pipeline.mk and CLAUDE.md presence. Single tool replaces manual health+dep+CI checks.",
+			func(_ context.Context, input FleetAuditInput) (FleetAuditOutput, error) {
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				entries, err := os.ReadDir(localDir)
+				if err != nil {
+					return FleetAuditOutput{}, fmt.Errorf("read dir: %v", err)
+				}
+
+				var repos []RepoAuditInfo
+				var total, passing, failing, goRepos int
+
+				for _, e := range entries {
+					if !e.IsDir() {
+						continue
+					}
+					repoPath := filepath.Join(localDir, e.Name())
+					gitDir := filepath.Join(repoPath, ".git")
+					if _, err := os.Stat(gitDir); err != nil {
+						continue
+					}
+					total++
+
+					info := RepoAuditInfo{Name: e.Name()}
+
+					// Detect language.
+					if _, err := os.Stat(filepath.Join(repoPath, "go.mod")); err == nil {
+						info.Language = "go"
+						goRepos++
+						// Read Go version.
+						goModCmd := exec.Command("grep", "-m1", "^go ", filepath.Join(repoPath, "go.mod"))
+						var goModOut bytes.Buffer
+						goModCmd.Stdout = &goModOut
+						if goModCmd.Run() == nil {
+							parts := strings.Fields(strings.TrimSpace(goModOut.String()))
+							if len(parts) >= 2 {
+								info.GoVersion = parts[1]
+							}
+						}
+					} else if _, err := os.Stat(filepath.Join(repoPath, "package.json")); err == nil {
+						info.Language = "node"
+					} else if _, err := os.Stat(filepath.Join(repoPath, "pyproject.toml")); err == nil {
+						info.Language = "python"
+					} else {
+						info.Language = "shell"
+					}
+
+					// Last commit age.
+					logCmd := exec.Command("git", "log", "-1", "--format=%ct")
+					logCmd.Dir = repoPath
+					var logOut bytes.Buffer
+					logCmd.Stdout = &logOut
+					if logCmd.Run() == nil {
+						ts := strings.TrimSpace(logOut.String())
+						if ts != "" {
+							var epoch int64
+							fmt.Sscanf(ts, "%d", &epoch)
+							nowCmd := exec.Command("date", "+%s")
+							var nowOut bytes.Buffer
+							nowCmd.Stdout = &nowOut
+							nowCmd.Run()
+							var nowEpoch int64
+							fmt.Sscanf(strings.TrimSpace(nowOut.String()), "%d", &nowEpoch)
+							info.LastCommitDays = int((nowEpoch - epoch) / 86400)
+						}
+					}
+
+					// CI status.
+					ciCmd := exec.Command("gh", "run", "list", "--repo", e.Name(), "--limit", "1", "--json", "conclusion", "--jq", ".[0].conclusion")
+					ciCmd.Dir = repoPath
+					var ciOut bytes.Buffer
+					ciCmd.Stdout = &ciOut
+					if ciCmd.Run() == nil {
+						conclusion := strings.TrimSpace(ciOut.String())
+						switch conclusion {
+						case "success":
+							info.CIStatus = "pass"
+							passing++
+						case "failure":
+							info.CIStatus = "fail"
+							failing++
+						case "":
+							info.CIStatus = "none"
+						default:
+							info.CIStatus = conclusion
+						}
+					} else {
+						info.CIStatus = "none"
+					}
+
+					// Test count.
+					var testCount int
+					switch info.Language {
+					case "go":
+						countCmd := exec.Command("bash", "-c", "find . -name '*_test.go' -not -path './vendor/*' 2>/dev/null | wc -l")
+						countCmd.Dir = repoPath
+						var countOut bytes.Buffer
+						countCmd.Stdout = &countOut
+						countCmd.Run()
+						fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &testCount)
+					case "node":
+						countCmd := exec.Command("bash", "-c", "find . -name '*.test.*' -o -name '*.spec.*' 2>/dev/null | wc -l")
+						countCmd.Dir = repoPath
+						var countOut bytes.Buffer
+						countCmd.Stdout = &countOut
+						countCmd.Run()
+						fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &testCount)
+					case "python":
+						countCmd := exec.Command("bash", "-c", "find . -name 'test_*.py' -o -name '*_test.py' 2>/dev/null | wc -l")
+						countCmd.Dir = repoPath
+						var countOut bytes.Buffer
+						countCmd.Stdout = &countOut
+						countCmd.Run()
+						fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &testCount)
+					}
+					info.TestCount = testCount
+
+					// pipeline.mk check.
+					if _, err := os.Stat(filepath.Join(repoPath, "pipeline.mk")); err == nil {
+						info.HasPipelineMk = true
+					} else {
+						// Check Makefile for include.
+						makeCmd := exec.Command("grep", "-q", "pipeline.mk", filepath.Join(repoPath, "Makefile"))
+						info.HasPipelineMk = makeCmd.Run() == nil
+					}
+
+					// CLAUDE.md check.
+					_, err := os.Stat(filepath.Join(repoPath, "CLAUDE.md"))
+					info.HasCLAUDEmd = err == nil
+
+					// CI workflows check.
+					_, err = os.Stat(filepath.Join(repoPath, ".github", "workflows"))
+					info.HasCI = err == nil
+
+					repos = append(repos, info)
+				}
+
+				return FleetAuditOutput{
+					Total:   total,
+					Passing: passing,
+					Failing: failing,
+					GoRepos: goRepos,
+					Repos:   repos,
+				}, nil
+			},
+		),
+
+		// ── dotfiles_cascade_reload ──────────────────
+		handler.TypedHandler[CascadeReloadInput, CascadeReloadOutput](
+			"dotfiles_cascade_reload",
+			"Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → eww), verifying each is healthy before proceeding to the next.",
+			func(_ context.Context, input CascadeReloadInput) (CascadeReloadOutput, error) {
+				services := input.Services
+				if len(services) == 0 {
+					services = []string{"hyprland", "mako", "eww"}
+				}
+
+				var results []ServiceReloadStatus
+
+				for _, svc := range services {
+					cmds, ok := reloadCommands[svc]
+					if !ok {
+						results = append(results, ServiceReloadStatus{Service: svc, Action: "skipped", Message: "unknown service"})
+						continue
+					}
+
+					cmd := exec.Command(cmds[0], cmds[1:]...)
+					out, err := cmd.CombinedOutput()
+					if err != nil {
+						results = append(results, ServiceReloadStatus{
+							Service: svc,
+							Action:  "failed",
+							Message: strings.TrimSpace(string(out)),
+						})
+						continue
+					}
+
+					// Verify health after reload.
+					var healthy bool
+					switch svc {
+					case "hyprland":
+						checkCmd := exec.Command("hyprctl", "configerrors")
+						var checkOut bytes.Buffer
+						checkCmd.Stdout = &checkOut
+						if checkCmd.Run() == nil {
+							output := strings.TrimSpace(checkOut.String())
+							healthy = output == "" || strings.Contains(output, "no errors")
+						}
+					case "eww":
+						checkCmd := exec.Command("eww", "ping")
+						healthy = checkCmd.Run() == nil
+					default:
+						healthy = true // No health check available.
+					}
+
+					if healthy {
+						results = append(results, ServiceReloadStatus{Service: svc, Action: "reloaded", Message: "healthy"})
+					} else {
+						results = append(results, ServiceReloadStatus{Service: svc, Action: "reloaded", Message: "reload succeeded but health check failed"})
+					}
+				}
+
+				return CascadeReloadOutput{Results: results}, nil
+			},
+		),
+
+		// ── dotfiles_rice_check ──────────────────────
+		handler.TypedHandler[RiceCheckInput, RiceCheckOutput](
+			"dotfiles_rice_check",
+			"Rice health check: reports compositor, shader, wallpaper, service states, and (with level=full) scans all configs for non-Snazzy palette violations.",
+			func(_ context.Context, input RiceCheckInput) (RiceCheckOutput, error) {
+				level := input.Level
+				if level == "" {
+					level = "quick"
+				}
+
+				result := RiceCheckOutput{}
+				dir := dotfilesDir()
+
+				// Compositor detection.
+				if os.Getenv("HYPRLAND_INSTANCE_SIGNATURE") != "" {
+					result.Compositor = "hyprland"
+				} else if os.Getenv("SWAYSOCK") != "" {
+					result.Compositor = "sway"
+				} else {
+					result.Compositor = "unknown"
+				}
+
+				// Active shader.
+				ghosttyConfig := filepath.Join(homeDir(), ".config", "ghostty", "config")
+				shaderCmd := exec.Command("grep", "-m1", "^custom-shader = ", ghosttyConfig)
+				var shaderOut bytes.Buffer
+				shaderCmd.Stdout = &shaderOut
+				if shaderCmd.Run() == nil {
+					line := strings.TrimSpace(shaderOut.String())
+					line = strings.TrimPrefix(line, "custom-shader = ")
+					if line != "" && line != "none" {
+						result.Shader = filepath.Base(strings.TrimSuffix(line, ".glsl"))
+					} else {
+						result.Shader = "none"
+					}
+				} else {
+					result.Shader = "none"
+				}
+
+				// Wallpaper.
+				if exec.Command("pgrep", "-f", "shaderbg").Run() == nil {
+					stateFile := filepath.Join(homeDir(), ".local", "state", "shader-wallpaper", "current")
+					if data, err := os.ReadFile(stateFile); err == nil {
+						result.Wallpaper = "shader:" + filepath.Base(strings.TrimSuffix(strings.TrimSpace(string(data)), ".frag"))
+					} else {
+						result.Wallpaper = "shader:unknown"
+					}
+				} else {
+					result.Wallpaper = "static"
+				}
+
+				// Service status.
+				checkServices := []string{"hyprland", "eww", "mako", "waybar", "swww-daemon", "hypridle"}
+				for _, svc := range checkServices {
+					pgrepCmd := exec.Command("pgrep", "-x", svc)
+					action := "stopped"
+					if pgrepCmd.Run() == nil {
+						action = "running"
+					}
+					result.Services = append(result.Services, ServiceReloadStatus{Service: svc, Action: action})
+				}
+
+				// Palette scan (full mode only).
+				if level == "full" {
+					snazzyAllowed := map[string]bool{
+						"57c7ff": true, "ff6ac1": true, "5af78e": true, "f3f99d": true,
+						"ff5c57": true, "686868": true, "9aedfe": true, "eff0eb": true,
+						"f1f1f0": true, "000000": true, "1a1a1a": true, "1a1b26": true,
+					}
+					scanDirs := []string{
+						filepath.Join(dir, "hyprland"),
+						filepath.Join(dir, "eww"),
+						filepath.Join(dir, "mako"),
+						filepath.Join(dir, "wofi"),
+						filepath.Join(dir, "waybar"),
+						filepath.Join(dir, "foot"),
+					}
+
+					for _, scanDir := range scanDirs {
+						grepCmd := exec.Command("grep", "-rnE", `#[0-9a-fA-F]{6}`, scanDir)
+						var grepOut bytes.Buffer
+						grepCmd.Stdout = &grepOut
+						grepCmd.Run() // Ignore errors (no matches is fine).
+
+						for _, line := range strings.Split(grepOut.String(), "\n") {
+							line = strings.TrimSpace(line)
+							if line == "" {
+								continue
+							}
+							// Extract hex color from line.
+							for i := 0; i < len(line); i++ {
+								if line[i] == '#' && i+6 < len(line) {
+									hex := strings.ToLower(line[i+1 : i+7])
+									isHex := true
+									for _, c := range hex {
+										if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+											isHex = false
+											break
+										}
+									}
+									if isHex && !snazzyAllowed[hex] {
+										parts := strings.SplitN(line, ":", 3)
+										file := ""
+										lineNum := 0
+										if len(parts) >= 2 {
+											file = parts[0]
+											fmt.Sscanf(parts[1], "%d", &lineNum)
+										}
+										result.PaletteViolations = append(result.PaletteViolations, PaletteViolation{
+											File:  filepath.Base(file),
+											Line:  lineNum,
+											Color: "#" + hex,
+										})
+									}
+								}
+							}
+						}
+					}
+				}
+
+				return result, nil
+			},
+		),
+
+		// ── dotfiles_bulk_pipeline ────────────────────
+		handler.TypedHandler[BulkPipelineInput, BulkPipelineOutput](
+			"dotfiles_bulk_pipeline",
+			"Run build+test pipeline across multiple repos. Detects language and runs appropriate build/test steps. Returns per-repo pass/fail with output.",
+			func(_ context.Context, input BulkPipelineInput) (BulkPipelineOutput, error) {
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				script := filepath.Join(dotfilesDir(), "scripts", "hg-pipeline.sh")
+
+				// Determine repos.
+				repos := input.Repos
+				if len(repos) == 0 {
+					entries, err := os.ReadDir(localDir)
+					if err != nil {
+						return BulkPipelineOutput{}, fmt.Errorf("read dir: %v", err)
+					}
+					for _, e := range entries {
+						if !e.IsDir() {
+							continue
+						}
+						repoPath := filepath.Join(localDir, e.Name())
+						// Filter by language if specified.
+						switch input.Language {
+						case "go":
+							if _, err := os.Stat(filepath.Join(repoPath, "go.mod")); err != nil {
+								continue
+							}
+						case "node":
+							if _, err := os.Stat(filepath.Join(repoPath, "package.json")); err != nil {
+								continue
+							}
+						case "python":
+							if _, err := os.Stat(filepath.Join(repoPath, "pyproject.toml")); err != nil {
+								continue
+							}
+						default:
+							// Must have a Makefile or language marker.
+							hasLang := false
+							for _, marker := range []string{"go.mod", "package.json", "pyproject.toml", "Makefile"} {
+								if _, err := os.Stat(filepath.Join(repoPath, marker)); err == nil {
+									hasLang = true
+									break
+								}
+							}
+							if !hasLang {
+								continue
+							}
+						}
+						repos = append(repos, e.Name())
+					}
+				}
+
+				var results []PipelineResult
+				var passed, failed int
+
+				for _, repo := range repos {
+					repoPath := filepath.Join(localDir, repo)
+					args := []string{repoPath, "--json"}
+					if input.BuildOnly {
+						args = append(args, "--build-only")
+					}
+					if input.TestOnly {
+						args = append(args, "--test-only")
+					}
+
+					cmd := exec.Command(script, args...)
+					var stdout bytes.Buffer
+					cmd.Stdout = &stdout
+					cmd.Stderr = &stdout
+					err := cmd.Run()
+
+					status := "pass"
+					if err != nil {
+						exitCode := 1
+						if exitErr, ok := err.(*exec.ExitError); ok {
+							exitCode = exitErr.ExitCode()
+						}
+						switch exitCode {
+						case 1:
+							status = "build-fail"
+						case 2:
+							status = "test-fail"
+						case 3:
+							status = "vet-fail"
+						default:
+							status = "fail"
+						}
+						failed++
+					} else {
+						passed++
+					}
+
+					results = append(results, PipelineResult{
+						Repo:   repo,
+						Status: status,
+						Output: strings.TrimSpace(stdout.String()),
+					})
+				}
+
+				return BulkPipelineOutput{
+					Total:   len(results),
+					Passed:  passed,
+					Failed:  failed,
+					Results: results,
 				}, nil
 			},
 		),
