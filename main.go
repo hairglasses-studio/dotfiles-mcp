@@ -880,6 +880,172 @@ func parseStringArray(v any) ([]string, error) {
 }
 
 // ---------------------------------------------------------------------------
+// Tool 11: dotfiles_onboard_repo
+// ---------------------------------------------------------------------------
+
+func onboardRepo(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	repoPath, _ := args["repo_path"].(string)
+	lang, _ := args["language"].(string)
+	dryRun, _ := args["dry_run"].(bool)
+
+	if repoPath == "" {
+		return errResult("repo_path is required")
+	}
+
+	scriptArgs := []string{repoPath}
+	if lang != "" {
+		scriptArgs = append(scriptArgs, "--language="+lang)
+	}
+	if dryRun {
+		scriptArgs = append(scriptArgs, "--dry-run")
+	}
+
+	script := filepath.Join(dotfilesDir(), "scripts", "hg-onboard-repo.sh")
+	cmd := exec.Command(script, scriptArgs...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	return jsonResult(map[string]any{
+		"repo":   filepath.Base(repoPath),
+		"status": map[bool]string{true: "fail", false: "ok"}[err != nil],
+		"output": stdout.String(),
+		"error":  stderr.String(),
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Tool 12: dotfiles_pipeline_run
+// ---------------------------------------------------------------------------
+
+func pipelineRun(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	repoPath, _ := args["repo_path"].(string)
+	buildOnly, _ := args["build_only"].(bool)
+	testOnly, _ := args["test_only"].(bool)
+
+	if repoPath == "" {
+		return errResult("repo_path is required")
+	}
+
+	scriptArgs := []string{repoPath, "--json"}
+	if buildOnly {
+		scriptArgs = append(scriptArgs, "--build-only")
+	}
+	if testOnly {
+		scriptArgs = append(scriptArgs, "--test-only")
+	}
+
+	script := filepath.Join(dotfilesDir(), "scripts", "hg-pipeline.sh")
+	cmd := exec.Command(script, scriptArgs...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmd.Run()
+
+	// Try to parse JSON from last line of stdout
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	lastLine := ""
+	if len(lines) > 0 {
+		lastLine = lines[len(lines)-1]
+	}
+
+	var result any
+	if json.Unmarshal([]byte(lastLine), &result) == nil {
+		return jsonResult(result)
+	}
+	return jsonResult(map[string]string{
+		"repo":   filepath.Base(repoPath),
+		"output": stdout.String(),
+		"error":  stderr.String(),
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Tool 13: dotfiles_health_check
+// ---------------------------------------------------------------------------
+
+func healthCheck(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	script := filepath.Join(dotfilesDir(), "scripts", "hg-health.sh")
+	cmd := exec.Command(script)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stdout
+	cmd.Run()
+	return mcp.NewToolResultText(stdout.String()), nil
+}
+
+// ---------------------------------------------------------------------------
+// Tool 14: dotfiles_dep_audit
+// ---------------------------------------------------------------------------
+
+func depAudit(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	script := filepath.Join(dotfilesDir(), "scripts", "hg-dep-audit.sh")
+	cmd := exec.Command(script)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stdout
+	cmd.Run()
+	return mcp.NewToolResultText(stdout.String()), nil
+}
+
+// ---------------------------------------------------------------------------
+// Tool 15: dotfiles_workflow_sync
+// ---------------------------------------------------------------------------
+
+func workflowSync(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	dryRun, _ := args["dry_run"].(bool)
+	push, _ := args["push"].(bool)
+
+	scriptArgs := []string{}
+	if dryRun {
+		scriptArgs = append(scriptArgs, "--dry-run")
+	}
+	if push {
+		scriptArgs = append(scriptArgs, "--push")
+	} else {
+		scriptArgs = append(scriptArgs, "--commit")
+	}
+
+	script := filepath.Join(dotfilesDir(), "scripts", "hg-workflow-sync.sh")
+	cmd := exec.Command(script, scriptArgs...)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stdout
+	cmd.Run()
+	return mcp.NewToolResultText(stdout.String()), nil
+}
+
+// ---------------------------------------------------------------------------
+// Tool 16: dotfiles_go_sync
+// ---------------------------------------------------------------------------
+
+func goSync(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	dryRun, _ := args["dry_run"].(bool)
+	tidy, _ := args["tidy"].(bool)
+
+	scriptArgs := []string{}
+	if dryRun {
+		scriptArgs = append(scriptArgs, "--dry-run")
+	}
+	if tidy {
+		scriptArgs = append(scriptArgs, "--tidy")
+	}
+
+	script := filepath.Join(dotfilesDir(), "scripts", "hg-go-sync.sh")
+	cmd := exec.Command(script, scriptArgs...)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stdout
+	cmd.Run()
+	return mcp.NewToolResultText(stdout.String()), nil
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -1022,6 +1188,87 @@ func main() {
 			),
 		),
 		ewwGet,
+	)
+
+	// Tool 11: dotfiles_onboard_repo
+	s.AddTool(
+		mcp.NewTool("dotfiles_onboard_repo",
+			mcp.WithDescription("Onboard a repo with hairglasses-studio standard files (.editorconfig, CI workflows, LICENSE, CONTRIBUTING.md, pre-commit hooks). Detects language and adds appropriate config."),
+			mcp.WithString("repo_path",
+				mcp.Required(),
+				mcp.Description("Absolute path to the repo directory"),
+			),
+			mcp.WithString("language",
+				mcp.Description("Language override (auto-detected if omitted)"),
+				mcp.Enum("auto", "go", "node", "python", "shell"),
+			),
+			mcp.WithBoolean("dry_run",
+				mcp.Description("Preview what would be added without making changes"),
+			),
+		),
+		onboardRepo,
+	)
+
+	// Tool 12: dotfiles_pipeline_run
+	s.AddTool(
+		mcp.NewTool("dotfiles_pipeline_run",
+			mcp.WithDescription("Run the build+test pipeline (hg-pipeline.sh) on a repo. Supports Go, Node.js, and Python. Returns JSON results with per-step timing."),
+			mcp.WithString("repo_path",
+				mcp.Required(),
+				mcp.Description("Absolute path to the repo directory"),
+			),
+			mcp.WithBoolean("build_only",
+				mcp.Description("Only run the build step"),
+			),
+			mcp.WithBoolean("test_only",
+				mcp.Description("Only run the test step"),
+			),
+		),
+		pipelineRun,
+	)
+
+	// Tool 13: dotfiles_health_check
+	s.AddTool(
+		mcp.NewTool("dotfiles_health_check",
+			mcp.WithDescription("Run org-wide health dashboard across all hairglasses-studio repos. Shows build status, Go version, pipeline.mk inclusion, and CI workflow presence for every repo."),
+		),
+		healthCheck,
+	)
+
+	// Tool 14: dotfiles_dep_audit
+	s.AddTool(
+		mcp.NewTool("dotfiles_dep_audit",
+			mcp.WithDescription("Audit Go dependency version skew across all hairglasses-studio repos. Reports which deps are unified vs which have version drift."),
+		),
+		depAudit,
+	)
+
+	// Tool 15: dotfiles_workflow_sync
+	s.AddTool(
+		mcp.NewTool("dotfiles_workflow_sync",
+			mcp.WithDescription("Sync CI workflow files across all repos from canonical sources. Detects stale workflows and optionally updates, commits, and pushes."),
+			mcp.WithBoolean("dry_run",
+				mcp.Description("Preview changes without modifying files"),
+			),
+			mcp.WithBoolean("push",
+				mcp.Description("Commit and push changes to each repo"),
+			),
+		),
+		workflowSync,
+	)
+
+	// Tool 16: dotfiles_go_sync
+	s.AddTool(
+		mcp.NewTool("dotfiles_go_sync",
+			mcp.WithDescription("Sync Go version across all repos to match dotfiles/make/go-version. Updates go.mod and optionally runs go mod tidy."),
+			mcp.WithBoolean("dry_run",
+				mcp.Description("Preview which repos would be updated"),
+			),
+			mcp.WithBoolean("tidy",
+				mcp.Description("Run go mod tidy after updating go.mod"),
+			),
+		),
+		goSync,
 	)
 
 	if err := server.ServeStdio(s); err != nil {
