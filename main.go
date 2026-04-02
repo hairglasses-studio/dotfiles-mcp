@@ -264,7 +264,159 @@ type GHRecreateForkOutput struct {
 	Results []TransferResult `json:"results"`
 }
 
-// Tool 8: dotfiles_eww_restart
+// Tool 8: dotfiles_gh_onboard_repos
+
+type GHOnboardReposInput struct {
+	Repos     []string `json:"repos" jsonschema:"required,description=Source repos in owner/name format (e.g. user/repo)"`
+	TargetOrg string   `json:"target_org" jsonschema:"required,description=GitHub org to onboard into (e.g. hairglasses-studio)"`
+	Execute   bool     `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+	LocalDir  string   `json:"local_dir,omitempty" jsonschema:"description=Local clone directory (default: ~/hairglasses-studio)"`
+}
+
+type GHOnboardResult struct {
+	Repo    string `json:"repo"`
+	Action  string `json:"action"`
+	Message string `json:"message,omitempty"`
+}
+
+type GHOnboardReposOutput struct {
+	Results []GHOnboardResult `json:"results"`
+}
+
+// Tool 9: dotfiles_gh_list_org_repos
+
+type GHListOrgReposInput struct {
+	Org      string `json:"org" jsonschema:"required,description=GitHub organization name"`
+	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory to check clone status (default: ~/hairglasses-studio)"`
+}
+
+type OrgRepoInfo struct {
+	Name        string `json:"name"`
+	Private     bool   `json:"private"`
+	Fork        bool   `json:"fork"`
+	Archived    bool   `json:"archived"`
+	Language    string `json:"language,omitempty"`
+	Description string `json:"description,omitempty"`
+	LocalStatus string `json:"local_status"` // cloned, missing, wrong-remote
+}
+
+type GHListOrgReposOutput struct {
+	Total   int           `json:"total"`
+	Cloned  int           `json:"cloned"`
+	Missing int           `json:"missing"`
+	Repos   []OrgRepoInfo `json:"repos"`
+}
+
+// Tool 10: dotfiles_gh_local_sync_audit
+
+type GHLocalSyncAuditInput struct {
+	Org      string `json:"org" jsonschema:"required,description=GitHub organization name"`
+	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory to audit (default: ~/hairglasses-studio)"`
+}
+
+type SyncAuditEntry struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"` // orphaned, missing, mismatched, synced
+	Details string `json:"details,omitempty"`
+}
+
+type GHLocalSyncAuditOutput struct {
+	Synced     int              `json:"synced"`
+	Orphaned   int              `json:"orphaned"`
+	Missing    int              `json:"missing"`
+	Mismatched int              `json:"mismatched"`
+	Entries    []SyncAuditEntry `json:"entries"`
+}
+
+// Tool 11: dotfiles_gh_bulk_archive
+
+type GHBulkArchiveInput struct {
+	Org     string   `json:"org" jsonschema:"required,description=GitHub organization name"`
+	Repos   []string `json:"repos" jsonschema:"required,description=Array of repo names to archive"`
+	Execute bool     `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+}
+
+type GHBulkArchiveOutput struct {
+	Results []TransferResult `json:"results"`
+}
+
+// Tool 12: dotfiles_gh_bulk_settings
+
+type GHBulkSettingsInput struct {
+	Org                 string   `json:"org" jsonschema:"required,description=GitHub organization name"`
+	Repos               []string `json:"repos,omitempty" jsonschema:"description=Specific repos (default: all non-archived in org)"`
+	DeleteBranchOnMerge *bool    `json:"delete_branch_on_merge,omitempty" jsonschema:"description=Auto-delete head branches after merge"`
+	HasWiki             *bool    `json:"has_wiki,omitempty" jsonschema:"description=Enable/disable wiki"`
+	HasProjects         *bool    `json:"has_projects,omitempty" jsonschema:"description=Enable/disable projects"`
+	AllowSquashMerge    *bool    `json:"allow_squash_merge,omitempty" jsonschema:"description=Allow squash merging"`
+	AllowMergeCommit    *bool    `json:"allow_merge_commit,omitempty" jsonschema:"description=Allow merge commits"`
+	AllowRebaseMerge    *bool    `json:"allow_rebase_merge,omitempty" jsonschema:"description=Allow rebase merging"`
+	Execute             bool     `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+}
+
+type SettingsResult struct {
+	Repo     string   `json:"repo"`
+	Action   string   `json:"action"`
+	Applied  []string `json:"applied,omitempty"`
+	Message  string   `json:"message,omitempty"`
+}
+
+type GHBulkSettingsOutput struct {
+	Results []SettingsResult `json:"results"`
+}
+
+// Tool 13: dotfiles_gh_bulk_clone
+
+type GHBulkCloneInput struct {
+	Org      string `json:"org" jsonschema:"required,description=GitHub organization name"`
+	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory to clone into (default: ~/hairglasses-studio)"`
+	Execute  bool   `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+}
+
+type CloneResult struct {
+	Repo    string `json:"repo"`
+	Action  string `json:"action"`
+	Message string `json:"message,omitempty"`
+}
+
+type GHBulkCloneOutput struct {
+	Results []CloneResult `json:"results"`
+}
+
+// Tool 14: dotfiles_gh_pull_all
+
+type GHPullAllInput struct {
+	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory containing repos (default: ~/hairglasses-studio)"`
+	FetchOnly bool  `json:"fetch_only,omitempty" jsonschema:"description=Only fetch without merging (default: pull with ff-only)"`
+}
+
+type PullResult struct {
+	Repo    string `json:"repo"`
+	Action  string `json:"action"`
+	Message string `json:"message,omitempty"`
+}
+
+type GHPullAllOutput struct {
+	Total   int          `json:"total"`
+	Updated int          `json:"updated"`
+	Current int          `json:"current"`
+	Failed  int          `json:"failed"`
+	Results []PullResult `json:"results"`
+}
+
+// Tool 15: dotfiles_gh_clean_stale
+
+type GHCleanStaleInput struct {
+	Org      string `json:"org" jsonschema:"required,description=GitHub organization name"`
+	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory to clean (default: ~/hairglasses-studio)"`
+	Execute  bool   `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+}
+
+type GHCleanStaleOutput struct {
+	Results []TransferResult `json:"results"`
+}
+
+// Tool 16: dotfiles_eww_restart
 
 type EwwRestartInput struct{}
 
@@ -1119,6 +1271,663 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				cmd.Stderr = &stdout
 				cmd.Run()
 				return GoSyncOutput{Output: stdout.String()}, nil
+			},
+		),
+
+		// ── dotfiles_gh_onboard_repos ─────────────────
+		handler.TypedHandler[GHOnboardReposInput, GHOnboardReposOutput](
+			"dotfiles_gh_onboard_repos",
+			"Onboard public repos into a GitHub org for architecture reference. For each repo: forks to org (if not already there), clones locally, strips git history to a single squashed commit on the default branch, and force-pushes. Designed for batch operations on 8-15+ repos. Set execute=true to run (dry-run by default).",
+			func(_ context.Context, input GHOnboardReposInput) (GHOnboardReposOutput, error) {
+				if input.TargetOrg == "" {
+					return GHOnboardReposOutput{}, fmt.Errorf("[%s] target_org is required", handler.ErrInvalidParam)
+				}
+				if len(input.Repos) == 0 {
+					return GHOnboardReposOutput{}, fmt.Errorf("[%s] repos is required (array of owner/name strings)", handler.ErrInvalidParam)
+				}
+
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				dryRun := !input.Execute
+				var results []GHOnboardResult
+
+				for _, sourceRepo := range input.Repos {
+					parts := strings.SplitN(sourceRepo, "/", 2)
+					if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "invalid format — use owner/name"})
+						continue
+					}
+					repoName := parts[1]
+
+					// Check if already exists in target org.
+					checkCmd := exec.Command("gh", "api", fmt.Sprintf("repos/%s/%s", input.TargetOrg, repoName), "--jq", ".full_name")
+					alreadyExists := checkCmd.Run() == nil
+
+					// Fetch source metadata.
+					metaCmd := exec.Command("gh", "api", fmt.Sprintf("repos/%s/%s", parts[0], repoName),
+						"--jq", "{default_branch: .default_branch, private: .private, description: .description}")
+					var metaOut bytes.Buffer
+					metaCmd.Stdout = &metaOut
+					if err := metaCmd.Run(); err != nil {
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "source repo not found"})
+						continue
+					}
+
+					var meta struct {
+						DefaultBranch string `json:"default_branch"`
+						Private       bool   `json:"private"`
+						Description   string `json:"description"`
+					}
+					if err := json.Unmarshal(metaOut.Bytes(), &meta); err != nil {
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "bad metadata: " + err.Error()})
+						continue
+					}
+
+					if dryRun {
+						action := "would fork, squash, clone"
+						if alreadyExists {
+							action = "would re-squash existing"
+						}
+						results = append(results, GHOnboardResult{
+							Repo:    sourceRepo,
+							Action:  "dry-run",
+							Message: fmt.Sprintf("%s → %s/%s (branch: %s)", action, input.TargetOrg, repoName, meta.DefaultBranch),
+						})
+						continue
+					}
+
+					// Step 1: Fork to org if not already there.
+					if !alreadyExists {
+						forkCmd := exec.Command("gh", "repo", "fork", sourceRepo, "--org", input.TargetOrg, "--clone=false")
+						if out, err := forkCmd.CombinedOutput(); err != nil {
+							// gh repo fork fails if already forked — try creating fresh.
+							results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "fork failed: " + strings.TrimSpace(string(out))})
+							continue
+						}
+					}
+
+					// Step 2: Clone to temp dir.
+					tmpDir, err := os.MkdirTemp("", "onboard-"+repoName+"-")
+					if err != nil {
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "mkdtemp: " + err.Error()})
+						continue
+					}
+
+					cloneURL := fmt.Sprintf("https://github.com/%s/%s.git", input.TargetOrg, repoName)
+					cloneCmd := exec.Command("git", "clone", "--quiet", cloneURL, tmpDir)
+					if out, err := cloneCmd.CombinedOutput(); err != nil {
+						os.RemoveAll(tmpDir)
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "clone failed: " + strings.TrimSpace(string(out))})
+						continue
+					}
+
+					runGit := func(args ...string) (string, error) {
+						c := exec.Command("git", args...)
+						c.Dir = tmpDir
+						out, err := c.CombinedOutput()
+						return strings.TrimSpace(string(out)), err
+					}
+
+					// Step 3: Squash to single commit.
+					runGit("checkout", meta.DefaultBranch)
+					if _, err := runGit("checkout", "--orphan", "squashed"); err != nil {
+						os.RemoveAll(tmpDir)
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "orphan checkout failed"})
+						continue
+					}
+					runGit("add", "-A")
+					commitMsg := fmt.Sprintf("Initial commit (onboarded from %s)", sourceRepo)
+					if _, err := runGit("commit", "-m", commitMsg); err != nil {
+						os.RemoveAll(tmpDir)
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "squash commit failed (empty repo?)"})
+						continue
+					}
+					runGit("branch", "-M", meta.DefaultBranch)
+
+					// Step 4: Force push squashed history.
+					if _, err := runGit("push", "--force", "origin", meta.DefaultBranch); err != nil {
+						os.RemoveAll(tmpDir)
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "failed", Message: "force push failed"})
+						continue
+					}
+
+					// Delete non-default remote branches.
+					branchOut, _ := runGit("branch", "-r")
+					for _, line := range strings.Split(branchOut, "\n") {
+						branch := strings.TrimSpace(line)
+						branch = strings.TrimPrefix(branch, "origin/")
+						if branch == "" || branch == meta.DefaultBranch || strings.HasPrefix(branch, "HEAD") {
+							continue
+						}
+						runGit("push", "origin", "--delete", branch)
+					}
+
+					os.RemoveAll(tmpDir)
+
+					// Step 5: Clone locally.
+					localPath := filepath.Join(localDir, repoName)
+					os.RemoveAll(localPath) // Remove stale local clone if exists.
+					localClone := exec.Command("gh", "repo", "clone", fmt.Sprintf("%s/%s", input.TargetOrg, repoName), localPath)
+					if out, err := localClone.CombinedOutput(); err != nil {
+						results = append(results, GHOnboardResult{Repo: sourceRepo, Action: "partial", Message: "squashed and pushed but local clone failed: " + strings.TrimSpace(string(out))})
+						continue
+					}
+
+					results = append(results, GHOnboardResult{
+						Repo:    sourceRepo,
+						Action:  "onboarded",
+						Message: fmt.Sprintf("forked → %s/%s, squashed to 1 commit, cloned to %s", input.TargetOrg, repoName, localPath),
+					})
+				}
+
+				return GHOnboardReposOutput{Results: results}, nil
+			},
+		),
+
+		// ── dotfiles_gh_list_org_repos ────────────────
+		handler.TypedHandler[GHListOrgReposInput, GHListOrgReposOutput](
+			"dotfiles_gh_list_org_repos",
+			"List all repos in a GitHub org with local clone sync status. Shows whether each repo is cloned locally, missing, or has a wrong remote.",
+			func(_ context.Context, input GHListOrgReposInput) (GHListOrgReposOutput, error) {
+				if input.Org == "" {
+					return GHListOrgReposOutput{}, fmt.Errorf("[%s] org is required", handler.ErrInvalidParam)
+				}
+
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				cmd := exec.Command("gh", "api", "--paginate",
+					fmt.Sprintf("/orgs/%s/repos?per_page=100&sort=updated", input.Org),
+					"--jq", ".[] | {name, private, fork, archived, language, description}")
+				var stdout, stderr bytes.Buffer
+				cmd.Stdout = &stdout
+				cmd.Stderr = &stderr
+
+				if err := cmd.Run(); err != nil {
+					return GHListOrgReposOutput{}, fmt.Errorf("gh api failed: %v: %s", err, strings.TrimSpace(stderr.String()))
+				}
+
+				var repos []OrgRepoInfo
+				var cloned, missing int
+				dec := json.NewDecoder(strings.NewReader(stdout.String()))
+				for dec.More() {
+					var r OrgRepoInfo
+					if err := dec.Decode(&r); err != nil {
+						continue
+					}
+
+					localPath := filepath.Join(localDir, r.Name)
+					if info, err := os.Stat(localPath); err != nil || !info.IsDir() {
+						r.LocalStatus = "missing"
+						missing++
+					} else {
+						remoteCmd := exec.Command("git", "remote", "get-url", "origin")
+						remoteCmd.Dir = localPath
+						var remoteOut bytes.Buffer
+						remoteCmd.Stdout = &remoteOut
+						if err := remoteCmd.Run(); err != nil {
+							r.LocalStatus = "missing"
+							missing++
+						} else {
+							remoteURL := strings.TrimSpace(remoteOut.String())
+							expected1 := fmt.Sprintf("git@github.com:%s/%s.git", input.Org, r.Name)
+							expected2 := fmt.Sprintf("https://github.com/%s/%s.git", input.Org, r.Name)
+							expected3 := fmt.Sprintf("https://github.com/%s/%s", input.Org, r.Name)
+							if remoteURL == expected1 || remoteURL == expected2 || remoteURL == expected3 {
+								r.LocalStatus = "cloned"
+								cloned++
+							} else {
+								r.LocalStatus = "wrong-remote"
+							}
+						}
+					}
+
+					repos = append(repos, r)
+				}
+
+				return GHListOrgReposOutput{
+					Total:   len(repos),
+					Cloned:  cloned,
+					Missing: missing,
+					Repos:   repos,
+				}, nil
+			},
+		),
+
+		// ── dotfiles_gh_local_sync_audit ──────────────
+		handler.TypedHandler[GHLocalSyncAuditInput, GHLocalSyncAuditOutput](
+			"dotfiles_gh_local_sync_audit",
+			"Audit local directory against GitHub org repos. Finds orphaned local dirs (no org repo), missing clones (org repo not cloned), and remote mismatches.",
+			func(_ context.Context, input GHLocalSyncAuditInput) (GHLocalSyncAuditOutput, error) {
+				if input.Org == "" {
+					return GHLocalSyncAuditOutput{}, fmt.Errorf("[%s] org is required", handler.ErrInvalidParam)
+				}
+
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				// Get org repos.
+				cmd := exec.Command("gh", "api", "--paginate",
+					fmt.Sprintf("/orgs/%s/repos?per_page=100", input.Org),
+					"--jq", ".[] | .name")
+				var stdout bytes.Buffer
+				cmd.Stdout = &stdout
+				if err := cmd.Run(); err != nil {
+					return GHLocalSyncAuditOutput{}, fmt.Errorf("gh api failed: %v", err)
+				}
+
+				orgRepos := make(map[string]bool)
+				for _, name := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+					name = strings.TrimSpace(name)
+					if name != "" {
+						orgRepos[name] = true
+					}
+				}
+
+				// Get local dirs.
+				localEntries, err := os.ReadDir(localDir)
+				if err != nil {
+					return GHLocalSyncAuditOutput{}, fmt.Errorf("read local dir: %v", err)
+				}
+
+				localDirs := make(map[string]bool)
+				for _, e := range localEntries {
+					if e.IsDir() {
+						localDirs[e.Name()] = true
+					}
+				}
+
+				var entries []SyncAuditEntry
+				var synced, orphaned, missingCount, mismatched int
+
+				// Check each local dir.
+				for name := range localDirs {
+					localPath := filepath.Join(localDir, name)
+					gitDir := filepath.Join(localPath, ".git")
+					if _, err := os.Stat(gitDir); err != nil {
+						continue // Not a git repo, skip.
+					}
+
+					if !orgRepos[name] {
+						entries = append(entries, SyncAuditEntry{Name: name, Status: "orphaned", Details: "local dir has no matching org repo"})
+						orphaned++
+						continue
+					}
+
+					remoteCmd := exec.Command("git", "remote", "get-url", "origin")
+					remoteCmd.Dir = localPath
+					var remoteOut bytes.Buffer
+					remoteCmd.Stdout = &remoteOut
+					if err := remoteCmd.Run(); err != nil {
+						entries = append(entries, SyncAuditEntry{Name: name, Status: "mismatched", Details: "no origin remote"})
+						mismatched++
+						continue
+					}
+
+					remoteURL := strings.TrimSpace(remoteOut.String())
+					if !strings.Contains(remoteURL, input.Org+"/"+name) {
+						entries = append(entries, SyncAuditEntry{Name: name, Status: "mismatched", Details: "origin=" + remoteURL})
+						mismatched++
+					} else {
+						synced++
+					}
+				}
+
+				// Check for missing clones.
+				for name := range orgRepos {
+					if !localDirs[name] {
+						entries = append(entries, SyncAuditEntry{Name: name, Status: "missing", Details: "org repo not cloned locally"})
+						missingCount++
+					}
+				}
+
+				return GHLocalSyncAuditOutput{
+					Synced:     synced,
+					Orphaned:   orphaned,
+					Missing:    missingCount,
+					Mismatched: mismatched,
+					Entries:    entries,
+				}, nil
+			},
+		),
+
+		// ── dotfiles_gh_bulk_archive ──────────────────
+		handler.TypedHandler[GHBulkArchiveInput, GHBulkArchiveOutput](
+			"dotfiles_gh_bulk_archive",
+			"Archive multiple repos in a GitHub org. Useful for housekeeping old reference repos. Set execute=true to run (dry-run by default).",
+			func(_ context.Context, input GHBulkArchiveInput) (GHBulkArchiveOutput, error) {
+				if input.Org == "" {
+					return GHBulkArchiveOutput{}, fmt.Errorf("[%s] org is required", handler.ErrInvalidParam)
+				}
+				if len(input.Repos) == 0 {
+					return GHBulkArchiveOutput{}, fmt.Errorf("[%s] repos is required", handler.ErrInvalidParam)
+				}
+
+				dryRun := !input.Execute
+				var results []TransferResult
+
+				for _, repo := range input.Repos {
+					// Check if already archived.
+					checkCmd := exec.Command("gh", "api", fmt.Sprintf("repos/%s/%s", input.Org, repo), "--jq", ".archived")
+					var checkOut bytes.Buffer
+					checkCmd.Stdout = &checkOut
+					if err := checkCmd.Run(); err != nil {
+						results = append(results, TransferResult{Repo: repo, Action: "failed", Message: "repo not found"})
+						continue
+					}
+					if strings.TrimSpace(checkOut.String()) == "true" {
+						results = append(results, TransferResult{Repo: repo, Action: "skipped", Message: "already archived"})
+						continue
+					}
+
+					if dryRun {
+						results = append(results, TransferResult{Repo: repo, Action: "dry-run", Message: "would archive " + input.Org + "/" + repo})
+						continue
+					}
+
+					archiveCmd := exec.Command("gh", "api", "--method", "PATCH",
+						fmt.Sprintf("repos/%s/%s", input.Org, repo),
+						"-f", "archived=true", "--silent")
+					if err := archiveCmd.Run(); err != nil {
+						results = append(results, TransferResult{Repo: repo, Action: "failed", Message: "archive failed"})
+					} else {
+						results = append(results, TransferResult{Repo: repo, Action: "archived", Message: "archived " + input.Org + "/" + repo})
+					}
+				}
+
+				return GHBulkArchiveOutput{Results: results}, nil
+			},
+		),
+
+		// ── dotfiles_gh_bulk_settings ─────────────────
+		handler.TypedHandler[GHBulkSettingsInput, GHBulkSettingsOutput](
+			"dotfiles_gh_bulk_settings",
+			"Batch-apply repo settings across multiple org repos. Supports auto-delete head branches, wiki, projects, and merge strategy toggles. Set execute=true to run (dry-run by default).",
+			func(_ context.Context, input GHBulkSettingsInput) (GHBulkSettingsOutput, error) {
+				if input.Org == "" {
+					return GHBulkSettingsOutput{}, fmt.Errorf("[%s] org is required", handler.ErrInvalidParam)
+				}
+
+				// Build the settings payload.
+				settings := make(map[string]bool)
+				var settingNames []string
+				if input.DeleteBranchOnMerge != nil {
+					settings["delete_branch_on_merge"] = *input.DeleteBranchOnMerge
+					settingNames = append(settingNames, "delete_branch_on_merge")
+				}
+				if input.HasWiki != nil {
+					settings["has_wiki"] = *input.HasWiki
+					settingNames = append(settingNames, "has_wiki")
+				}
+				if input.HasProjects != nil {
+					settings["has_projects"] = *input.HasProjects
+					settingNames = append(settingNames, "has_projects")
+				}
+				if input.AllowSquashMerge != nil {
+					settings["allow_squash_merge"] = *input.AllowSquashMerge
+					settingNames = append(settingNames, "allow_squash_merge")
+				}
+				if input.AllowMergeCommit != nil {
+					settings["allow_merge_commit"] = *input.AllowMergeCommit
+					settingNames = append(settingNames, "allow_merge_commit")
+				}
+				if input.AllowRebaseMerge != nil {
+					settings["allow_rebase_merge"] = *input.AllowRebaseMerge
+					settingNames = append(settingNames, "allow_rebase_merge")
+				}
+
+				if len(settings) == 0 {
+					return GHBulkSettingsOutput{}, fmt.Errorf("[%s] at least one setting must be specified", handler.ErrInvalidParam)
+				}
+
+				// Determine target repos.
+				repos := input.Repos
+				if len(repos) == 0 {
+					cmd := exec.Command("gh", "api", "--paginate",
+						fmt.Sprintf("/orgs/%s/repos?per_page=100", input.Org),
+						"--jq", ".[] | select(.archived == false) | .name")
+					var stdout bytes.Buffer
+					cmd.Stdout = &stdout
+					if err := cmd.Run(); err != nil {
+						return GHBulkSettingsOutput{}, fmt.Errorf("failed to list org repos: %v", err)
+					}
+					for _, name := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+						name = strings.TrimSpace(name)
+						if name != "" {
+							repos = append(repos, name)
+						}
+					}
+				}
+
+				dryRun := !input.Execute
+				var results []SettingsResult
+
+				for _, repo := range repos {
+					if dryRun {
+						results = append(results, SettingsResult{
+							Repo:    repo,
+							Action:  "dry-run",
+							Applied: settingNames,
+							Message: fmt.Sprintf("would apply %d settings to %s/%s", len(settings), input.Org, repo),
+						})
+						continue
+					}
+
+					// Build gh api args.
+					args := []string{"api", "--method", "PATCH", fmt.Sprintf("repos/%s/%s", input.Org, repo)}
+					for k, v := range settings {
+						val := "false"
+						if v {
+							val = "true"
+						}
+						args = append(args, "-F", k+"="+val)
+					}
+					args = append(args, "--silent")
+
+					patchCmd := exec.Command("gh", args...)
+					if err := patchCmd.Run(); err != nil {
+						results = append(results, SettingsResult{Repo: repo, Action: "failed", Message: "patch failed"})
+					} else {
+						results = append(results, SettingsResult{Repo: repo, Action: "applied", Applied: settingNames})
+					}
+				}
+
+				return GHBulkSettingsOutput{Results: results}, nil
+			},
+		),
+
+		// ── dotfiles_gh_bulk_clone ────────────────────
+		handler.TypedHandler[GHBulkCloneInput, GHBulkCloneOutput](
+			"dotfiles_gh_bulk_clone",
+			"Clone all missing org repos to the local directory. Skips repos already cloned. Pairs with dotfiles_gh_local_sync_audit to act on missing repos. Set execute=true to run (dry-run by default).",
+			func(_ context.Context, input GHBulkCloneInput) (GHBulkCloneOutput, error) {
+				if input.Org == "" {
+					return GHBulkCloneOutput{}, fmt.Errorf("[%s] org is required", handler.ErrInvalidParam)
+				}
+
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				// List org repos.
+				cmd := exec.Command("gh", "api", "--paginate",
+					fmt.Sprintf("/orgs/%s/repos?per_page=100", input.Org),
+					"--jq", ".[] | select(.archived == false) | .name")
+				var stdout bytes.Buffer
+				cmd.Stdout = &stdout
+				if err := cmd.Run(); err != nil {
+					return GHBulkCloneOutput{}, fmt.Errorf("gh api failed: %v", err)
+				}
+
+				dryRun := !input.Execute
+				var results []CloneResult
+
+				for _, name := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+					name = strings.TrimSpace(name)
+					if name == "" {
+						continue
+					}
+
+					localPath := filepath.Join(localDir, name)
+					if info, err := os.Stat(localPath); err == nil && info.IsDir() {
+						results = append(results, CloneResult{Repo: name, Action: "skipped", Message: "already exists"})
+						continue
+					}
+
+					if dryRun {
+						results = append(results, CloneResult{Repo: name, Action: "dry-run", Message: "would clone to " + localPath})
+						continue
+					}
+
+					cloneCmd := exec.Command("gh", "repo", "clone", fmt.Sprintf("%s/%s", input.Org, name), localPath)
+					if out, err := cloneCmd.CombinedOutput(); err != nil {
+						results = append(results, CloneResult{Repo: name, Action: "failed", Message: strings.TrimSpace(string(out))})
+					} else {
+						results = append(results, CloneResult{Repo: name, Action: "cloned", Message: localPath})
+					}
+				}
+
+				return GHBulkCloneOutput{Results: results}, nil
+			},
+		),
+
+		// ── dotfiles_gh_pull_all ──────────────────────
+		handler.TypedHandler[GHPullAllInput, GHPullAllOutput](
+			"dotfiles_gh_pull_all",
+			"Fetch or pull updates for all git repos in the local directory. Uses --ff-only by default to avoid merge conflicts. Set fetch_only=true to just fetch without merging.",
+			func(_ context.Context, input GHPullAllInput) (GHPullAllOutput, error) {
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				entries, err := os.ReadDir(localDir)
+				if err != nil {
+					return GHPullAllOutput{}, fmt.Errorf("read dir: %v", err)
+				}
+
+				var results []PullResult
+				var total, updated, current, failed int
+
+				for _, e := range entries {
+					if !e.IsDir() {
+						continue
+					}
+
+					repoPath := filepath.Join(localDir, e.Name())
+					gitDir := filepath.Join(repoPath, ".git")
+					if _, err := os.Stat(gitDir); err != nil {
+						continue // Not a git repo.
+					}
+					total++
+
+					var gitCmd *exec.Cmd
+					if input.FetchOnly {
+						gitCmd = exec.Command("git", "fetch", "--prune")
+					} else {
+						gitCmd = exec.Command("git", "pull", "--ff-only")
+					}
+					gitCmd.Dir = repoPath
+					out, err := gitCmd.CombinedOutput()
+					outStr := strings.TrimSpace(string(out))
+
+					if err != nil {
+						results = append(results, PullResult{Repo: e.Name(), Action: "failed", Message: outStr})
+						failed++
+					} else if strings.Contains(outStr, "Already up to date") || strings.Contains(outStr, "Already up-to-date") || (input.FetchOnly && outStr == "") {
+						current++
+					} else {
+						results = append(results, PullResult{Repo: e.Name(), Action: "updated", Message: outStr})
+						updated++
+					}
+				}
+
+				return GHPullAllOutput{
+					Total:   total,
+					Updated: updated,
+					Current: current,
+					Failed:  failed,
+					Results: results,
+				}, nil
+			},
+		),
+
+		// ── dotfiles_gh_clean_stale ──────────────────
+		handler.TypedHandler[GHCleanStaleInput, GHCleanStaleOutput](
+			"dotfiles_gh_clean_stale",
+			"Remove local clones that have no matching repo in the GitHub org. Identifies orphaned directories (local git repos whose origin doesn't point to the org). Set execute=true to delete (dry-run by default).",
+			func(_ context.Context, input GHCleanStaleInput) (GHCleanStaleOutput, error) {
+				if input.Org == "" {
+					return GHCleanStaleOutput{}, fmt.Errorf("[%s] org is required", handler.ErrInvalidParam)
+				}
+
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				// Get org repos.
+				cmd := exec.Command("gh", "api", "--paginate",
+					fmt.Sprintf("/orgs/%s/repos?per_page=100", input.Org),
+					"--jq", ".[] | .name")
+				var stdout bytes.Buffer
+				cmd.Stdout = &stdout
+				if err := cmd.Run(); err != nil {
+					return GHCleanStaleOutput{}, fmt.Errorf("gh api failed: %v", err)
+				}
+
+				orgRepos := make(map[string]bool)
+				for _, name := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+					name = strings.TrimSpace(name)
+					if name != "" {
+						orgRepos[name] = true
+					}
+				}
+
+				entries, err := os.ReadDir(localDir)
+				if err != nil {
+					return GHCleanStaleOutput{}, fmt.Errorf("read dir: %v", err)
+				}
+
+				dryRun := !input.Execute
+				var results []TransferResult
+
+				for _, e := range entries {
+					if !e.IsDir() {
+						continue
+					}
+
+					name := e.Name()
+					repoPath := filepath.Join(localDir, name)
+					gitDir := filepath.Join(repoPath, ".git")
+					if _, err := os.Stat(gitDir); err != nil {
+						continue // Not a git repo, skip.
+					}
+
+					if orgRepos[name] {
+						continue // Matches an org repo, keep it.
+					}
+
+					if dryRun {
+						results = append(results, TransferResult{Repo: name, Action: "dry-run", Message: "would remove " + repoPath})
+					} else {
+						if err := os.RemoveAll(repoPath); err != nil {
+							results = append(results, TransferResult{Repo: name, Action: "failed", Message: err.Error()})
+						} else {
+							results = append(results, TransferResult{Repo: name, Action: "removed", Message: "deleted " + repoPath})
+						}
+					}
+				}
+
+				return GHCleanStaleOutput{Results: results}, nil
 			},
 		),
 	}
