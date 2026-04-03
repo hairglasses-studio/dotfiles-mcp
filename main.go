@@ -446,7 +446,27 @@ type GHFullSyncOutput struct {
 	Details  []FullSyncDetail `json:"details"`
 }
 
-// Tool 17: dotfiles_create_repo
+// Tool 17: dotfiles_mcpkit_version_sync
+
+type MCPKitVersionSyncInput struct {
+	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory (default: ~/hairglasses-studio)"`
+	Execute  bool   `json:"execute,omitempty" jsonschema:"description=Set true to run go get + go mod tidy (default: dry-run)"`
+}
+
+type MCPKitSyncResult struct {
+	Repo       string `json:"repo"`
+	Action     string `json:"action"` // updated, already-current, skipped, failed
+	OldVersion string `json:"old_version,omitempty"`
+	NewVersion string `json:"new_version,omitempty"`
+	Message    string `json:"message,omitempty"`
+}
+
+type MCPKitVersionSyncOutput struct {
+	LatestVersion string            `json:"latest_version"`
+	Results       []MCPKitSyncResult `json:"results"`
+}
+
+// Tool 18: dotfiles_create_repo
 
 type CreateRepoInput struct {
 	Name     string `json:"name" jsonschema:"required,description=Repository name (e.g. my-new-tool)"`
@@ -2402,8 +2422,25 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 						}
 					}
 
-					// CI status.
-					ciCmd := exec.Command("gh", "run", "list", "--repo", e.Name(), "--limit", "1", "--json", "conclusion", "--jq", ".[0].conclusion")
+					// CI status — derive org/repo from git remote.
+					ciRemoteCmd := exec.Command("git", "config", "remote.origin.url")
+					ciRemoteCmd.Dir = repoPath
+					var ciRemoteOut bytes.Buffer
+					ciRemoteCmd.Stdout = &ciRemoteOut
+					repoSlug := e.Name()
+					if ciRemoteCmd.Run() == nil {
+						url := strings.TrimSpace(ciRemoteOut.String())
+						url = strings.TrimSuffix(url, ".git")
+						if idx := strings.Index(url, "github.com"); idx >= 0 {
+							slug := url[idx+len("github.com"):]
+							slug = strings.TrimPrefix(slug, ":")
+							slug = strings.TrimPrefix(slug, "/")
+							if slug != "" {
+								repoSlug = slug
+							}
+						}
+					}
+					ciCmd := exec.Command("gh", "run", "list", "--repo", repoSlug, "--limit", "1", "--json", "conclusion", "--jq", ".[0].conclusion")
 					ciCmd.Dir = repoPath
 					var ciOut bytes.Buffer
 					ciCmd.Stdout = &ciOut
@@ -2785,8 +2822,15 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 func main() {
 	reg := registry.NewToolRegistry()
 	reg.RegisterModule(&DotfilesModule{})
+	reg.RegisterModule(&HyprlandModule{})
+	reg.RegisterModule(&ShaderModule{})
+	reg.RegisterModule(&InputModule{})
+	reg.RegisterModule(&BluetoothModule{})
+	reg.RegisterModule(&ControllerModule{})
+	reg.RegisterModule(&MidiModule{})
+	reg.RegisterModule(&SolaarModule{})
 
-	s := registry.NewMCPServer("dotfiles-mcp", "1.0.0")
+	s := registry.NewMCPServer("dotfiles-mcp", "2.0.0")
 	reg.RegisterWithServer(s)
 
 	if err := registry.ServeStdio(s); err != nil {
