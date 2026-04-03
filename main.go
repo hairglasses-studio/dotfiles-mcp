@@ -2938,7 +2938,12 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 // ---------------------------------------------------------------------------
 
 func main() {
-	reg := registry.NewToolRegistry()
+	reg := registry.NewToolRegistry(registry.Config{
+		Middleware: []registry.Middleware{
+			registry.AuditMiddleware(""),
+			registry.SafetyTierMiddleware(),
+		},
+	})
 	reg.RegisterModule(&DotfilesModule{})
 	reg.RegisterModule(&HyprlandModule{})
 	reg.RegisterModule(&ShaderModule{})
