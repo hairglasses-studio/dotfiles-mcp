@@ -2823,7 +2823,7 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					localDir = filepath.Join(homeDir(), "hairglasses-studio")
 				}
 
-				mcpRepos := []string{"dotfiles-mcp", "input-mcp", "shader-mcp", "hyprland-mcp"}
+				mcpRepos := []string{"dotfiles-mcp", "process-mcp", "systemd-mcp", "tmux-mcp"}
 				dryRun := !input.Execute
 
 				// Get latest mcpkit version from the first repo that has it.
