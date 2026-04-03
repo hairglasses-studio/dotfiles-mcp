@@ -10,7 +10,7 @@ go test ./... -count=1
 go install .
 ```
 
-## Tools (44)
+## Tools (84)
 
 ### Config Management (4)
 - `dotfiles_list_configs` — List dotfiles config directories with symlink health and format
@@ -55,7 +55,36 @@ go install .
 - `dotfiles_onboard_repo` — Add standard files to any repo (.editorconfig, CI, LICENSE)
 - `dotfiles_eww_get` — Query current eww variable value
 
-### Bluetooth (10)
+### Hyprland Desktop (12)
+- `hypr_list_windows` — List all windows with address, title, class, workspace
+- `hypr_list_workspaces` — List workspaces with window count, monitor, focused status
+- `hypr_get_monitors` — List monitors with resolution, refresh rate, position, scale
+- `hypr_screenshot` — Capture screenshot (single monitor or all)
+- `hypr_screenshot_monitors` — Capture separate screenshots per monitor
+- `hypr_focus_window` — Focus window by address or class name
+- `hypr_switch_workspace` — Switch to workspace by ID
+- `hypr_reload_config` — Reload Hyprland config and check for errors
+- `hypr_click` — Click at coordinates using ydotool
+- `hypr_type_text` — Type text at cursor using wtype
+- `hypr_key` — Send key events using ydotool
+- `hypr_set_monitor` — Configure monitor resolution, position, or scale
+
+### Shader Pipeline (13)
+- `shader_list` — List GLSL shaders, optionally filter by category
+- `shader_set` — Apply shader to Ghostty via atomic config write
+- `shader_cycle` — Advance shader playlist (next/prev)
+- `shader_random` — Pick and apply a random shader
+- `shader_status` — Current shader, animation state, playlist position, auto-rotate
+- `shader_meta` — Full manifest metadata (category, cost, source, playlists)
+- `shader_test` — Compile-test shaders via glslangValidator
+- `shader_build` — Preprocess and validate shaders
+- `shader_playlist` — List playlists or pick random shader from one
+- `shader_get_state` — Read active shader from Ghostty config
+- `wallpaper_set` — Set a live wallpaper shader via shaderbg
+- `wallpaper_random` — Set random wallpaper shader
+- `wallpaper_list` — List available wallpaper shaders
+
+### Bluetooth (9)
 - `bt_list_devices` — List BT devices with connection status and battery levels
 - `bt_device_info` — Detailed device info (battery, profiles, trust, UUIDs)
 - `bt_scan` — Scan for nearby devices with configurable timeout (default 8s)
@@ -65,7 +94,6 @@ go install .
 - `bt_remove` — Forget a paired device
 - `bt_trust` — Trust or untrust a device
 - `bt_power` — Toggle BT adapter power
-- `bt_discover_and_connect` — **Composed**: scan→find→remove stale→pair (with agent)→trust→connect (with retry). Handles BLE re-pairing and MAC changes
 
 ### Input Devices (3)
 - `input_detect_controllers` — Scan for gamepads with brand detection and makima profile status
@@ -77,9 +105,25 @@ go install .
 - `input_set_logiops_config` — Write logiops config and restart service
 - `input_status` — Status of all input services (logiops, makima, solaar)
 
+### Makima Profiles (4)
+- `input_list_makima_profiles` — List all per-app button remapping profiles
+- `input_get_makima_profile` — Read a specific makima profile by name
+- `input_set_makima_profile` — Create or update a makima profile (validates TOML)
+- `input_delete_makima_profile` — Delete a makima profile
+
 ### Solaar (2)
 - `input_get_solaar_settings` — Read Solaar settings for Logitech devices
 - `input_set_solaar_setting` — Set a Solaar device setting
+
+### MIDI (4)
+- `midi_list_devices` — Detect connected USB MIDI controllers via ALSA
+- `midi_generate_mapping` — Generate MIDI controller mapping config from template
+- `midi_get_mapping` — Read existing MIDI controller mapping config
+- `midi_set_mapping` — Create or update MIDI mapping (validates TOML)
+
+### Composed Workflows (2)
+- `bt_discover_and_connect` — **Composed**: scan→find→remove stale→pair (with agent)→trust→connect (with retry)
+- `input_auto_setup_controller` — **Composed**: detect controllers→generate missing profiles→restart makima
 
 ## Key Patterns
 - All batch tools use dry-run by default (`execute: true` for live mode)
