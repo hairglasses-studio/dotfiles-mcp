@@ -2812,6 +2812,124 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				}, nil
 			},
 		),
+
+		// ── dotfiles_mcpkit_version_sync ──────────────
+		handler.TypedHandler[MCPKitVersionSyncInput, MCPKitVersionSyncOutput](
+			"dotfiles_mcpkit_version_sync",
+			"Sync mcpkit dependency version across all thin MCP servers. Finds latest mcpkit version and updates go.mod in each MCP repo. Set execute=true to run go get + go mod tidy (dry-run by default).",
+			func(_ context.Context, input MCPKitVersionSyncInput) (MCPKitVersionSyncOutput, error) {
+				localDir := input.LocalDir
+				if localDir == "" {
+					localDir = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+
+				mcpRepos := []string{"dotfiles-mcp", "input-mcp", "shader-mcp", "hyprland-mcp"}
+				dryRun := !input.Execute
+
+				// Get latest mcpkit version from the first repo that has it.
+				var latestVersion string
+				for _, repo := range mcpRepos {
+					goModPath := filepath.Join(localDir, repo, "go.mod")
+					grepCmd := exec.Command("grep", "github.com/hairglasses-studio/mcpkit", goModPath)
+					var grepOut bytes.Buffer
+					grepCmd.Stdout = &grepOut
+					if grepCmd.Run() == nil {
+						line := strings.TrimSpace(grepOut.String())
+						fields := strings.Fields(line)
+						if len(fields) >= 2 {
+							latestVersion = fields[len(fields)-1]
+							break
+						}
+					}
+				}
+
+				// Get truly latest from Go proxy.
+				listCmd := exec.Command("go", "list", "-m", "-versions", "github.com/hairglasses-studio/mcpkit@latest")
+				listCmd.Dir = filepath.Join(localDir, mcpRepos[0])
+				var listOut bytes.Buffer
+				listCmd.Stdout = &listOut
+				if listCmd.Run() == nil {
+					parts := strings.Fields(strings.TrimSpace(listOut.String()))
+					if len(parts) >= 2 {
+						latestVersion = parts[len(parts)-1]
+					}
+				}
+
+				var results []MCPKitSyncResult
+
+				for _, repo := range mcpRepos {
+					repoPath := filepath.Join(localDir, repo)
+					goModPath := filepath.Join(repoPath, "go.mod")
+
+					if _, err := os.Stat(goModPath); err != nil {
+						results = append(results, MCPKitSyncResult{Repo: repo, Action: "skipped", Message: "no go.mod"})
+						continue
+					}
+
+					// Get current version.
+					grepCmd := exec.Command("grep", "github.com/hairglasses-studio/mcpkit", goModPath)
+					var grepOut bytes.Buffer
+					grepCmd.Stdout = &grepOut
+					currentVersion := ""
+					if grepCmd.Run() == nil {
+						line := strings.TrimSpace(grepOut.String())
+						// Skip replace directives.
+						if strings.Contains(line, "=>") {
+							results = append(results, MCPKitSyncResult{Repo: repo, Action: "skipped", Message: "uses local replace directive"})
+							continue
+						}
+						fields := strings.Fields(line)
+						if len(fields) >= 2 {
+							currentVersion = fields[len(fields)-1]
+						}
+					} else {
+						results = append(results, MCPKitSyncResult{Repo: repo, Action: "skipped", Message: "mcpkit not in go.mod"})
+						continue
+					}
+
+					if currentVersion == latestVersion {
+						results = append(results, MCPKitSyncResult{Repo: repo, Action: "already-current", OldVersion: currentVersion, NewVersion: latestVersion})
+						continue
+					}
+
+					if dryRun {
+						results = append(results, MCPKitSyncResult{
+							Repo:       repo,
+							Action:     "dry-run",
+							OldVersion: currentVersion,
+							NewVersion: latestVersion,
+							Message:    fmt.Sprintf("would update %s → %s", currentVersion, latestVersion),
+						})
+						continue
+					}
+
+					// Run go get to update.
+					getCmd := exec.Command("go", "get", "github.com/hairglasses-studio/mcpkit@"+latestVersion)
+					getCmd.Dir = repoPath
+					if out, err := getCmd.CombinedOutput(); err != nil {
+						results = append(results, MCPKitSyncResult{Repo: repo, Action: "failed", OldVersion: currentVersion, Message: "go get failed: " + strings.TrimSpace(string(out))})
+						continue
+					}
+
+					// Run go mod tidy.
+					tidyCmd := exec.Command("go", "mod", "tidy")
+					tidyCmd.Dir = repoPath
+					tidyCmd.CombinedOutput()
+
+					results = append(results, MCPKitSyncResult{
+						Repo:       repo,
+						Action:     "updated",
+						OldVersion: currentVersion,
+						NewVersion: latestVersion,
+					})
+				}
+
+				return MCPKitVersionSyncOutput{
+					LatestVersion: latestVersion,
+					Results:       results,
+				}, nil
+			},
+		),
 	}
 }
 
