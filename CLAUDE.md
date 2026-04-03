@@ -10,7 +10,7 @@ go test ./... -count=1
 go install .
 ```
 
-## Tools (30)
+## Tools (31)
 
 ### Config Management (4)
 - `dotfiles_list_configs` — List dotfiles config directories with symlink health and format
@@ -38,10 +38,11 @@ go install .
 - `dotfiles_dep_audit` — Go dependency version skew across fleet
 - `dotfiles_workflow_sync` — Sync CI workflows from canonical sources
 
-### Build & Sync (4)
+### Build & Sync (5)
 - `dotfiles_pipeline_run` — Run build+test pipeline on a repo (Go/Node/Python)
 - `dotfiles_bulk_pipeline` — Run pipeline across N repos with language filtering
 - `dotfiles_go_sync` — Sync Go version across all repos
+- `dotfiles_mcpkit_version_sync` — Sync mcpkit dependency across all thin MCP servers
 - `dotfiles_create_repo` — Scaffold new repo with standard files
 
 ### Desktop (4)
