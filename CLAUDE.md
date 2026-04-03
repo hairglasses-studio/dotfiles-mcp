@@ -10,7 +10,7 @@ go test ./... -count=1
 go install .
 ```
 
-## Tools (31)
+## Tools (44)
 
 ### Config Management (4)
 - `dotfiles_list_configs` — List dotfiles config directories with symlink health and format
@@ -54,6 +54,32 @@ go install .
 ### Repository Onboarding (2)
 - `dotfiles_onboard_repo` — Add standard files to any repo (.editorconfig, CI, LICENSE)
 - `dotfiles_eww_get` — Query current eww variable value
+
+### Bluetooth (10)
+- `bt_list_devices` — List BT devices with connection status and battery levels
+- `bt_device_info` — Detailed device info (battery, profiles, trust, UUIDs)
+- `bt_scan` — Scan for nearby devices with configurable timeout (default 8s)
+- `bt_pair` — Pair with interactive agent (BLE-safe, handles auth handshake). `remove_first` clears stale bonds
+- `bt_connect` — Connect with BLE retry logic, resolves names against all known devices
+- `bt_disconnect` — Disconnect a device
+- `bt_remove` — Forget a paired device
+- `bt_trust` — Trust or untrust a device
+- `bt_power` — Toggle BT adapter power
+- `bt_discover_and_connect` — **Composed**: scan→find→remove stale→pair (with agent)→trust→connect (with retry). Handles BLE re-pairing and MAC changes
+
+### Input Devices (3)
+- `input_detect_controllers` — Scan for gamepads with brand detection and makima profile status
+- `input_generate_controller_profile` — Generate makima profile from template (desktop/gaming/media/macropad)
+- `input_controller_test` — Detect controllers, generate missing profiles, optionally restart makima
+
+### Logiops / Mouse (3)
+- `input_get_logiops_config` — Read current logiops config for Logitech mice
+- `input_set_logiops_config` — Write logiops config and restart service
+- `input_status` — Status of all input services (logiops, makima, solaar)
+
+### Solaar (2)
+- `input_get_solaar_settings` — Read Solaar settings for Logitech devices
+- `input_set_solaar_setting` — Set a Solaar device setting
 
 ## Key Patterns
 - All batch tools use dry-run by default (`execute: true` for live mode)

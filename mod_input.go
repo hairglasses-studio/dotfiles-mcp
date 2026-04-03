@@ -37,6 +37,96 @@ func inputRunCmd(name string, args ...string) (string, string, error) {
 	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
 }
 
+// btInteractivePair runs bluetoothctl interactively with an agent registered,
+// which is required for BLE devices (e.g. Logitech MX Master) that need an
+// active pairing agent for the authentication handshake.
+func btInteractivePair(mac string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "bluetoothctl")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return "", fmt.Errorf("stdin pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("start bluetoothctl: %w", err)
+	}
+
+	commands := []string{
+		"agent on",
+		"default-agent",
+		"pair " + mac,
+	}
+	for _, c := range commands {
+		fmt.Fprintln(stdin, c)
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	// Wait for pairing to complete or timeout
+	time.Sleep(5 * time.Second)
+	fmt.Fprintln(stdin, "quit")
+	stdin.Close()
+	cmd.Wait()
+
+	output := out.String()
+	if strings.Contains(output, "Pairing successful") || strings.Contains(output, "already exists") {
+		return output, nil
+	}
+	if strings.Contains(output, "AuthenticationFailed") || strings.Contains(output, "Failed to pair") {
+		return output, fmt.Errorf("authentication failed (device may need re-pairing: remove + re-scan + pair)")
+	}
+	return output, fmt.Errorf("pairing did not confirm success: %s", output)
+}
+
+// btInteractiveConnect runs connect with retry for flaky BLE connections.
+func btInteractiveConnect(mac string, retries int) (string, error) {
+	if retries <= 0 {
+		retries = 3
+	}
+	var lastOut, lastStderr string
+	var lastErr error
+	for i := 0; i < retries; i++ {
+		lastOut, lastStderr, lastErr = inputRunCmd("bluetoothctl", "connect", mac)
+		if lastErr == nil {
+			return lastOut, nil
+		}
+		if strings.Contains(lastOut, "le-connection-abort") || strings.Contains(lastStderr, "le-connection-abort") {
+			time.Sleep(time.Duration(i+1) * time.Second)
+			continue
+		}
+		break // non-retryable error
+	}
+	return lastOut, fmt.Errorf("connect failed after %d attempts: %s %s", retries, lastOut, lastStderr)
+}
+
+// resolveAnyDevice resolves a name against all known devices (paired + recently scanned).
+func resolveAnyDevice(query string) (string, error) {
+	if macRe.MatchString(query) {
+		return query, nil
+	}
+	out, _, err := inputRunCmd("bluetoothctl", "devices")
+	if err != nil {
+		return "", err
+	}
+	q := strings.ToLower(query)
+	for _, line := range strings.Split(out, "\n") {
+		m := deviceRe.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil {
+			continue
+		}
+		if strings.Contains(strings.ToLower(m[2]), q) {
+			return m[1], nil
+		}
+	}
+	return "", fmt.Errorf("no device matching %q", query)
+}
+
 // ---------------------------------------------------------------------------
 // Bluetooth helpers
 // ---------------------------------------------------------------------------
@@ -95,23 +185,6 @@ func btEnrichDevice(d *btDevice) {
 	}
 }
 
-// resolveDevice accepts a MAC address or a case-insensitive name substring.
-func resolveDevice(query string) (string, error) {
-	if macRe.MatchString(query) {
-		return query, nil
-	}
-	devices, err := btListPaired()
-	if err != nil {
-		return "", err
-	}
-	q := strings.ToLower(query)
-	for _, d := range devices {
-		if strings.Contains(strings.ToLower(d.Name), q) {
-			return d.MAC, nil
-		}
-	}
-	return "", fmt.Errorf("no paired device matching %q", query)
-}
 
 // ---------------------------------------------------------------------------
 // Controller Detection
@@ -689,7 +762,8 @@ type BTDisconnectOutput struct {
 }
 
 type BTPairInput struct {
-	Device string `json:"device" jsonschema:"required,description=MAC address of the device to pair"`
+	Device      string `json:"device" jsonschema:"required,description=MAC address of the device to pair"`
+	RemoveFirst bool   `json:"remove_first,omitempty" jsonschema:"description=Remove existing pairing before re-pairing (fixes stale BLE bonds)"`
 }
 type BTPairOutput struct {
 	Status string `json:"status"`
@@ -717,7 +791,8 @@ type BTTrustOutput struct {
 }
 
 type BTScanInput struct {
-	Action string `json:"action" jsonschema:"required,description=Scan action,enum=start,enum=stop,enum=list"`
+	Action  string `json:"action" jsonschema:"required,description=Scan action,enum=start,enum=stop,enum=list"`
+	Timeout int    `json:"timeout,omitempty" jsonschema:"description=Scan duration in seconds (default: 8)"`
 }
 type BTScanOutput struct {
 	Status  string     `json:"status"`
@@ -1143,7 +1218,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 					return BTDeviceInfoOutput{}, fmt.Errorf("[%s] device is required (MAC address or name)", handler.ErrInvalidParam)
 				}
 
-				mac, err := resolveDevice(input.Device)
+				mac, err := resolveAnyDevice(input.Device)
 				if err != nil {
 					return BTDeviceInfoOutput{}, fmt.Errorf("[%s] %w", handler.ErrNotFound, err)
 				}
@@ -1181,18 +1256,18 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 
 		handler.TypedHandler[BTConnectInput, BTConnectOutput](
 			"bt_connect",
-			"Connect to a paired Bluetooth device.",
+			"Connect to a Bluetooth device with BLE retry logic. Resolves names against all known devices (paired + scanned).",
 			func(_ context.Context, input BTConnectInput) (BTConnectOutput, error) {
 				if input.Device == "" {
 					return BTConnectOutput{}, fmt.Errorf("[%s] device is required", handler.ErrInvalidParam)
 				}
-				mac, err := resolveDevice(input.Device)
+				mac, err := resolveAnyDevice(input.Device)
 				if err != nil {
 					return BTConnectOutput{}, fmt.Errorf("[%s] %w", handler.ErrNotFound, err)
 				}
-				out, stderr, err := inputRunCmd("bluetoothctl", "connect", mac)
+				out, err := btInteractiveConnect(mac, 3)
 				if err != nil {
-					return BTConnectOutput{}, fmt.Errorf("connect failed: %s %s", out, stderr)
+					return BTConnectOutput{}, err
 				}
 				return BTConnectOutput{Status: "connected", MAC: mac, Output: out}, nil
 			},
@@ -1205,7 +1280,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 				if input.Device == "" {
 					return BTDisconnectOutput{}, fmt.Errorf("[%s] device is required", handler.ErrInvalidParam)
 				}
-				mac, err := resolveDevice(input.Device)
+				mac, err := resolveAnyDevice(input.Device)
 				if err != nil {
 					return BTDisconnectOutput{}, fmt.Errorf("[%s] %w", handler.ErrNotFound, err)
 				}
@@ -1219,7 +1294,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 
 		handler.TypedHandler[BTPairInput, BTPairOutput](
 			"bt_pair",
-			"Pair with a discovered Bluetooth device and auto-trust it.",
+			"Pair with a Bluetooth device using interactive agent (handles BLE auth). Set remove_first=true to clear stale bonds before re-pairing.",
 			func(_ context.Context, input BTPairInput) (BTPairOutput, error) {
 				if input.Device == "" {
 					return BTPairOutput{}, fmt.Errorf("[%s] device is required (MAC address)", handler.ErrInvalidParam)
@@ -1227,9 +1302,17 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 				if !macRe.MatchString(input.Device) {
 					return BTPairOutput{}, fmt.Errorf("[%s] device must be a MAC address for pairing", handler.ErrInvalidParam)
 				}
-				out, stderr, err := inputRunCmd("bluetoothctl", "pair", input.Device)
+
+				// Optionally remove stale pairing first (fixes BLE re-pair failures)
+				if input.RemoveFirst {
+					inputRunCmd("bluetoothctl", "remove", input.Device)
+					time.Sleep(time.Second)
+				}
+
+				// Use interactive pairing with agent for BLE compatibility
+				out, err := btInteractivePair(input.Device)
 				if err != nil {
-					return BTPairOutput{}, fmt.Errorf("pair failed: %s %s", out, stderr)
+					return BTPairOutput{}, fmt.Errorf("pair failed: %w\nOutput: %s", err, out)
 				}
 				// Auto-trust after pairing
 				inputRunCmd("bluetoothctl", "trust", input.Device)
@@ -1244,7 +1327,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 				if input.Device == "" {
 					return BTRemoveOutput{}, fmt.Errorf("[%s] device is required", handler.ErrInvalidParam)
 				}
-				mac, err := resolveDevice(input.Device)
+				mac, err := resolveAnyDevice(input.Device)
 				if err != nil {
 					return BTRemoveOutput{}, fmt.Errorf("[%s] %w", handler.ErrNotFound, err)
 				}
@@ -1267,7 +1350,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 				if input.Trust != nil {
 					trust = *input.Trust
 				}
-				mac, err := resolveDevice(input.Device)
+				mac, err := resolveAnyDevice(input.Device)
 				if err != nil {
 					return BTTrustOutput{}, fmt.Errorf("[%s] %w", handler.ErrNotFound, err)
 				}
@@ -1285,16 +1368,21 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 
 		handler.TypedHandler[BTScanInput, BTScanOutput](
 			"bt_scan",
-			"Scan for nearby Bluetooth devices. 'start' scans for 5 seconds and returns results.",
+			"Scan for nearby Bluetooth devices. 'start' scans for 8 seconds (configurable) and returns discovered devices.",
 			func(_ context.Context, input BTScanInput) (BTScanOutput, error) {
 				switch input.Action {
 				case "start":
-					cmd := exec.Command("bluetoothctl", "scan", "on")
+					timeout := input.Timeout
+					if timeout <= 0 {
+						timeout = 8
+					}
+					cmd := exec.Command("bluetoothctl", "--timeout", fmt.Sprintf("%d", timeout), "scan", "on")
 					if err := cmd.Start(); err != nil {
 						return BTScanOutput{}, fmt.Errorf("start scan: %w", err)
 					}
-					time.Sleep(5 * time.Second)
+					time.Sleep(time.Duration(timeout) * time.Second)
 					cmd.Process.Kill()
+					cmd.Wait()
 
 					out, _, _ := inputRunCmd("bluetoothctl", "devices")
 					var devices []btDevice
@@ -1830,7 +1918,7 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 
 		handler.TypedHandler[BTDiscoverConnectInput, BTDiscoverConnectOutput](
 			"bt_discover_and_connect",
-			"Scan for BT devices, find one matching a name pattern, pair, trust, and connect. Single tool replaces scan + pair + trust + connect.",
+			"Full BLE-safe workflow: scan, find device by name, remove stale bond, pair with agent, trust, connect with retry. Handles BLE re-pairing (MAC changes, auth failures).",
 			func(_ context.Context, input BTDiscoverConnectInput) (BTDiscoverConnectOutput, error) {
 				if input.DevicePattern == "" {
 					return BTDiscoverConnectOutput{}, fmt.Errorf("[%s] device_pattern is required", handler.ErrInvalidParam)
@@ -1849,13 +1937,31 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 				var steps []btDiscoverStep
 				result := BTDiscoverConnectOutput{}
 
-				// Step 1: Scan for devices
-				cmd := exec.Command("bluetoothctl", "scan", "on")
+				// Step 1: Remove stale pairing if device was previously known
+				// BLE devices get new MACs in pairing mode; stale bonds cause auth failures
+				pattern := strings.ToLower(input.DevicePattern)
+				existingDevices, _ := btListPaired()
+				for _, d := range existingDevices {
+					if strings.Contains(strings.ToLower(d.Name), pattern) {
+						inputRunCmd("bluetoothctl", "remove", d.MAC)
+						steps = append(steps, btDiscoverStep{
+							Step:   "remove_stale",
+							Status: "removed",
+							Detail: fmt.Sprintf("cleared stale bond for %s (%s)", d.Name, d.MAC),
+						})
+						time.Sleep(time.Second)
+						break
+					}
+				}
+
+				// Step 2: Scan for devices
+				cmd := exec.Command("bluetoothctl", "--timeout", fmt.Sprintf("%d", timeout), "scan", "on")
 				if err := cmd.Start(); err != nil {
 					return BTDiscoverConnectOutput{}, fmt.Errorf("start scan: %w", err)
 				}
 				time.Sleep(time.Duration(timeout) * time.Second)
 				cmd.Process.Kill()
+				cmd.Wait()
 
 				steps = append(steps, btDiscoverStep{
 					Step:   "scan",
@@ -1863,9 +1969,8 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 					Detail: fmt.Sprintf("scanned for %d seconds", timeout),
 				})
 
-				// Step 2: Find matching device
+				// Step 3: Find matching device
 				out, _, _ := inputRunCmd("bluetoothctl", "devices")
-				pattern := strings.ToLower(input.DevicePattern)
 				var matchMAC, matchName string
 				for _, line := range strings.Split(out, "\n") {
 					dm := deviceRe.FindStringSubmatch(strings.TrimSpace(line))
@@ -1897,11 +2002,10 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 				result.DeviceName = matchName
 				result.MAC = matchMAC
 
-				// Step 3: Pair
-				pairOut, pairStderr, pairErr := inputRunCmd("bluetoothctl", "pair", matchMAC)
+				// Step 4: Pair using interactive agent (BLE-safe)
+				pairOut, pairErr := btInteractivePair(matchMAC)
 				if pairErr != nil {
-					// Check if already paired
-					if strings.Contains(pairOut, "Already Exists") || strings.Contains(pairStderr, "Already Exists") {
+					if strings.Contains(pairOut, "Already Exists") || strings.Contains(pairOut, "already exists") {
 						steps = append(steps, btDiscoverStep{
 							Step:   "pair",
 							Status: "already_paired",
@@ -1910,10 +2014,10 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 						steps = append(steps, btDiscoverStep{
 							Step:   "pair",
 							Status: "failed",
-							Detail: strings.TrimSpace(pairOut + " " + pairStderr),
+							Detail: strings.TrimSpace(pairOut),
 						})
 						result.Steps = steps
-						return result, fmt.Errorf("pair failed: %s %s", pairOut, pairStderr)
+						return result, fmt.Errorf("pair failed: %w", pairErr)
 					}
 				} else {
 					steps = append(steps, btDiscoverStep{
@@ -1922,7 +2026,7 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 					})
 				}
 
-				// Step 4: Trust (if auto_trust)
+				// Step 5: Trust (if auto_trust)
 				if autoTrust {
 					trustOut, trustStderr, trustErr := inputRunCmd("bluetoothctl", "trust", matchMAC)
 					if trustErr != nil {
@@ -1944,16 +2048,16 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 					})
 				}
 
-				// Step 5: Connect
-				connOut, connStderr, connErr := inputRunCmd("bluetoothctl", "connect", matchMAC)
+				// Step 6: Connect with retry (BLE connections are flaky)
+				connOut, connErr := btInteractiveConnect(matchMAC, 3)
 				if connErr != nil {
 					steps = append(steps, btDiscoverStep{
 						Step:   "connect",
 						Status: "failed",
-						Detail: strings.TrimSpace(connOut + " " + connStderr),
+						Detail: connOut,
 					})
 					result.Steps = steps
-					return result, fmt.Errorf("connect failed: %s %s", connOut, connStderr)
+					return result, connErr
 				}
 
 				steps = append(steps, btDiscoverStep{
