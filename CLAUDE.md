@@ -45,15 +45,13 @@ go install .
 - `dotfiles_mcpkit_version_sync` — Sync mcpkit dependency across all thin MCP servers
 - `dotfiles_create_repo` — Scaffold new repo with standard files
 
-### Desktop (4)
+### Desktop (6)
 - `dotfiles_cascade_reload` — Ordered multi-service reload with health verification
 - `dotfiles_rice_check` — Compositor/shader/wallpaper/service status + Snazzy palette compliance
 - `dotfiles_eww_restart` — Kill and restart eww daemon with both bars
 - `dotfiles_eww_status` — Show eww daemon health, windows, key variables
-
-### Repository Onboarding (2)
-- `dotfiles_onboard_repo` — Add standard files to any repo (.editorconfig, CI, LICENSE)
 - `dotfiles_eww_get` — Query current eww variable value
+- `dotfiles_onboard_repo` — Add standard files to any repo (.editorconfig, CI, LICENSE)
 
 ### Hyprland Desktop (12)
 - `hypr_list_windows` — List all windows with address, title, class, workspace
@@ -100,10 +98,11 @@ go install .
 - `input_generate_controller_profile` — Generate makima profile from template (desktop/gaming/media/macropad)
 - `input_controller_test` — Detect controllers, generate missing profiles, optionally restart makima
 
-### Logiops / Mouse (3)
+### Logiops / Mouse (4)
+- `input_status` — Show running state of input services (logid, makima) and battery levels
 - `input_get_logiops_config` — Read current logiops config for Logitech mice
-- `input_set_logiops_config` — Write logiops config and restart service
-- `input_status` — Status of all input services (logiops, makima, solaar)
+- `input_set_logiops_config` — Write logiops config, optionally deploy to /etc/logid.cfg + restart logid
+- `input_restart_services` — Restart input device services (logid, makima, or both; requires sudo)
 
 ### Makima Profiles (4)
 - `input_list_makima_profiles` — List all per-app button remapping profiles
