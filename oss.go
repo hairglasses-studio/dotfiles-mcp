@@ -475,9 +475,10 @@ func checkSecurity(repo string) []CheckResult {
 		if err != nil {
 			continue
 		}
-		if scanFilesForPattern(repo, re) {
+		if matchFile := scanFilesForPattern(repo, re); matchFile != "" {
 			hasSecrets = true
-			secretDetail = fmt.Sprintf("Potential secret pattern matched: %s", pat)
+			rel, _ := filepath.Rel(repo, matchFile)
+			secretDetail = fmt.Sprintf("Potential secret in %s (pattern: %s)", rel, pat)
 			break
 		}
 	}
@@ -712,11 +713,11 @@ func grepFiles(repo, pattern string) bool {
 	return found
 }
 
-func scanFilesForPattern(repo string, re *regexp.Regexp) bool {
-	found := false
+func scanFilesForPattern(repo string, re *regexp.Regexp) string {
+	var matchPath string
 	exts := map[string]bool{".go": true, ".json": true, ".toml": true, ".yaml": true, ".yml": true, ".md": true, ".sh": true, ".env": true}
 	filepath.Walk(repo, func(path string, info os.FileInfo, err error) error {
-		if found || err != nil || info.IsDir() {
+		if matchPath != "" || err != nil || info.IsDir() {
 			if info != nil && info.IsDir() {
 				base := info.Name()
 				if base == ".git" || base == "vendor" || base == "node_modules" || base == "testdata" || base == ".claude" || base == "worktrees" {
@@ -732,10 +733,6 @@ func scanFilesForPattern(repo string, re *regexp.Regexp) bool {
 		if !exts[filepath.Ext(path)] && info.Name() != ".env" {
 			return nil
 		}
-		// Skip test files — they legitimately contain example secrets for testing
-		if strings.HasSuffix(info.Name(), "_test.go") {
-			return nil
-		}
 		f, err := os.Open(path)
 		if err != nil {
 			return nil
@@ -744,13 +741,13 @@ func scanFilesForPattern(repo string, re *regexp.Regexp) bool {
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			if re.MatchString(scanner.Text()) {
-				found = true
+				matchPath = path
 				return nil
 			}
 		}
 		return nil
 	})
-	return found
+	return matchPath
 }
 
 func goVetCheck(repo string, points int) []CheckResult {
