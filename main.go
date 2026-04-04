@@ -2953,8 +2953,9 @@ func main() {
 	reg.RegisterModule(&MidiModule{})
 	reg.RegisterModule(&SolaarModule{})
 	reg.RegisterModule(&WorkflowModule{})
+	reg.RegisterModule(&OSSModule{})
 
-	s := registry.NewMCPServer("dotfiles-mcp", "2.0.0")
+	s := registry.NewMCPServer("dotfiles-mcp", "2.1.0")
 	reg.RegisterWithServer(s)
 
 	if err := registry.ServeAuto(s); err != nil {

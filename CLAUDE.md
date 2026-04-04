@@ -10,7 +10,7 @@ go test ./... -count=1
 go install .
 ```
 
-## Tools (84)
+## Tools (86)
 
 ### Config Management (4)
 - `dotfiles_list_configs` — List dotfiles config directories with symlink health and format
@@ -123,6 +123,10 @@ go install .
 ### Composed Workflows (2)
 - `bt_discover_and_connect` — **Composed**: scan→find→remove stale→pair (with agent)→trust→connect (with retry)
 - `input_auto_setup_controller` — **Composed**: detect controllers→generate missing profiles→restart makima
+
+### Open-Source Readiness (2)
+- `dotfiles_oss_score` — Score a repo's open-source readiness (0-100) across 8 categories: community files, README quality, Go module, testing, CI/CD, security, release, maintenance. Returns structured report with per-check pass/fail and top action items.
+- `dotfiles_oss_check` — Run checks for a single category with detailed suggestions
 
 ## Key Patterns
 - All batch tools use dry-run by default (`execute: true` for live mode)
