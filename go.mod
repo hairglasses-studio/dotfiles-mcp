@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/hairglasses-studio/mcpkit v0.1.1
+	github.com/hairglasses-studio/mcpkit v0.1.0
 	github.com/mark3labs/mcp-go v0.46.0
 )
 

@@ -9,8 +9,9 @@ This project supports development with **Claude Code**, **Gemini CLI**, and **Op
 ```bash
 git clone https://github.com/hairglasses-studio/dotfiles-mcp
 cd dotfiles-mcp
-make build   # or: go build ./...
-make test    # or: go test ./... -count=1
+go build ./...
+go vet ./...
+go test ./... -count=1
 ```
 
 ### 2. Verify
@@ -25,21 +26,34 @@ Or use the pipeline script directly:
 ~/hairglasses-studio/dotfiles/scripts/hg-pipeline.sh
 ```
 
+## Architecture
+
+dotfiles-mcp is a single-binary MCP server with 86 tools registered across module files:
+
+- `main.go` -- Server setup, tool registration
+- `mod_hyprland.go` -- Hyprland compositor tools
+- `mod_shader.go` -- Ghostty shader pipeline
+- `mod_input.go` -- Input device management (logiops, makima, Solaar, MIDI)
+- `oss.go` -- Open-source readiness scoring
+
+All tools are built on [mcpkit](https://github.com/hairglasses-studio/mcpkit) using `handler.TypedHandler` generics and `registry.ToolDefinition`.
+
 ## Making Changes
 
 1. Create a branch: `git checkout -b feat/my-change`
 2. Make your changes
-3. Run the pipeline: `make pipeline-check`
+3. Run the pipeline: `go build ./... && go vet ./... && go test ./... -count=1`
 4. Commit with a descriptive message
 5. Push and open a PR
 
 ## Code Style
 
-- **Go**: `gofmt` formatting, `go vet` clean, golangci-lint passing
-- **Node.js**: ESLint/Prettier where configured
-- **Python**: ruff/black formatting
+- **Go**: `gofmt` formatting, `go vet` clean
+- Error handling: `handler.CodedErrorResult(handler.ErrInvalidParam, err)` -- never naked panics
+- Thread safety: `sync.RWMutex` with `RLock` for reads, `Lock` for writes
+- Param extraction: `handler.GetStringParam`, `handler.GetIntParam`, `handler.GetBoolParam`
 
-Editor settings are in `.editorconfig` — most editors pick this up automatically.
+Editor settings are in `.editorconfig` -- most editors pick this up automatically.
 
 ## Pre-commit Hooks
 
