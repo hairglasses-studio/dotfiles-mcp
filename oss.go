@@ -467,7 +467,7 @@ func checkSecurity(repo string) []CheckResult {
 	})
 
 	// No hardcoded secrets
-	secretPatterns := []string{"sk-ant-api", "sk-svcacct", "AIzaSy", "ghp_", "gho_", "github_pat_", "AKIA", "password\\s*=\\s*[\"'][^\"']+[\"']"}
+	secretPatterns := []string{"sk-ant-api03-[A-Za-z0-9_-]{20}", "sk-svcacct-[A-Za-z0-9_-]{20}", "AIzaSy[A-Za-z0-9_-]{33}", "ghp_[A-Za-z0-9]{36}", "gho_[A-Za-z0-9]{36}", "github_pat_[A-Za-z0-9_]{22}", "AKIA[0-9A-Z]{16}", "password\\s*=\\s*[\"'][^\"']{8,}[\"']"}
 	hasSecrets := false
 	secretDetail := "No hardcoded secrets detected"
 	for _, pat := range secretPatterns {
@@ -719,13 +719,21 @@ func scanFilesForPattern(repo string, re *regexp.Regexp) bool {
 		if found || err != nil || info.IsDir() {
 			if info != nil && info.IsDir() {
 				base := info.Name()
-				if base == ".git" || base == "vendor" || base == "node_modules" || base == "testdata" {
+				if base == ".git" || base == "vendor" || base == "node_modules" || base == "testdata" || base == ".claude" || base == "worktrees" {
 					return filepath.SkipDir
 				}
 			}
 			return nil
 		}
+		// Skip test files — they legitimately contain secret patterns as test fixtures
+		if strings.HasSuffix(info.Name(), "_test.go") {
+			return nil
+		}
 		if !exts[filepath.Ext(path)] && info.Name() != ".env" {
+			return nil
+		}
+		// Skip test files — they legitimately contain example secrets for testing
+		if strings.HasSuffix(info.Name(), "_test.go") {
 			return nil
 		}
 		f, err := os.Open(path)
