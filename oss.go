@@ -771,14 +771,38 @@ func goVetCheck(repo string, points int) []CheckResult {
 }
 
 func goTestCoverage(repo string) float64 {
-	cmd := exec.Command("go", "test", "-count=1", "-coverprofile=/tmp/oss-cov.out", "-short", "./...")
+	covFile := filepath.Join(os.TempDir(), fmt.Sprintf("oss-cov-%d.out", os.Getpid()))
+	cmd := exec.Command("go", "test", "-count=1", "-coverprofile="+covFile, "-short", "./...")
 	cmd.Dir = repo
-	cmd.Env = append(os.Environ(), "GOFLAGS=-count=1")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0
 	}
-	// Parse coverage from output lines like "coverage: 90.5% of statements"
+	// Use go tool cover -func for accurate statement-weighted coverage
+	funcCmd := exec.Command("go", "tool", "cover", "-func="+covFile)
+	funcCmd.Dir = repo
+	funcOut, funcErr := funcCmd.CombinedOutput()
+	os.Remove(covFile)
+	if funcErr == nil {
+		// Last line: "total:  (statements)  81.9%"
+		funcLines := strings.Split(strings.TrimSpace(string(funcOut)), "\n")
+		if len(funcLines) > 0 {
+			lastLine := funcLines[len(funcLines)-1]
+			if pctIdx := strings.LastIndex(lastLine, "%"); pctIdx > 0 {
+				// Find the number before %
+				start := pctIdx - 1
+				for start >= 0 && (lastLine[start] == '.' || (lastLine[start] >= '0' && lastLine[start] <= '9')) {
+					start--
+				}
+				var pct float64
+				fmt.Sscanf(lastLine[start+1:pctIdx], "%f", &pct)
+				if pct > 0 {
+					return pct
+				}
+			}
+		}
+	}
+	// Fallback: average per-package coverage from test output
 	lines := strings.Split(string(out), "\n")
 	var totalCov, count float64
 	for _, line := range lines {
