@@ -2957,7 +2957,7 @@ func main() {
 	s := registry.NewMCPServer("dotfiles-mcp", "2.0.0")
 	reg.RegisterWithServer(s)
 
-	if err := registry.ServeStdio(s); err != nil {
+	if err := registry.ServeAuto(s); err != nil {
 		log.Fatal(err)
 	}
 }
