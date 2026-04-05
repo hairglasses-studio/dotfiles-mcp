@@ -250,6 +250,7 @@ func dotfilesModules() []registry.ToolModule {
 		&ScreenModule{},
 		&InputSimulateModule{},
 		&ClaudeSessionModule{},
+		&PromptRegistryModule{},
 	}
 }
 
