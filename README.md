@@ -26,6 +26,15 @@ Add to your MCP client config (e.g. Claude Code `.mcp.json`):
 }
 ```
 
+By default, `dotfiles-mcp` marks its non-discovery tools as `defer_loading` and exposes discovery helpers first:
+
+- `dotfiles_tool_search`
+- `dotfiles_tool_schema`
+- `dotfiles_tool_catalog`
+- `dotfiles_tool_stats`
+
+Use `DOTFILES_MCP_PROFILE=full` if you explicitly want the full catalog treated as eager.
+
 ## Tool Categories
 
 | Category | Tools | Description |

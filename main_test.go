@@ -40,6 +40,23 @@ func TestModuleRegistration(t *testing.T) {
 	}
 }
 
+func TestRegisterDotfilesModules_DefaultProfile(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "default")
+
+	reg := registry.NewToolRegistry()
+	registerDotfilesModules(reg)
+
+	if !reg.IsDeferred("dotfiles_validate_config") {
+		t.Fatal("expected dotfiles_validate_config to be deferred in default profile")
+	}
+	if reg.IsDeferred("dotfiles_tool_search") {
+		t.Fatal("expected discovery tools to stay eager")
+	}
+	if _, ok := reg.GetTool("dotfiles_tool_catalog"); !ok {
+		t.Fatal("expected discovery tool dotfiles_tool_catalog to be registered")
+	}
+}
+
 func TestValidateConfig_ValidTOML(t *testing.T) {
 	m := &DotfilesModule{}
 	td := findTool(t, m, "dotfiles_validate_config")

@@ -2,3 +2,11 @@
 .env.*
 .envrc
 dotfiles-mcp
+
+# Local env files
+.env
+.env.local
+.envrc
+.env.*
+!.env.example
+!.env.*.example
