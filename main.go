@@ -2956,6 +2956,7 @@ func main() {
 	reg.RegisterModule(&OSSModule{})
 	reg.RegisterModule(&MappingEngineModule{})
 	reg.RegisterModule(&LearnModule{})
+	reg.RegisterModule(&MappingStatusModule{})
 
 	s := registry.NewMCPServer("dotfiles-mcp", "2.1.0")
 	reg.RegisterWithServer(s)
