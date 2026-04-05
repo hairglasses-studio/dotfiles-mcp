@@ -1,0 +1,25 @@
+version: 2
+project_name: dotfiles-mcp
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - binary: dotfiles-mcp
+    goos: [linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+
+checksum:
+  algorithm: sha256
+
+release:
+  github:
+    owner: hairglasses-studio
+    name: dotfiles-mcp
