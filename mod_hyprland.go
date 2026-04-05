@@ -104,6 +104,16 @@ type SetMonitorInput struct {
 	Scale      string `json:"scale,omitempty" jsonschema:"description=Scale factor (e.g. 1 or 1.5 or 2)"`
 }
 
+type monitorInfo struct {
+	Name            string `json:"name"`
+	Resolution      string `json:"resolution"`
+	RefreshRate     string `json:"refreshRate"`
+	Position        string `json:"position"`
+	Scale           string `json:"scale"`
+	ActiveWorkspace int    `json:"activeWorkspace"`
+	Focused         bool   `json:"focused"`
+}
+
 // ---------- module ----------
 
 type HyprlandModule struct{}
@@ -525,28 +535,18 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 		),
 
 		// ── hypr_get_monitors ─────────────────────────
-		handler.TypedHandler[EmptyInput, string](
+		handler.TypedHandler[EmptyInput, []monitorInfo](
 			"hypr_get_monitors",
 			"List connected monitors with resolution, refresh rate, position, scale, and active workspace.",
-			func(_ context.Context, _ EmptyInput) (string, error) {
+			func(_ context.Context, _ EmptyInput) ([]monitorInfo, error) {
 				out, err := runHyprctl("monitors", "-j")
 				if err != nil {
-					return "", err
+					return nil, err
 				}
 
 				var monitors []map[string]interface{}
 				if err := json.Unmarshal([]byte(out), &monitors); err != nil {
-					return "", fmt.Errorf("failed to parse monitors JSON: %w", err)
-				}
-
-				type monitorInfo struct {
-					Name            string `json:"name"`
-					Resolution      string `json:"resolution"`
-					RefreshRate     string `json:"refreshRate"`
-					Position        string `json:"position"`
-					Scale           string `json:"scale"`
-					ActiveWorkspace int    `json:"activeWorkspace"`
-					Focused         bool   `json:"focused"`
+					return nil, fmt.Errorf("failed to parse monitors JSON: %w", err)
 				}
 
 				var result []monitorInfo
@@ -588,8 +588,7 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 					result = append(result, mi)
 				}
 
-				b, _ := json.MarshalIndent(result, "", "  ")
-				return string(b), nil
+				return result, nil
 			},
 		),
 
