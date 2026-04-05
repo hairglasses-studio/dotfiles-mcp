@@ -48,7 +48,7 @@ func TestScreenModule_MCPTestServer(t *testing.T) {
 	srv := mcptest.NewServer(t, reg)
 
 	names := srv.ToolNames()
-	if len(names) != 5 {
-		t.Fatalf("expected 5 registered tools, got %d: %v", len(names), names)
+	if len(names) != 8 {
+		t.Fatalf("expected 8 registered tools, got %d: %v", len(names), names)
 	}
 }
