@@ -440,3 +440,154 @@ func TestExtractJSONLMeta_MissingFile(t *testing.T) {
 		t.Error("expected all empty for missing file")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// summarizeLogEntry
+// ---------------------------------------------------------------------------
+
+func TestSummarizeLogEntry_User(t *testing.T) {
+	entry := map[string]any{
+		"type":      "user",
+		"timestamp": "2026-04-05T12:00:00Z",
+		"message": map[string]any{
+			"content": "Fix the build error in main.go",
+		},
+	}
+	le := summarizeLogEntry(entry)
+	if le.Type != "user" {
+		t.Errorf("type = %q, want user", le.Type)
+	}
+	if le.Timestamp != "2026-04-05T12:00:00Z" {
+		t.Errorf("timestamp = %q, want 2026-04-05T12:00:00Z", le.Timestamp)
+	}
+	if le.Summary == "" {
+		t.Error("expected non-empty summary for user message")
+	}
+}
+
+func TestSummarizeLogEntry_Assistant_Text(t *testing.T) {
+	entry := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "text",
+					"text": "I found the issue in the build configuration.",
+				},
+			},
+		},
+	}
+	le := summarizeLogEntry(entry)
+	if le.Type != "assistant" {
+		t.Errorf("type = %q, want assistant", le.Type)
+	}
+	if le.Summary == "" {
+		t.Error("expected non-empty summary for assistant text")
+	}
+}
+
+func TestSummarizeLogEntry_Assistant_ToolUse(t *testing.T) {
+	entry := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"content": []any{
+				map[string]any{
+					"type": "tool_use",
+					"name": "shader_list",
+				},
+			},
+		},
+	}
+	le := summarizeLogEntry(entry)
+	if le.Summary != "[tool_use: shader_list]" {
+		t.Errorf("summary = %q, want [tool_use: shader_list]", le.Summary)
+	}
+}
+
+func TestSummarizeLogEntry_System(t *testing.T) {
+	entry := map[string]any{
+		"type":    "system",
+		"subtype": "init",
+	}
+	le := summarizeLogEntry(entry)
+	if le.Summary != "[system: init]" {
+		t.Errorf("summary = %q, want [system: init]", le.Summary)
+	}
+}
+
+func TestSummarizeLogEntry_PermissionMode(t *testing.T) {
+	entry := map[string]any{
+		"type":           "permission-mode",
+		"permissionMode": "full",
+	}
+	le := summarizeLogEntry(entry)
+	if le.Summary != "[permission-mode: full]" {
+		t.Errorf("summary = %q, want [permission-mode: full]", le.Summary)
+	}
+}
+
+func TestSummarizeLogEntry_FileHistorySnapshot(t *testing.T) {
+	entry := map[string]any{
+		"type": "file-history-snapshot",
+	}
+	le := summarizeLogEntry(entry)
+	if le.Summary != "[file-history-snapshot]" {
+		t.Errorf("summary = %q, want [file-history-snapshot]", le.Summary)
+	}
+}
+
+func TestSummarizeLogEntry_Unknown(t *testing.T) {
+	entry := map[string]any{
+		"type": "custom-event",
+	}
+	le := summarizeLogEntry(entry)
+	if le.Summary != "[custom-event]" {
+		t.Errorf("summary = %q, want [custom-event]", le.Summary)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// findRecentPlanFile
+// ---------------------------------------------------------------------------
+
+func TestFindRecentPlanFile_Found(t *testing.T) {
+	dir := t.TempDir()
+	sessionID := "test-session-abc123"
+
+	// Create a JSONL file with plan reference.
+	jsonlPath := filepath.Join(dir, sessionID+".jsonl")
+	content := `{"type":"system","subtype":"init"}
+{"type":"user","message":{"content":"use plans/my-great-plan.md"}}
+`
+	os.WriteFile(jsonlPath, []byte(content), 0644)
+
+	got := findRecentPlanFile(dir, sessionID)
+	if got != "my-great-plan.md" {
+		t.Errorf("findRecentPlanFile() = %q, want 'my-great-plan.md'", got)
+	}
+}
+
+func TestFindRecentPlanFile_NoPlan(t *testing.T) {
+	dir := t.TempDir()
+	sessionID := "test-session-abc123"
+
+	jsonlPath := filepath.Join(dir, sessionID+".jsonl")
+	content := `{"type":"system","subtype":"init"}
+{"type":"user","message":{"content":"no plan references here"}}
+`
+	os.WriteFile(jsonlPath, []byte(content), 0644)
+
+	got := findRecentPlanFile(dir, sessionID)
+	if got != "" {
+		t.Errorf("findRecentPlanFile() = %q, want empty", got)
+	}
+}
+
+func TestFindRecentPlanFile_NoJSONL(t *testing.T) {
+	dir := t.TempDir()
+	got := findRecentPlanFile(dir, "nonexistent-session")
+	if got != "" {
+		t.Errorf("findRecentPlanFile() = %q, want empty for missing JSONL", got)
+	}
+}
+

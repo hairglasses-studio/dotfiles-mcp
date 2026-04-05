@@ -503,6 +503,208 @@ func TestPromptExport_JSONL(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// PromptIndex update + rewriteJSONL
+// ---------------------------------------------------------------------------
+
+func TestPromptIndex_Update(t *testing.T) {
+	tmpDir := t.TempDir()
+	origBase := promptsBaseDir
+	promptsBaseDir = func() string { return tmpDir }
+	defer func() { promptsBaseDir = origBase }()
+
+	// Create index file
+	indexPath := filepath.Join(tmpDir, ".prompt-index.jsonl")
+	os.WriteFile(indexPath, []byte{}, 0644)
+
+	idx := &PromptIndex{records: make(map[string]*PromptRecord)}
+
+	rec := &PromptRecord{
+		Hash:      "aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa7777bbbb8888",
+		ShortHash: "aaaa1111bbbb",
+		Repo:      "test-repo",
+		Timestamp: "2026-04-05T10:00:00Z",
+		WordCount: 5,
+		TaskType:  "code",
+		Score:     50,
+		Grade:     "D",
+		Tags:      []string{"go"},
+		Status:    "unsorted",
+		Prompt:    "Write a Go function",
+	}
+
+	// Add the record first
+	if err := idx.add(rec); err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	// Now update it with new data
+	rec.Score = 90
+	rec.Grade = "A"
+	rec.Status = "scored"
+	if err := idx.update(rec); err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+
+	// Verify in-memory update
+	got := idx.get(rec.Hash)
+	if got == nil {
+		t.Fatal("record not found after update")
+	}
+	if got.Score != 90 {
+		t.Errorf("score = %d, want 90", got.Score)
+	}
+	if got.Grade != "A" {
+		t.Errorf("grade = %q, want A", got.Grade)
+	}
+	if got.Status != "scored" {
+		t.Errorf("status = %q, want scored", got.Status)
+	}
+
+	// Verify the JSONL was rewritten by loading from disk
+	idx2 := &PromptIndex{records: make(map[string]*PromptRecord)}
+	if err := idx2.load(); err != nil {
+		t.Fatalf("reload failed: %v", err)
+	}
+	got2 := idx2.get(rec.Hash)
+	if got2 == nil {
+		t.Fatal("record not found after reload")
+	}
+	if got2.Score != 90 {
+		t.Errorf("reloaded score = %d, want 90", got2.Score)
+	}
+}
+
+func TestPromptIndex_SearchLimit(t *testing.T) {
+	idx := &PromptIndex{records: make(map[string]*PromptRecord)}
+
+	// Add several records
+	for i := 0; i < 5; i++ {
+		hash := computePromptHash(strings.Repeat("x", i+1))
+		idx.records[hash] = &PromptRecord{
+			Hash:      hash,
+			ShortHash: hash[:12],
+			Repo:      "test-repo",
+			Timestamp: "2026-04-05T10:00:00Z",
+			Prompt:    "test prompt " + strings.Repeat("x", i+1),
+			Status:    "unsorted",
+		}
+	}
+
+	// Search with limit
+	results := idx.search("", "", "", nil, 0, 3)
+	if len(results) > 3 {
+		t.Errorf("expected at most 3 results with limit=3, got %d", len(results))
+	}
+}
+
+func TestPromptIndex_SearchByStatus(t *testing.T) {
+	idx := &PromptIndex{records: make(map[string]*PromptRecord)}
+
+	hash1 := computePromptHash("prompt1")
+	hash2 := computePromptHash("prompt2")
+	idx.records[hash1] = &PromptRecord{
+		Hash: hash1, Prompt: "prompt1", Status: "unsorted", Repo: "test",
+	}
+	idx.records[hash2] = &PromptRecord{
+		Hash: hash2, Prompt: "prompt2", Status: "scored", Repo: "test",
+	}
+
+	results := idx.search("", "", "scored", nil, 0, 10)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result for status=scored, got %d", len(results))
+	}
+}
+
+func TestPromptIndex_StatsRepoFilter(t *testing.T) {
+	idx := &PromptIndex{records: make(map[string]*PromptRecord)}
+
+	hash1 := computePromptHash("prompt1")
+	hash2 := computePromptHash("prompt2")
+	idx.records[hash1] = &PromptRecord{
+		Hash: hash1, Repo: "repo-a", Score: 80, Grade: "B",
+		TaskType: "code", Status: "unsorted", Tags: []string{"go"},
+	}
+	idx.records[hash2] = &PromptRecord{
+		Hash: hash2, Repo: "repo-b", Score: 60, Grade: "D",
+		TaskType: "analysis", Status: "scored", Tags: []string{"python"},
+	}
+
+	// Stats with filter
+	stats := idx.stats("repo-a")
+	if stats.TotalPrompts != 1 {
+		t.Errorf("expected 1 prompt for repo-a, got %d", stats.TotalPrompts)
+	}
+	if stats.AverageScore != 80 {
+		t.Errorf("expected average score 80, got %.1f", stats.AverageScore)
+	}
+
+	// Stats without filter
+	statsAll := idx.stats("")
+	if statsAll.TotalPrompts != 2 {
+		t.Errorf("expected 2 total prompts, got %d", statsAll.TotalPrompts)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// wordCount
+// ---------------------------------------------------------------------------
+
+func TestWordCount(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"hello world", 2},
+		{"one", 1},
+		{"", 0},
+		{"  spaces   between   words  ", 3},
+		{"multi\nline\ntext", 3},
+	}
+	for _, tc := range tests {
+		got := wordCount(tc.input)
+		if got != tc.want {
+			t.Errorf("wordCount(%q) = %d, want %d", tc.input, got, tc.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// promptFilePath
+// ---------------------------------------------------------------------------
+
+func TestPromptFilePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	origBase := promptsBaseDir
+	promptsBaseDir = func() string { return tmpDir }
+	defer func() { promptsBaseDir = origBase }()
+
+	rec := &PromptRecord{
+		ShortHash: "abc123",
+		Repo:      "test-repo",
+		Status:    "unsorted",
+	}
+	path := promptFilePath(rec)
+	if !strings.Contains(path, "unsorted") {
+		t.Errorf("expected unsorted in path, got %s", path)
+	}
+	if !strings.HasSuffix(path, "abc123.md") {
+		t.Errorf("expected abc123.md suffix, got %s", path)
+	}
+
+	rec.Status = "improved"
+	path = promptFilePath(rec)
+	if !strings.Contains(path, "sorted") {
+		t.Errorf("expected sorted in path for improved status, got %s", path)
+	}
+
+	rec.Status = "scored"
+	path = promptFilePath(rec)
+	if !strings.Contains(path, "sorted") {
+		t.Errorf("expected sorted in path for scored status, got %s", path)
+	}
+}
+
 func TestCorruptJSONLRecovery(t *testing.T) {
 	tmpDir := t.TempDir()
 	origBase := promptsBaseDir
