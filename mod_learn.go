@@ -303,6 +303,8 @@ func (m *LearnModule) Tools() []registry.ToolDefinition {
 					{Name: "desktop-control", Type: "midi", Description: "MIDI faders for volume/brightness, pads for workspace switching", Tags: []string{"desktop", "volume", "workspace"}},
 					{Name: "shader-control", Type: "midi", Description: "MIDI controls for Ghostty shader cycling and wallpaper selection", Tags: []string{"shader", "wallpaper", "ghostty"}},
 					{Name: "volume-mixer", Type: "midi", Description: "Per-sink audio control via PipeWire — one fader per audio source", Tags: []string{"audio", "pipewire", "mixer"}},
+					{Name: "vj-control", Type: "midi", Description: "VJ/DJ live performance — encoder-to-OSC for Resolume, TouchDesigner, OBS", Tags: []string{"vj", "dj", "resolume", "touchdesigner", "osc", "en16"}},
+					{Name: "en16-default", Type: "midi", Description: "Intech Studio Grid EN16 default layout — system, workspace, shader, media", Tags: []string{"intech", "grid", "en16", "encoder"}},
 				}
 				return ListTemplatesOutput{Templates: templates}, nil
 			},
@@ -389,7 +391,13 @@ func (m *LearnModule) Tools() []registry.ToolDefinition {
 						action := "would_generate"
 						if input.Execute {
 							action = "generated"
-							if tmpl, ok := midiTemplates["desktop-control"]; ok {
+							// Use EN16-specific template for Intech Grid devices.
+							tmplName := "desktop-control"
+							lowerName := strings.ToLower(d.Name)
+							if strings.Contains(lowerName, "grid") || strings.Contains(lowerName, "intech") {
+								tmplName = "en16-default"
+							}
+							if tmpl, ok := midiTemplates[tmplName]; ok {
 								content := fmt.Sprintf(tmpl, d.Name, d.RawPath, d.Name, d.RawPath)
 								os.MkdirAll(midiDir(), 0755)
 								os.WriteFile(mappingPath, []byte(content), 0644)
@@ -535,6 +543,8 @@ func suggestMappings(controls []CapturedControl, purpose string) []LearnSuggesti
 	hasButtons := false
 	hasAxes := false
 	hasEncoders := false
+	hasMIDICC := false
+	hasMIDINote := false
 
 	for _, c := range controls {
 		switch c.Type {
@@ -544,6 +554,10 @@ func suggestMappings(controls []CapturedControl, purpose string) []LearnSuggesti
 			hasAxes = true
 		case "encoder":
 			hasEncoders = true
+		case "midi_cc":
+			hasMIDICC = true
+		case "midi_note":
+			hasMIDINote = true
 		}
 	}
 
@@ -598,6 +612,46 @@ output = { type = "command", exec = ["brightnessctl", "set", "{delta}%"] }
 [mapping.value]
 mode = "relative"
 step = 5`,
+		})
+	}
+
+	if hasMIDICC {
+		suggestions = append(suggestions, LearnSuggestion{
+			OutputType:  "osc",
+			Description: "Map MIDI CC to OSC for VJ software (Resolume, TouchDesigner)",
+			Example: `[[mapping]]
+input = "midi:cc:32"
+output = { type = "osc", address = "/composition/layers/1/video/opacity", port = 7000 }
+[mapping.value]
+input_range = [0, 127]
+output_range = [0.0, 1.0]`,
+		})
+		suggestions = append(suggestions, LearnSuggestion{
+			OutputType:  "command",
+			Description: "Map MIDI CC to system controls (volume, brightness)",
+			Example: `[[mapping]]
+input = "midi:cc:32"
+output = { type = "command", exec = ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "{scaled}%"] }
+[mapping.value]
+input_range = [0, 127]
+output_range = [0, 100]`,
+		})
+	}
+
+	if hasMIDINote {
+		suggestions = append(suggestions, LearnSuggestion{
+			OutputType:  "osc",
+			Description: "Map MIDI note buttons to OSC triggers (clip launch, scene switch)",
+			Example: `[[mapping]]
+input = "midi:note:32"
+output = { type = "osc", address = "/composition/layers/1/clips/1/connect", port = 7000 }`,
+		})
+		suggestions = append(suggestions, LearnSuggestion{
+			OutputType:  "command",
+			Description: "Map MIDI note buttons to shell commands",
+			Example: `[[mapping]]
+input = "midi:note:32"
+output = { type = "command", exec = ["hyprctl", "dispatch", "workspace", "1"] }`,
 		})
 	}
 
