@@ -4,6 +4,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/hairglasses-studio/mcpkit/handler"
@@ -109,7 +111,8 @@ func findShader(name string) (string, error) {
 // atomicSetShader replaces the custom-shader line in the Ghostty config
 // using temp-file + rename for atomic writes. Also detects whether the
 // shader uses animation uniforms and sets custom-shader-animation accordingly.
-func atomicSetShader(shaderPath string) error {
+// Optionally logs the change to the JSONL history.
+func atomicSetShader(shaderPath string, source ...string) error {
 	cfgPath := ghosttyConfig()
 
 	// Detect animation need.
@@ -168,6 +171,17 @@ func atomicSetShader(shaderPath string) error {
 		os.Remove(tmpPath)
 		return fmt.Errorf("rename: %w", err)
 	}
+
+	// Log to JSONL history
+	src := "mcp:shader_set"
+	if len(source) > 0 && source[0] != "" {
+		src = source[0]
+	}
+	_ = appendShaderHistory(ShaderHistoryEntry{
+		Action: "set",
+		Shader: strings.TrimSuffix(filepath.Base(shaderPath), ".glsl"),
+		Source: src,
+	})
 	return nil
 }
 
@@ -238,11 +252,11 @@ func activePlaylistName() string {
 	p := filepath.Join(playlistStateDir(), "auto-rotate-playlist")
 	data, err := os.ReadFile(p)
 	if err != nil {
-		return "low-intensity" // default
+		return "ambient" // default
 	}
 	name := strings.TrimSpace(string(data))
 	if name == "" {
-		return "low-intensity"
+		return "ambient"
 	}
 	return name
 }
@@ -491,8 +505,149 @@ type ShaderPlaylistOutput struct {
 }
 
 // ---------------------------------------------------------------------------
+// History (JSONL append-only log)
+// ---------------------------------------------------------------------------
+
+// ShaderHistoryEntry is a single entry in the shader change log.
+type ShaderHistoryEntry struct {
+	Timestamp string            `json:"timestamp"`
+	Action    string            `json:"action"` // set, cycle, random, preview, revert
+	Shader    string            `json:"shader"`
+	Source    string            `json:"source"` // mcp:shader_set, mcp:shader_cycle, etc.
+	Details   map[string]string `json:"details,omitempty"`
+}
+
+func shaderHistoryPath() string {
+	return filepath.Join(os.Getenv("HOME"), ".local", "state", "ghostty", "shader-history.jsonl")
+}
+
+func appendShaderHistory(entry ShaderHistoryEntry) error {
+	if entry.Timestamp == "" {
+		entry.Timestamp = time.Now().UTC().Format(time.RFC3339)
+	}
+	dir := filepath.Dir(shaderHistoryPath())
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(shaderHistoryPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return json.NewEncoder(f).Encode(entry)
+}
+
+func readShaderHistory(limit int, since time.Time) ([]ShaderHistoryEntry, error) {
+	data, err := os.ReadFile(shaderHistoryPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var all []ShaderHistoryEntry
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line == "" {
+			continue
+		}
+		var e ShaderHistoryEntry
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			continue
+		}
+		if !since.IsZero() {
+			t, err := time.Parse(time.RFC3339, e.Timestamp)
+			if err != nil || t.Before(since) {
+				continue
+			}
+		}
+		all = append(all, e)
+	}
+	// Return most recent entries up to limit
+	if limit > 0 && len(all) > limit {
+		all = all[len(all)-limit:]
+	}
+	return all, nil
+}
+
+// ---------------------------------------------------------------------------
+// New tool I/O types
+// ---------------------------------------------------------------------------
+
+type ShaderHotReloadInput struct{}
+
+type ShaderHotReloadOutput struct {
+	Reloaded bool   `json:"reloaded"`
+	Method   string `json:"method"` // "touch" or "sigusr1"
+}
+
+type ShaderDiffInput struct {
+	Limit int `json:"limit,omitempty" jsonschema:"description=Number of recent changes to compare (default: 2)"`
+}
+
+type DiffEntry struct {
+	Field  string `json:"field"`
+	Before string `json:"before"`
+	After  string `json:"after"`
+}
+
+type ShaderDiffOutput struct {
+	Changes []DiffEntry `json:"changes"`
+	Before  string      `json:"before"`
+	After   string      `json:"after"`
+}
+
+type ShaderLogInput struct {
+	Limit int    `json:"limit,omitempty" jsonschema:"description=Max entries to return (default: 20)"`
+	Since string `json:"since,omitempty" jsonschema:"description=Only show entries after this RFC3339 timestamp"`
+}
+
+type ShaderLogEntry struct {
+	Shader    string `json:"shader"`
+	Action    string `json:"action"`
+	Source    string `json:"source"`
+	Timestamp string `json:"timestamp"`
+	Duration  string `json:"duration,omitempty"`
+}
+
+type ShaderLogOutput struct {
+	Entries []ShaderLogEntry `json:"entries"`
+	Count   int              `json:"count"`
+}
+
+type ShaderPreviewInput struct {
+	Name     string `json:"name" jsonschema:"required,description=Shader to preview (with or without .glsl)"`
+	Duration int    `json:"duration,omitempty" jsonschema:"description=Preview duration in seconds (default: 10)"`
+}
+
+type ShaderPreviewOutput struct {
+	Previewing string `json:"previewing"`
+	Duration   int    `json:"duration"`
+	RevertTo   string `json:"revert_to"`
+}
+
+type ShaderAuditTrailInput struct {
+	Limit  int    `json:"limit,omitempty" jsonschema:"description=Max entries to return (default: 50)"`
+	Format string `json:"format,omitempty" jsonschema:"description=Output format: json or text (default: json),enum=json,enum=text"`
+}
+
+type ShaderAuditTrailOutput struct {
+	Entries []ShaderHistoryEntry `json:"entries,omitempty"`
+	Text    string               `json:"text,omitempty"`
+	Count   int                  `json:"count"`
+}
+
+// ---------------------------------------------------------------------------
 // Module
 // ---------------------------------------------------------------------------
+
+// previewState tracks an in-progress shader preview for auto-revert.
+type previewState struct {
+	mu       sync.Mutex
+	timer    *time.Timer
+	original string // shader path to revert to
+}
+
+var preview = &previewState{}
 
 type ShaderModule struct {
 	manifest     map[string]ShaderMeta
@@ -589,7 +744,7 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 				}
 				pick := files[rand.IntN(len(files))]
 				p := filepath.Join(shadersDir(), pick)
-				if err := atomicSetShader(p); err != nil {
+				if err := atomicSetShader(p, "mcp:shader_random"); err != nil {
 					return ShaderRandomOutput{}, fmt.Errorf("failed to apply shader: %w", err)
 				}
 				return ShaderRandomOutput{
@@ -801,7 +956,7 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 					return ShaderCycleOutput{}, fmt.Errorf("shader %s from playlist %s not found: %w", pick, playlist, err)
 				}
 
-				if err := atomicSetShader(p); err != nil {
+				if err := atomicSetShader(p, "mcp:shader_cycle:"+playlist); err != nil {
 					return ShaderCycleOutput{}, fmt.Errorf("failed to apply shader: %w", err)
 				}
 
@@ -950,7 +1105,7 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 					if err != nil {
 						return ShaderPlaylistOutput{}, err
 					}
-					if err := atomicSetShader(p); err != nil {
+					if err := atomicSetShader(p, "mcp:shader_playlist:"+input.Name); err != nil {
 						return ShaderPlaylistOutput{}, fmt.Errorf("failed to apply shader: %w", err)
 					}
 					return ShaderPlaylistOutput{
@@ -968,6 +1123,220 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 						Shaders: shaders,
 					}},
 				}, nil
+			},
+		),
+
+		// ── shader_hot_reload ─────────────────────────
+		handler.TypedHandler[ShaderHotReloadInput, ShaderHotReloadOutput](
+			"shader_hot_reload",
+			"Force Ghostty to reload its config. Touches the config file to trigger inotify; falls back to SIGUSR1.",
+			func(_ context.Context, _ ShaderHotReloadInput) (ShaderHotReloadOutput, error) {
+				cfgPath := ghosttyConfig()
+
+				// Method 1: re-write config atomically (new inode triggers inotify)
+				data, err := os.ReadFile(cfgPath)
+				if err != nil {
+					return ShaderHotReloadOutput{}, fmt.Errorf("read config: %w", err)
+				}
+				tmp, err := os.CreateTemp(filepath.Dir(cfgPath), "ghostty-reload-*.tmp")
+				if err != nil {
+					return ShaderHotReloadOutput{}, fmt.Errorf("create temp: %w", err)
+				}
+				tmpPath := tmp.Name()
+				if _, err := tmp.Write(data); err != nil {
+					tmp.Close()
+					os.Remove(tmpPath)
+					return ShaderHotReloadOutput{}, err
+				}
+				tmp.Close()
+				if info, statErr := os.Stat(cfgPath); statErr == nil {
+					os.Chmod(tmpPath, info.Mode())
+				}
+				if err := os.Rename(tmpPath, cfgPath); err != nil {
+					os.Remove(tmpPath)
+					// Fallback: SIGUSR1
+					cmd := exec.Command("pkill", "-USR1", "ghostty")
+					if err := cmd.Run(); err != nil {
+						return ShaderHotReloadOutput{}, fmt.Errorf("both touch and SIGUSR1 failed")
+					}
+					return ShaderHotReloadOutput{Reloaded: true, Method: "sigusr1"}, nil
+				}
+				return ShaderHotReloadOutput{Reloaded: true, Method: "touch"}, nil
+			},
+		),
+
+		// ── shader_diff ───────────────────────────────
+		handler.TypedHandler[ShaderDiffInput, ShaderDiffOutput](
+			"shader_diff",
+			"Compare the last two shader changes from the history log. Shows what changed between shader switches.",
+			func(_ context.Context, input ShaderDiffInput) (ShaderDiffOutput, error) {
+				limit := input.Limit
+				if limit < 2 {
+					limit = 2
+				}
+				entries, err := readShaderHistory(limit, time.Time{})
+				if err != nil {
+					return ShaderDiffOutput{}, fmt.Errorf("read history: %w", err)
+				}
+				if len(entries) < 2 {
+					return ShaderDiffOutput{}, fmt.Errorf("need at least 2 history entries for diff, found %d", len(entries))
+				}
+				before := entries[len(entries)-2]
+				after := entries[len(entries)-1]
+
+				var changes []DiffEntry
+				if before.Shader != after.Shader {
+					changes = append(changes, DiffEntry{Field: "shader", Before: before.Shader, After: after.Shader})
+				}
+				if before.Action != after.Action {
+					changes = append(changes, DiffEntry{Field: "action", Before: before.Action, After: after.Action})
+				}
+				if before.Source != after.Source {
+					changes = append(changes, DiffEntry{Field: "source", Before: before.Source, After: after.Source})
+				}
+				if before.Timestamp != after.Timestamp {
+					changes = append(changes, DiffEntry{Field: "timestamp", Before: before.Timestamp, After: after.Timestamp})
+				}
+
+				return ShaderDiffOutput{
+					Changes: changes,
+					Before:  before.Shader,
+					After:   after.Shader,
+				}, nil
+			},
+		),
+
+		// ── shader_log ────────────────────────────────
+		handler.TypedHandler[ShaderLogInput, ShaderLogOutput](
+			"shader_log",
+			"View shader change history with computed durations. Shows when each shader was active and for how long.",
+			func(_ context.Context, input ShaderLogInput) (ShaderLogOutput, error) {
+				limit := input.Limit
+				if limit <= 0 {
+					limit = 20
+				}
+				var since time.Time
+				if input.Since != "" {
+					var err error
+					since, err = time.Parse(time.RFC3339, input.Since)
+					if err != nil {
+						return ShaderLogOutput{}, fmt.Errorf("invalid since timestamp: %w", err)
+					}
+				}
+				entries, err := readShaderHistory(limit+1, since) // +1 to compute last duration
+				if err != nil {
+					return ShaderLogOutput{}, fmt.Errorf("read history: %w", err)
+				}
+
+				var out []ShaderLogEntry
+				for i, e := range entries {
+					le := ShaderLogEntry{
+						Shader:    e.Shader,
+						Action:    e.Action,
+						Source:    e.Source,
+						Timestamp: e.Timestamp,
+					}
+					// Compute duration from this entry to the next
+					if i+1 < len(entries) {
+						t1, err1 := time.Parse(time.RFC3339, e.Timestamp)
+						t2, err2 := time.Parse(time.RFC3339, entries[i+1].Timestamp)
+						if err1 == nil && err2 == nil {
+							le.Duration = t2.Sub(t1).Round(time.Second).String()
+						}
+					}
+					out = append(out, le)
+				}
+				// Trim to requested limit
+				if len(out) > limit {
+					out = out[len(out)-limit:]
+				}
+
+				return ShaderLogOutput{Entries: out, Count: len(out)}, nil
+			},
+		),
+
+		// ── shader_preview ────────────────────────────
+		handler.TypedHandler[ShaderPreviewInput, ShaderPreviewOutput](
+			"shader_preview",
+			"Preview a shader for N seconds, then automatically revert to the previous shader. Cancels any in-progress preview.",
+			func(_ context.Context, input ShaderPreviewInput) (ShaderPreviewOutput, error) {
+				p, err := findShader(input.Name)
+				if err != nil {
+					return ShaderPreviewOutput{}, err
+				}
+
+				duration := input.Duration
+				if duration <= 0 {
+					duration = 10
+				}
+
+				// Read current shader to revert to
+				original, err := readActiveShader()
+				if err != nil {
+					return ShaderPreviewOutput{}, fmt.Errorf("read current shader: %w", err)
+				}
+
+				// Cancel any in-progress preview
+				preview.mu.Lock()
+				if preview.timer != nil {
+					preview.timer.Stop()
+				}
+
+				// Apply preview shader
+				if err := atomicSetShader(p, "mcp:shader_preview"); err != nil {
+					preview.mu.Unlock()
+					return ShaderPreviewOutput{}, fmt.Errorf("apply preview shader: %w", err)
+				}
+
+				// Schedule revert
+				revertPath := original
+				preview.original = revertPath
+				preview.timer = time.AfterFunc(time.Duration(duration)*time.Second, func() {
+					_ = atomicSetShader(filepath.Join(shadersDir(), filepath.Base(revertPath)), "mcp:shader_preview:revert")
+					preview.mu.Lock()
+					preview.timer = nil
+					preview.original = ""
+					preview.mu.Unlock()
+				})
+				preview.mu.Unlock()
+
+				return ShaderPreviewOutput{
+					Previewing: strings.TrimSuffix(filepath.Base(p), ".glsl"),
+					Duration:   duration,
+					RevertTo:   strings.TrimSuffix(filepath.Base(original), ".glsl"),
+				}, nil
+			},
+		),
+
+		// ── shader_audit_trail ────────────────────────
+		handler.TypedHandler[ShaderAuditTrailInput, ShaderAuditTrailOutput](
+			"shader_audit_trail",
+			"View the raw, append-only shader change history log. Returns all recorded shader changes with timestamps and sources.",
+			func(_ context.Context, input ShaderAuditTrailInput) (ShaderAuditTrailOutput, error) {
+				limit := input.Limit
+				if limit <= 0 {
+					limit = 50
+				}
+				entries, err := readShaderHistory(limit, time.Time{})
+				if err != nil {
+					return ShaderAuditTrailOutput{}, fmt.Errorf("read history: %w", err)
+				}
+
+				if strings.EqualFold(input.Format, "text") {
+					var sb strings.Builder
+					for _, e := range entries {
+						fmt.Fprintf(&sb, "[%s] %s %s (via %s)", e.Timestamp, e.Action, e.Shader, e.Source)
+						if len(e.Details) > 0 {
+							for k, v := range e.Details {
+								fmt.Fprintf(&sb, " %s=%s", k, v)
+							}
+						}
+						sb.WriteString("\n")
+					}
+					return ShaderAuditTrailOutput{Text: sb.String(), Count: len(entries)}, nil
+				}
+
+				return ShaderAuditTrailOutput{Entries: entries, Count: len(entries)}, nil
 			},
 		),
 	}

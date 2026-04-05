@@ -17,8 +17,8 @@ import (
 func TestShaderModuleRegistration(t *testing.T) {
 	m := &ShaderModule{}
 	tools := m.Tools()
-	if len(tools) != 13 {
-		t.Fatalf("expected 13 shader tools, got %d", len(tools))
+	if len(tools) != 18 {
+		t.Fatalf("expected 18 shader tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -30,6 +30,8 @@ func TestShaderModuleRegistration(t *testing.T) {
 		"shader_status", "shader_meta", "shader_test", "shader_build",
 		"shader_playlist", "shader_get_state",
 		"wallpaper_set", "wallpaper_random", "wallpaper_list",
+		"shader_hot_reload", "shader_diff", "shader_log",
+		"shader_preview", "shader_audit_trail",
 	} {
 		if !srv.HasTool(want) {
 			t.Errorf("missing tool: %s", want)
