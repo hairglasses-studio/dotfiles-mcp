@@ -85,6 +85,126 @@ BTN_SOUTH = ["echo hello"]`
 }
 
 // ---------------------------------------------------------------------------
+// Quick map input validation
+// ---------------------------------------------------------------------------
+
+func TestQuickMap_Validation(t *testing.T) {
+	m := &MappingStatusModule{}
+	tools := m.Tools()
+
+	var quickMap *registry.ToolDefinition
+	for i := range tools {
+		if tools[i].Tool.Name == "mapping_quick_map" {
+			quickMap = &tools[i]
+			break
+		}
+	}
+	if quickMap == nil {
+		t.Fatal("mapping_quick_map not found")
+	}
+
+	tests := []struct {
+		name    string
+		args    map[string]any
+		wantErr string
+	}{
+		{
+			name: "path traversal in profile",
+			args: map[string]any{
+				"profile":     "../../etc/evil",
+				"input":       "BTN_SOUTH",
+				"output_type": "key",
+				"keys":        "KEY_ENTER",
+			},
+			wantErr: "must not contain '..'",
+		},
+		{
+			name: "invalid output_type",
+			args: map[string]any{
+				"profile":     "Test Controller",
+				"input":       "BTN_SOUTH",
+				"output_type": "banana",
+				"keys":        "KEY_ENTER",
+			},
+			wantErr: "invalid output_type",
+		},
+		{
+			name: "invalid input name",
+			args: map[string]any{
+				"profile":     "Test Controller",
+				"input":       "NOPE_THING",
+				"output_type": "key",
+				"keys":        "KEY_ENTER",
+			},
+			wantErr: "invalid input",
+		},
+		{
+			name: "valid gamepad input accepted",
+			args: map[string]any{
+				"profile":     "Test Controller",
+				"input":       "BTN_SOUTH",
+				"output_type": "key",
+				"keys":        "KEY_ENTER",
+			},
+			wantErr: "", // should succeed
+		},
+	}
+
+	dir := t.TempDir()
+	t.Setenv("DOTFILES_DIR", dir)
+	os.MkdirAll(filepath.Join(dir, "makima"), 0755)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := registry.CallToolRequest{}
+			req.Params.Arguments = tt.args
+
+			result, err := quickMap.Handler(nil, req)
+			if err != nil {
+				t.Fatalf("unexpected Go error: %v", err)
+			}
+			if tt.wantErr != "" {
+				if !registry.IsResultError(result) {
+					t.Fatalf("expected error result containing %q, got success", tt.wantErr)
+				}
+				text := ""
+				if len(result.Content) > 0 {
+					text, _ = registry.ExtractTextContent(result.Content[0])
+				}
+				if !strings.Contains(text, tt.wantErr) {
+					t.Fatalf("expected error containing %q, got %q", tt.wantErr, text)
+				}
+			} else {
+				if registry.IsResultError(result) {
+					t.Fatalf("unexpected error result: %+v", result)
+				}
+			}
+		})
+	}
+}
+
+func TestValidInputPattern(t *testing.T) {
+	valid := []string{
+		"BTN_SOUTH", "BTN_TL", "ABS_X", "ABS_Z",
+		"KEY_ENTER", "KEY_LEFTCTRL", "REL_X",
+		"midi:cc:1", "midi:note:60", "midi:pb",
+	}
+	for _, in := range valid {
+		if !validInputPattern.MatchString(in) {
+			t.Errorf("expected %q to be valid", in)
+		}
+	}
+	invalid := []string{
+		"NOPE_THING", "banana", "", "SOUTH", "../etc",
+	}
+	for _, in := range invalid {
+		if validInputPattern.MatchString(in) {
+			t.Errorf("expected %q to be invalid", in)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Quick map integration (filesystem-based)
 // ---------------------------------------------------------------------------
 

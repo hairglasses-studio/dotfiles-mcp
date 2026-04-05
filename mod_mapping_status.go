@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -13,6 +14,19 @@ import (
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
+
+// validOutputTypes is the set of output types accepted by mapping_quick_map.
+var validOutputTypes = map[string]bool{
+	string(mapping.OutputKey):      true,
+	string(mapping.OutputCommand):  true,
+	string(mapping.OutputOSC):      true,
+	string(mapping.OutputMovement): true,
+}
+
+// validInputPattern matches recognised input naming conventions:
+//
+//	BTN_*, ABS_*, KEY_*, REL_* (evdev), midi:* (MIDI controls).
+var validInputPattern = regexp.MustCompile(`^(BTN_|ABS_|KEY_|REL_|midi:)\S+$`)
 
 // ===========================================================================
 // I/O types
@@ -160,6 +174,25 @@ func (m *MappingStatusModule) Tools() []registry.ToolDefinition {
 			func(_ context.Context, input QuickMapInput) (QuickMapOutput, error) {
 				if input.Profile == "" || input.Input == "" || input.OutputType == "" {
 					return QuickMapOutput{}, fmt.Errorf("[%s] profile, input, and output_type are required", handler.ErrInvalidParam)
+				}
+
+				// Reject path traversal in profile name.
+				if strings.Contains(input.Profile, "..") {
+					return QuickMapOutput{}, fmt.Errorf("[%s] profile must not contain '..'", handler.ErrInvalidParam)
+				}
+
+				// Validate output_type against known mapping output types.
+				if !validOutputTypes[input.OutputType] {
+					valid := make([]string, 0, len(validOutputTypes))
+					for k := range validOutputTypes {
+						valid = append(valid, k)
+					}
+					return QuickMapOutput{}, fmt.Errorf("[%s] invalid output_type %q; must be one of: %s", handler.ErrInvalidParam, input.OutputType, strings.Join(valid, ", "))
+				}
+
+				// Validate input naming convention.
+				if !validInputPattern.MatchString(input.Input) {
+					return QuickMapOutput{}, fmt.Errorf("[%s] invalid input %q; must start with BTN_, ABS_, KEY_, REL_, or midi:", handler.ErrInvalidParam, input.Input)
 				}
 
 				// Build the mapping line based on output type.
