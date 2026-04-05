@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
-MCP server for desktop environment management -- Hyprland, Ghostty shaders, Bluetooth, MIDI, input devices, and open-source readiness scoring. 86 tools across 10 modules.
+MCP server for desktop environment management -- Hyprland, Ghostty shaders, Bluetooth, MIDI, input devices, GitHub org lifecycle, fleet auditing, and open-source readiness scoring. 89 tools across 15 modules.
 
 ## Install
 
@@ -35,6 +35,44 @@ By default, `dotfiles-mcp` marks its non-discovery tools as `defer_loading` and 
 
 Use `DOTFILES_MCP_PROFILE=full` if you explicitly want the full catalog treated as eager.
 
+## Quick Start
+
+After installing, try the discovery tools to explore what's available:
+
+```bash
+# Search tools by keyword
+claude mcp call dotfiles dotfiles_tool_search '{"query": "bluetooth"}'
+
+# Get full tool catalog
+claude mcp call dotfiles dotfiles_tool_catalog '{}'
+
+# Check desktop rice health
+claude mcp call dotfiles dotfiles_rice_check '{}'
+```
+
+## Loading Profiles
+
+Control how many tools load at startup via `DOTFILES_MCP_PROFILE`:
+
+| Profile | Behavior | Context Cost |
+|---------|----------|-------------|
+| `default` | Discovery tools loaded, rest deferred on demand | ~2K tokens |
+| `ops` | Operational subset (config, desktop, fleet) loaded eagerly | ~15K tokens |
+| `full` | All 89 tools loaded immediately | ~40K tokens |
+
+Set in your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "dotfiles": {
+      "command": "dotfiles-mcp",
+      "env": { "DOTFILES_MCP_PROFILE": "ops" }
+    }
+  }
+}
+```
+
 ## Tool Categories
 
 | Category | Tools | Description |
@@ -63,14 +101,25 @@ Use `DOTFILES_MCP_PROFILE=full` if you explicitly want the full catalog treated 
 
 - Go 1.26+
 - Linux (Hyprland/Wayland for desktop tools)
-- `gh` CLI (for GitHub org tools)
-- `bluetoothctl` (for Bluetooth tools)
-- `ydotool`, `wtype` (for input simulation)
-- `glslangValidator` (for shader compilation)
 
-## Built With
+Runtime tools vary by category. Missing tools are detected gracefully -- unused categories won't error:
+
+| Category | Runtime Dependencies |
+|----------|---------------------|
+| Hyprland | `hyprctl`, `ydotool`, `wtype` |
+| Bluetooth | `bluetoothctl` |
+| Shaders | `glslangValidator` (optional, for compile-testing) |
+| Input / Mouse | `logiops` (logid), `solaar`, `makima` |
+| Desktop | `eww`, `makoctl`, `pgrep` |
+| GitHub Org | `gh` (GitHub CLI) |
+| MIDI | ALSA (`aconnect`, `amidi`) |
+
+## See Also
 
 - [mcpkit](https://github.com/hairglasses-studio/mcpkit) -- production-grade Go MCP server toolkit
+- [systemd-mcp](https://github.com/hairglasses-studio/systemd-mcp) -- systemd service management
+- [tmux-mcp](https://github.com/hairglasses-studio/tmux-mcp) -- tmux multiplexer management
+- [process-mcp](https://github.com/hairglasses-studio/process-mcp) -- process debugging with composed investigation
 
 ## License
 
