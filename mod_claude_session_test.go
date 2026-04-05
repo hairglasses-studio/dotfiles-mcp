@@ -68,8 +68,8 @@ func TestEncodeRepoPath(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"/home/hg/hairglasses-studio", "-home-hg-hairglasses-studio"},
-		{"/home/hg/hairglasses-studio/dotfiles", "-home-hg-hairglasses-studio-dotfiles"},
+		{"/home/user/projects", "-home-user-projects"},
+		{"/home/user/projects/dotfiles", "-home-user-projects-dotfiles"},
 		{"/tmp/test", "-tmp-test"},
 	}
 	for _, tc := range tests {

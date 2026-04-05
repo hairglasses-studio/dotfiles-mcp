@@ -56,7 +56,7 @@ func parseDurationString(s string) (time.Duration, error) {
 }
 
 // encodeRepoPath converts an absolute path to Claude's encoded project directory name.
-// e.g. /home/hg/hairglasses-studio -> -home-hg-hairglasses-studio
+// e.g. /home/user/projects -> -home-user-projects
 func encodeRepoPath(path string) string {
 	return strings.ReplaceAll(path, "/", "-")
 }
