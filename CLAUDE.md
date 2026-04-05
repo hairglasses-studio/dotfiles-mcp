@@ -10,7 +10,7 @@ go test ./... -count=1
 go install .
 ```
 
-## Tools (87)
+## Tools (93)
 
 ### Config Management (4)
 - `dotfiles_list_configs` — List dotfiles config directories with symlink health and format
@@ -53,7 +53,7 @@ go install .
 - `dotfiles_eww_get` — Query current eww variable value
 - `dotfiles_onboard_repo` — Add standard files to any repo (.editorconfig, CI, LICENSE)
 
-### Hyprland Desktop (13)
+### Hyprland Desktop (19)
 - `hypr_list_windows` — List all windows with address, title, class, workspace
 - `hypr_list_workspaces` — List workspaces with window count, monitor, focused status
 - `hypr_get_monitors` — List monitors with resolution, refresh rate, position, scale
@@ -67,6 +67,12 @@ go install .
 - `hypr_type_text` — Type text at cursor using wtype
 - `hypr_key` — Send key events using ydotool
 - `hypr_set_monitor` — Configure monitor resolution, position, or scale
+- `hypr_move_window` — Move a window to exact pixel coordinates
+- `hypr_resize_window` — Resize a window to exact pixel dimensions
+- `hypr_close_window` — Close a window by address or class
+- `hypr_toggle_floating` — Toggle floating state of a window
+- `hypr_minimize_window` — Minimize a window to special:minimized workspace
+- `hypr_fullscreen_window` — Toggle fullscreen/maximize for a window
 
 ### Shader Pipeline (13)
 - `shader_list` — List GLSL shaders, optionally filter by category

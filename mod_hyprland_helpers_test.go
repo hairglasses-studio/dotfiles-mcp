@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
 
@@ -148,6 +150,186 @@ func TestWindowRegion(t *testing.T) {
 					tt.wantX, tt.wantY, tt.wantW, tt.wantH)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// resolveHyprWindow — unit tests with mock JSON
+// ---------------------------------------------------------------------------
+
+func TestResolveHyprWindow_ByAddress(t *testing.T) {
+	clientsJSON := `[
+		{"address": "0xaaa111", "class": "foot", "title": "terminal"},
+		{"address": "0xbbb222", "class": "firefox", "title": "browser"}
+	]`
+
+	got, err := resolveHyprWindow("0xbbb222", "", clientsJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "address:0xbbb222" {
+		t.Errorf("got %q, want address:0xbbb222", got)
+	}
+}
+
+func TestResolveHyprWindow_ByClass(t *testing.T) {
+	clientsJSON := `[
+		{"address": "0xaaa111", "class": "foot", "title": "terminal"},
+		{"address": "0xbbb222", "class": "firefox", "title": "browser"}
+	]`
+
+	got, err := resolveHyprWindow("", "Firefox", clientsJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "address:0xbbb222" {
+		t.Errorf("got %q, want address:0xbbb222 (case-insensitive match)", got)
+	}
+}
+
+func TestResolveHyprWindow_NotFound(t *testing.T) {
+	clientsJSON := `[
+		{"address": "0xaaa111", "class": "foot", "title": "terminal"}
+	]`
+
+	_, err := resolveHyprWindow("", "nonexistent", clientsJSON)
+	if err == nil {
+		t.Fatal("expected error for nonexistent window")
+	}
+	if !strings.Contains(err.Error(), "window not found") {
+		t.Errorf("expected 'window not found' in error, got: %v", err)
+	}
+}
+
+func TestResolveHyprWindow_NoSelector(t *testing.T) {
+	_, err := resolveHyprWindow("", "", `[]`)
+	if err == nil {
+		t.Fatal("expected error when neither address nor class is provided")
+	}
+	if !strings.Contains(err.Error(), handler.ErrInvalidParam) {
+		t.Errorf("expected ErrInvalidParam in error, got: %v", err)
+	}
+}
+
+func TestResolveHyprWindow_AddressPriority(t *testing.T) {
+	clientsJSON := `[
+		{"address": "0xaaa111", "class": "foot", "title": "terminal 1"},
+		{"address": "0xbbb222", "class": "foot", "title": "terminal 2"}
+	]`
+
+	got, err := resolveHyprWindow("0xbbb222", "foot", clientsJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "address:0xbbb222" {
+		t.Errorf("address match should take priority, got %q", got)
+	}
+}
+
+func TestResolveHyprWindow_InvalidJSON(t *testing.T) {
+	_, err := resolveHyprWindow("0xaaa111", "", "not json")
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// New window manipulation tools — input validation
+// ---------------------------------------------------------------------------
+
+func TestHyprMoveWindow_NoSelector(t *testing.T) {
+	m := &HyprlandModule{}
+	td := findHyprTool(t, m, "hypr_move_window")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"x": 100, "y": 200}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || !result.IsError {
+		t.Error("expected error result when neither address nor class is provided")
+	}
+}
+
+func TestHyprResizeWindow_NoSelector(t *testing.T) {
+	m := &HyprlandModule{}
+	td := findHyprTool(t, m, "hypr_resize_window")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"width": 800, "height": 600}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || !result.IsError {
+		t.Error("expected error result when neither address nor class is provided")
+	}
+}
+
+func TestHyprCloseWindow_NoSelector(t *testing.T) {
+	m := &HyprlandModule{}
+	td := findHyprTool(t, m, "hypr_close_window")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || !result.IsError {
+		t.Error("expected error result when neither address nor class is provided")
+	}
+}
+
+func TestHyprToggleFloating_NoSelector(t *testing.T) {
+	m := &HyprlandModule{}
+	td := findHyprTool(t, m, "hypr_toggle_floating")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || !result.IsError {
+		t.Error("expected error result when neither address nor class is provided")
+	}
+}
+
+func TestHyprMinimizeWindow_NoSelector(t *testing.T) {
+	m := &HyprlandModule{}
+	td := findHyprTool(t, m, "hypr_minimize_window")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || !result.IsError {
+		t.Error("expected error result when neither address nor class is provided")
+	}
+}
+
+func TestHyprFullscreenWindow_NoSelector(t *testing.T) {
+	m := &HyprlandModule{}
+	td := findHyprTool(t, m, "hypr_fullscreen_window")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || !result.IsError {
+		t.Error("expected error result when neither address nor class is provided")
 	}
 }
 
