@@ -399,16 +399,16 @@ func (m *LearnModule) Tools() []registry.ToolDefinition {
 					Devices: results,
 				}
 
-				// Restart mapitall if executing and gamepads were generated.
+				// Restart mapitall if executing and any profiles were generated.
 				if input.Execute {
-					hasNewGamepad := false
+					hasNewProfile := false
 					for _, r := range results {
-						if r.Type == "gamepad" && r.Action == "generated" {
-							hasNewGamepad = true
+						if r.Action == "generated" {
+							hasNewProfile = true
 							break
 						}
 					}
-					if hasNewGamepad {
+					if hasNewProfile {
 						if _, _, err := inputRunCmd("sudo", "systemctl", "restart", "mapitall.service"); err == nil {
 							out.Restart = "mapitall restarted"
 						} else {
