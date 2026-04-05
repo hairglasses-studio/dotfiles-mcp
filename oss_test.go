@@ -417,12 +417,12 @@ func TestCheckCICD(t *testing.T) {
 	}
 	ciFound := false
 	for _, r := range results {
-		if r.Name == "ci_workflows" && r.Passed {
+		if r.Name == "has_workflows" && r.Passed {
 			ciFound = true
 		}
 	}
 	if !ciFound {
-		t.Error("expected ci_workflows to pass when workflow file exists")
+		t.Error("expected has_workflows to pass when workflow file exists")
 	}
 }
 
