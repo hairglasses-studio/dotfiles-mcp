@@ -737,3 +737,90 @@ schema_version = 1
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Layer-aware resolve tests
+// ---------------------------------------------------------------------------
+
+func TestMappingResolveTest_LayerMatch(t *testing.T) {
+	p := &mapping.MappingProfile{
+		Profile: &mapping.ProfileMeta{SchemaVersion: 1, Device: "layer-test"},
+		Mappings: []mapping.MappingRule{
+			{
+				Input:       "BTN_SOUTH",
+				Layer:       2,
+				Output:      mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_Z"}},
+				Description: "layer-2 action",
+			},
+		},
+	}
+	idx := mapping.BuildRuleIndex(p)
+	state := mapping.NewEngineState()
+	state.SetActiveLayer("test", 2)
+
+	rule := idx.Resolve("BTN_SOUTH", state, "test")
+	if rule == nil {
+		t.Fatal("expected layer-2 rule to match when device layer is 2")
+	}
+	if rule.Description != "layer-2 action" {
+		t.Errorf("got description=%q, want %q", rule.Description, "layer-2 action")
+	}
+}
+
+func TestMappingResolveTest_LayerMismatch(t *testing.T) {
+	p := &mapping.MappingProfile{
+		Profile: &mapping.ProfileMeta{SchemaVersion: 1, Device: "layer-test"},
+		Mappings: []mapping.MappingRule{
+			{
+				Input:       "BTN_SOUTH",
+				Layer:       2,
+				Output:      mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_Z"}},
+				Description: "layer-2 action",
+			},
+		},
+	}
+	idx := mapping.BuildRuleIndex(p)
+	state := mapping.NewEngineState()
+	state.SetActiveLayer("test", 1)
+
+	rule := idx.Resolve("BTN_SOUTH", state, "test")
+	if rule != nil {
+		t.Errorf("expected no match when active layer is 1, but got rule: %v", rule.Description)
+	}
+}
+
+func TestMappingResolveTest_LayerZeroMatchesAll(t *testing.T) {
+	p := &mapping.MappingProfile{
+		Profile: &mapping.ProfileMeta{SchemaVersion: 1, Device: "layer-test"},
+		Mappings: []mapping.MappingRule{
+			{
+				Input:       "BTN_SOUTH",
+				Layer:       0, // layer 0 = matches all layers
+				Output:      mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_ENTER"}},
+				Description: "global action",
+			},
+		},
+	}
+	idx := mapping.BuildRuleIndex(p)
+
+	// Test with layer 0 (default).
+	state := mapping.NewEngineState()
+	rule := idx.Resolve("BTN_SOUTH", state, "test")
+	if rule == nil || rule.Description != "global action" {
+		t.Errorf("layer-0 rule should match with default layer, got %v", rule)
+	}
+
+	// Test with layer 3 active — layer-0 rule should still match.
+	state.SetActiveLayer("test", 3)
+	rule = idx.Resolve("BTN_SOUTH", state, "test")
+	if rule == nil || rule.Description != "global action" {
+		t.Errorf("layer-0 rule should match with layer 3 active, got %v", rule)
+	}
+
+	// Test with layer 99 active — still matches.
+	state.SetActiveLayer("test", 99)
+	rule = idx.Resolve("BTN_SOUTH", state, "test")
+	if rule == nil || rule.Description != "global action" {
+		t.Errorf("layer-0 rule should match with layer 99 active, got %v", rule)
+	}
+}

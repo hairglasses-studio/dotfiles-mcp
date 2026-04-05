@@ -86,7 +86,7 @@ type MappingValidateOutput struct {
 
 type MappingMigrateInput struct {
 	Name   string `json:"name,omitempty" jsonschema:"description=Legacy profile name to migrate. If empty, lists all legacy profiles."`
-	DryRun bool   `json:"dry_run,omitempty" jsonschema:"description=Preview migration without writing (default true)"`
+	DryRun bool   `json:"dry_run,omitempty" jsonschema:"description=Preview migration without writing. Defaults to true (safe). Pass false to actually execute the migration."`
 }
 
 type MigrationResult struct {
@@ -105,9 +105,11 @@ type MappingMigrateOutput struct {
 // ── Resolve Test ──
 
 type MappingResolveTestInput struct {
-	Name    string `json:"name" jsonschema:"required,description=Profile name to test resolution against"`
-	Source  string `json:"source" jsonschema:"required,description=Input source to simulate (e.g. BTN_SOUTH or midi:cc:1)"`
-	App     string `json:"app,omitempty" jsonschema:"description=Window class context for resolution"`
+	Name     string `json:"name" jsonschema:"required,description=Profile name to test resolution against"`
+	Source   string `json:"source" jsonschema:"required,description=Input source to simulate (e.g. BTN_SOUTH or midi:cc:1)"`
+	App      string `json:"app,omitempty" jsonschema:"description=Window class context for resolution"`
+	DeviceID string `json:"device_id,omitempty" jsonschema:"description=Device ID for layer-aware testing"`
+	Layer    int    `json:"layer,omitempty" jsonschema:"description=Active layer for the device (0 = default)"`
 }
 
 type MappingResolveTestOutput struct {
@@ -410,15 +412,9 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 			"mapping_migrate_legacy",
 			"Convert legacy makima profiles to the unified mapping format. Dry-run by default.",
 			func(_ context.Context, input MappingMigrateInput) (MappingMigrateOutput, error) {
-				dryRun := !input.DryRun // field is named DryRun but we want dry_run default true
-				// Actually re-read: the field default is false, so !false = true. Correct.
-				// Wait, let me fix this: if DryRun field is false (default), we should dry-run.
-				// Let's just use the convention: dry_run defaults to true when not set.
-				if !input.DryRun {
-					dryRun = true
-				} else {
-					dryRun = input.DryRun
-				}
+				// dry_run defaults to true (safe). Pass dry_run:false to execute.
+				// Go zero-value false → !false → true (dry-run). Explicit false → execute.
+				dryRun := !input.DryRun
 
 				profiles, err := listMappingProfiles()
 				if err != nil {
@@ -516,7 +512,10 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				state := mapping.NewEngineState()
 				state.ActiveApp = input.App
 
-				rule := idx.Resolve(input.Source, state, "")
+				if input.DeviceID != "" && input.Layer != 0 {
+					state.SetActiveLayer(input.DeviceID, input.Layer)
+				}
+				rule := idx.Resolve(input.Source, state, input.DeviceID)
 				if rule == nil {
 					return MappingResolveTestOutput{
 						Matched: false,
