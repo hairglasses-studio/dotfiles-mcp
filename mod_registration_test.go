@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hairglasses-studio/mcpkit/mcptest"
@@ -196,3 +197,29 @@ func TestMappingDaemonModuleRegistration(t *testing.T) {
 		t.Error("missing tool: mapping_daemon_control")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// mapitallSocketPath
+// ---------------------------------------------------------------------------
+
+func TestMapitallSocketPath_EnvOverride(t *testing.T) {
+	t.Setenv("MAPITALL_SOCKET", "/custom/path/mapitall.sock")
+	got := mapitallSocketPath()
+	if got != "/custom/path/mapitall.sock" {
+		t.Errorf("mapitallSocketPath() = %q, want /custom/path/mapitall.sock", got)
+	}
+}
+
+func TestMapitallSocketPath_Default(t *testing.T) {
+	t.Setenv("MAPITALL_SOCKET", "")
+	got := mapitallSocketPath()
+	if got == "" {
+		t.Error("expected non-empty default socket path")
+	}
+	// On Linux with XDG_RUNTIME_DIR, should use that. Otherwise /tmp.
+	// Either way it should end in mapitall.sock.
+	if !strings.HasSuffix(got, "mapitall.sock") {
+		t.Errorf("expected path ending in mapitall.sock, got %q", got)
+	}
+}
+

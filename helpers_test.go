@@ -328,6 +328,93 @@ func TestInputPathHelpers(t *testing.T) {
 // Validate JSON round-trip for output types
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Input device regexes (from mod_input.go)
+// ---------------------------------------------------------------------------
+
+func TestDeviceRe(t *testing.T) {
+	tests := []struct {
+		input string
+		match bool
+		mac   string
+		name  string
+	}{
+		{"Device AA:BB:CC:DD:EE:FF MX Master 4", true, "AA:BB:CC:DD:EE:FF", "MX Master 4"},
+		{"Device 12:34:56:78:9a:bc My Device", true, "12:34:56:78:9a:bc", "My Device"},
+		{"Not a device line", false, "", ""},
+		{"", false, "", ""},
+	}
+
+	for _, tc := range tests {
+		m := deviceRe.FindStringSubmatch(tc.input)
+		if tc.match {
+			if m == nil {
+				t.Errorf("expected match for %q", tc.input)
+				continue
+			}
+			if m[1] != tc.mac {
+				t.Errorf("mac = %q, want %q", m[1], tc.mac)
+			}
+			if m[2] != tc.name {
+				t.Errorf("name = %q, want %q", m[2], tc.name)
+			}
+		} else {
+			if m != nil {
+				t.Errorf("unexpected match for %q", tc.input)
+			}
+		}
+	}
+}
+
+func TestMacRe(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"AA:BB:CC:DD:EE:FF", true},
+		{"12:34:56:78:9a:bc", true},
+		{"00:00:00:00:00:00", true},
+		{"not-a-mac", false},
+		{"AA:BB:CC:DD:EE", false},
+		{"AA:BB:CC:DD:EE:FF:GG", false},
+		{"", false},
+	}
+	for _, tc := range tests {
+		got := macRe.MatchString(tc.input)
+		if got != tc.want {
+			t.Errorf("macRe.MatchString(%q) = %v, want %v", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestBatteryRe(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"Battery (85)", "85"},
+		{"Battery (100)", "100"},
+		{"Battery (0)", "0"},
+		{"No battery", ""},
+	}
+	for _, tc := range tests {
+		m := batteryRe.FindStringSubmatch(tc.input)
+		if tc.want != "" {
+			if m == nil || m[1] != tc.want {
+				got := ""
+				if m != nil {
+					got = m[1]
+				}
+				t.Errorf("batteryRe on %q: got %q, want %q", tc.input, got, tc.want)
+			}
+		} else {
+			if m != nil {
+				t.Errorf("expected no match for %q, got %v", tc.input, m)
+			}
+		}
+	}
+}
+
 func TestRiceCheckOutput_JSONRoundTrip(t *testing.T) {
 	out := RiceCheckOutput{
 		Compositor: "hyprland",

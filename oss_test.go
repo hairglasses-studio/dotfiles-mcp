@@ -545,6 +545,209 @@ func TestOSSCheck_MissingRepoPath(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// checkTesting — skip_tests path
+// ---------------------------------------------------------------------------
+
+func TestCheckTesting_SkipTests(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "main_test.go"), []byte("package main\nfunc TestFoo(t *testing.T) {}\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test\n\ngo 1.21\n"), 0644)
+
+	results := checkTesting(dir, true)
+	if len(results) == 0 {
+		t.Fatal("expected non-empty results")
+	}
+
+	hasTestsOK := false
+	covSkipped := false
+	for _, r := range results {
+		if r.Name == "has_tests" && r.Passed {
+			hasTestsOK = true
+		}
+		if r.Name == "coverage" && !r.Passed && r.Points == 0 {
+			covSkipped = true
+		}
+	}
+	if !hasTestsOK {
+		t.Error("expected has_tests to pass")
+	}
+	if !covSkipped {
+		t.Error("expected coverage to be skipped")
+	}
+}
+
+func TestCheckTesting_NoGoMod(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "main_test.go"), []byte("package main\nfunc TestFoo(t *testing.T) {}\n"), 0644)
+	// No go.mod
+
+	results := checkTesting(dir, false)
+	// Without go.mod, should skip coverage/race even with skip_tests=false
+	covSkipped := false
+	for _, r := range results {
+		if r.Name == "coverage" && !r.Passed && r.Points == 0 {
+			covSkipped = true
+		}
+	}
+	if !covSkipped {
+		t.Error("expected coverage to be skipped without go.mod")
+	}
+}
+
+func TestCheckTesting_NoTestFiles(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc main() {}\n"), 0644)
+
+	results := checkTesting(dir, true)
+	hasTestsFailed := false
+	for _, r := range results {
+		if r.Name == "has_tests" && !r.Passed {
+			hasTestsFailed = true
+		}
+	}
+	if !hasTestsFailed {
+		t.Error("expected has_tests to fail when no test files exist")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkRelease — integration
+// ---------------------------------------------------------------------------
+
+func TestCheckRelease_MinimalRepo(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/test/repo\n\ngo 1.21\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc main() {}\n"), 0644)
+
+	// Initialize git repo for semver tag check
+	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
+		// Not a git repo -- checkRelease won't find tags, which is fine
+	}
+
+	results := checkRelease(dir)
+	if len(results) == 0 {
+		t.Fatal("expected non-empty results")
+	}
+
+	// Should detect public module path
+	publicPath := false
+	installable := false
+	for _, r := range results {
+		if r.Name == "public_module_path" && r.Passed {
+			publicPath = true
+		}
+		if r.Name == "installable" && r.Passed {
+			installable = true
+		}
+	}
+	if !publicPath {
+		t.Error("expected public_module_path to pass for github.com module")
+	}
+	if !installable {
+		t.Error("expected installable to pass with main.go present")
+	}
+}
+
+func TestCheckRelease_LibraryOnly(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/test/lib\n\ngo 1.21\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "lib.go"), []byte("package lib\nfunc Foo() {}\n"), 0644)
+
+	results := checkRelease(dir)
+	installable := false
+	for _, r := range results {
+		if r.Name == "installable" && !r.Passed {
+			installable = true
+		}
+	}
+	if !installable {
+		t.Error("expected installable to fail for library-only repo")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkMaintenance — integration
+// ---------------------------------------------------------------------------
+
+func TestCheckMaintenance_WithTemplates(t *testing.T) {
+	dir := t.TempDir()
+	// Create issue templates
+	os.MkdirAll(filepath.Join(dir, ".github", "ISSUE_TEMPLATE"), 0755)
+	os.WriteFile(filepath.Join(dir, ".github", "ISSUE_TEMPLATE", "bug.md"), []byte("bug template"), 0644)
+	// Create PR template
+	os.WriteFile(filepath.Join(dir, ".github", "pull_request_template.md"), []byte("PR template"), 0644)
+	// Create .editorconfig
+	os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte("root = true\n"), 0644)
+
+	results := checkMaintenance(dir)
+	if len(results) == 0 {
+		t.Fatal("expected non-empty results")
+	}
+
+	issueTemplateOK := false
+	prTemplateOK := false
+	editorconfigOK := false
+	for _, r := range results {
+		if r.Name == "issue_templates" && r.Passed {
+			issueTemplateOK = true
+		}
+		if r.Name == "pr_template" && r.Passed {
+			prTemplateOK = true
+		}
+		if r.Name == "editorconfig" && r.Passed {
+			editorconfigOK = true
+		}
+	}
+	if !issueTemplateOK {
+		t.Error("expected issue_templates to pass")
+	}
+	if !prTemplateOK {
+		t.Error("expected pr_template to pass")
+	}
+	if !editorconfigOK {
+		t.Error("expected editorconfig to pass")
+	}
+}
+
+func TestCheckMaintenance_Bare(t *testing.T) {
+	dir := t.TempDir()
+
+	results := checkMaintenance(dir)
+	for _, r := range results {
+		if r.Name == "issue_templates" && r.Passed {
+			t.Error("expected issue_templates to fail when not present")
+		}
+		if r.Name == "pr_template" && r.Passed {
+			t.Error("expected pr_template to fail when not present")
+		}
+		if r.Name == "editorconfig" && r.Passed {
+			t.Error("expected editorconfig to fail when not present")
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// goVetCheck — integration
+// ---------------------------------------------------------------------------
+
+func TestGoVetCheck_ValidRepo(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/test\n\ngo 1.21\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc main() {}\n"), 0644)
+
+	results := goVetCheck(dir, 5)
+	if len(results) == 0 {
+		t.Fatal("expected non-empty results")
+	}
+	if !results[0].Passed {
+		t.Errorf("expected go vet to pass on valid code, detail: %s", results[0].Detail)
+	}
+	if results[0].Points != 5 {
+		t.Errorf("expected 5 points, got %d", results[0].Points)
+	}
+}
+
 func TestOSSCheck_InvalidRepoPath(t *testing.T) {
 	m := &OSSModule{}
 	var td registry.ToolDefinition

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/mark3labs/mcp-go/mcp"
+
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
 
@@ -246,6 +248,128 @@ func TestToolSchema_NotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Tool catalog — with category filter
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Description (coverage for DotfilesDiscoveryModule.Description)
+// ---------------------------------------------------------------------------
+
+func TestDiscoveryModuleDescription(t *testing.T) {
+	reg := registry.NewToolRegistry()
+	m := &DotfilesDiscoveryModule{reg: reg}
+	desc := m.Description()
+	if desc == "" {
+		t.Error("expected non-empty description")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// toolMetaMap
+// ---------------------------------------------------------------------------
+
+func TestToolMetaMap_NilMeta(t *testing.T) {
+	tool := registry.Tool{Name: "test"}
+	got := toolMetaMap(tool)
+	if got != nil {
+		t.Errorf("expected nil for nil Meta, got %v", got)
+	}
+}
+
+func TestToolMetaMap_WithMeta(t *testing.T) {
+	meta := mcp.NewMetaFromMap(map[string]any{
+		"category": "discovery",
+		"deferred": true,
+	})
+	tool := registry.Tool{
+		Name: "test",
+		Meta: meta,
+	}
+	got := toolMetaMap(tool)
+	if got == nil {
+		t.Fatal("expected non-nil map")
+	}
+	if got["category"] != "discovery" {
+		t.Errorf("category = %v, want discovery", got["category"])
+	}
+	if got["deferred"] != true {
+		t.Errorf("deferred = %v, want true", got["deferred"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tool search — integration
+// ---------------------------------------------------------------------------
+
+func TestToolSearch_Integration(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "full")
+
+	reg := registry.NewToolRegistry()
+	registerDotfilesModules(reg)
+
+	disc := &DotfilesDiscoveryModule{reg: reg}
+	tools := disc.Tools()
+
+	var searchTool registry.ToolDefinition
+	for _, td := range tools {
+		if td.Tool.Name == "dotfiles_tool_search" {
+			searchTool = td
+			break
+		}
+	}
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"query": "shader"}
+	result, err := searchTool.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	text := extractText(t, result)
+	var out dotfilesToolSearchOutput
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.Total == 0 {
+		t.Error("expected at least 1 result for 'shader' query")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tool catalog — no filter (all categories)
+// ---------------------------------------------------------------------------
+
+func TestToolCatalog_AllCategories(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "full")
+
+	reg := registry.NewToolRegistry()
+	registerDotfilesModules(reg)
+
+	disc := &DotfilesDiscoveryModule{reg: reg}
+	tools := disc.Tools()
+
+	var catalogTool registry.ToolDefinition
+	for _, td := range tools {
+		if td.Tool.Name == "dotfiles_tool_catalog" {
+			catalogTool = td
+			break
+		}
+	}
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+	result, err := catalogTool.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	text := extractText(t, result)
+	var out dotfilesToolCatalogOutput
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(out.Groups) == 0 {
+		t.Error("expected at least 1 category group when no filter applied")
+	}
+}
 
 func TestToolCatalog_WithFilter(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "full")
