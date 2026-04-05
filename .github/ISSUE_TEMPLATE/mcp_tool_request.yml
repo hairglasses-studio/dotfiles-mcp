@@ -1,0 +1,90 @@
+name: MCP Tool Request
+description: Propose a new MCP tool for dotfiles-mcp
+title: "[Tool] "
+labels: ["type/mcp-tool", "status/triage"]
+assignees: ["hairglasses"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Propose a new MCP tool! Describe what it should do, who benefits, and how agents would use it.
+
+  - type: input
+    id: tool-name
+    attributes:
+      label: Tool Name
+      description: "Follow the `module_action` naming convention (e.g., `hypr_focus_window`, `shader_preview`)"
+      placeholder: "hypr_focus_window"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What does this tool do? One clear sentence.
+      placeholder: "Focuses a specific window by class or title in Hyprland."
+    validations:
+      required: true
+
+  - type: textarea
+    id: parameters
+    attributes:
+      label: Input Parameters
+      description: What input parameters should the tool accept? Use a table format.
+      placeholder: |
+        | Parameter | Type | Required | Description |
+        |-----------|------|----------|-------------|
+        | window_class | string | no | Window class to focus |
+        | title | string | no | Window title substring to match |
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Expected Output
+      description: What should the tool return? Provide an example.
+      placeholder: |
+        ```json
+        {
+          "focused": true,
+          "window": {"class": "firefox", "title": "GitHub", "workspace": 4}
+        }
+        ```
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target-module
+    attributes:
+      label: Target Module
+      description: Which module domain does this tool belong to?
+      options:
+        - Hyprland / window management (hypr_*)
+        - Sway / compositor abstraction
+        - shaders (shader_*)
+        - input devices (input_*)
+        - Bluetooth / audio
+        - MIDI
+        - open-source scoring
+        - new module (describe in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: security
+    attributes:
+      label: Security Considerations
+      description: Does this tool read sensitive data, modify system state, or require elevated privileges?
+      placeholder: "Interacts with Hyprland IPC. No elevated privileges required."
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked the existing tool catalog and this is not a duplicate
+          required: true
+        - label: I am willing to implement this tool
+          required: false
