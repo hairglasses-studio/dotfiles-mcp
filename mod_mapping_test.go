@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hairglasses-studio/mapping"
 	"github.com/hairglasses-studio/mcpkit/mcptest"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
@@ -49,10 +50,10 @@ func TestMappingModuleRegistration(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestValueTransform_Linear(t *testing.T) {
-	vt := ValueTransform{
+	vt := mapping.ValueTransform{
 		InputRange:  [2]float64{0, 127},
 		OutputRange: [2]float64{0, 1.0},
-		Curve:       CurveLinear,
+		Curve:       mapping.CurveLinear,
 	}
 
 	tests := []struct {
@@ -72,10 +73,10 @@ func TestValueTransform_Linear(t *testing.T) {
 }
 
 func TestValueTransform_Exponential(t *testing.T) {
-	vt := ValueTransform{
+	vt := mapping.ValueTransform{
 		InputRange:  [2]float64{0, 127},
 		OutputRange: [2]float64{0, 1.0},
-		Curve:       CurveExponential,
+		Curve:       mapping.CurveExponential,
 	}
 
 	// Exponential: midpoint should be below 0.5 (curve rises slowly then fast).
@@ -94,10 +95,10 @@ func TestValueTransform_Exponential(t *testing.T) {
 }
 
 func TestValueTransform_Logarithmic(t *testing.T) {
-	vt := ValueTransform{
+	vt := mapping.ValueTransform{
 		InputRange:  [2]float64{0, 127},
 		OutputRange: [2]float64{0, 1.0},
-		Curve:       CurveLogarithmic,
+		Curve:       mapping.CurveLogarithmic,
 	}
 
 	// Logarithmic: midpoint should be above 0.5 (curve rises fast then slow).
@@ -108,10 +109,10 @@ func TestValueTransform_Logarithmic(t *testing.T) {
 }
 
 func TestValueTransform_SCurve(t *testing.T) {
-	vt := ValueTransform{
+	vt := mapping.ValueTransform{
 		InputRange:  [2]float64{0, 127},
 		OutputRange: [2]float64{0, 1.0},
-		Curve:       CurveSCurve,
+		Curve:       mapping.CurveSCurve,
 	}
 
 	// S-curve: midpoint should be approximately 0.5.
@@ -122,10 +123,10 @@ func TestValueTransform_SCurve(t *testing.T) {
 }
 
 func TestValueTransform_Clamping(t *testing.T) {
-	vt := ValueTransform{
+	vt := mapping.ValueTransform{
 		InputRange:  [2]float64{0, 127},
 		OutputRange: [2]float64{0, 100},
-		Curve:       CurveLinear,
+		Curve:       mapping.CurveLinear,
 	}
 
 	// Below range should clamp to min.
@@ -140,7 +141,7 @@ func TestValueTransform_Clamping(t *testing.T) {
 }
 
 func TestValueTransform_EqualRange(t *testing.T) {
-	vt := ValueTransform{
+	vt := mapping.ValueTransform{
 		InputRange:  [2]float64{64, 64},
 		OutputRange: [2]float64{50, 100},
 	}
@@ -155,7 +156,7 @@ func TestValueTransform_EqualRange(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCondition_Equals(t *testing.T) {
-	c := Condition{Variable: "mode", Equals: "recording"}
+	c := mapping.Condition{Variable: "mode", Equals: "recording"}
 	vars := map[string]any{"mode": "recording"}
 	if !c.Evaluate(vars) {
 		t.Error("expected condition to match")
@@ -167,7 +168,7 @@ func TestCondition_Equals(t *testing.T) {
 }
 
 func TestCondition_NotEqual(t *testing.T) {
-	c := Condition{Variable: "mode", NotEqual: "recording"}
+	c := mapping.Condition{Variable: "mode", NotEqual: "recording"}
 	vars := map[string]any{"mode": "idle"}
 	if !c.Evaluate(vars) {
 		t.Error("expected not_equal condition to match")
@@ -175,7 +176,7 @@ func TestCondition_NotEqual(t *testing.T) {
 }
 
 func TestCondition_Numeric(t *testing.T) {
-	c := Condition{Variable: "level", GreaterThan: 50}
+	c := mapping.Condition{Variable: "level", GreaterThan: 50}
 	vars := map[string]any{"level": 75.0}
 	if !c.Evaluate(vars) {
 		t.Error("expected numeric > condition to match")
@@ -187,7 +188,7 @@ func TestCondition_Numeric(t *testing.T) {
 }
 
 func TestCondition_MissingVariable(t *testing.T) {
-	c := Condition{Variable: "missing", Equals: "anything"}
+	c := mapping.Condition{Variable: "missing", Equals: "anything"}
 	vars := map[string]any{}
 	if c.Evaluate(vars) {
 		t.Error("expected condition to fail for missing variable")
@@ -199,14 +200,14 @@ func TestCondition_MissingVariable(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRuleIndex_BasicResolve(t *testing.T) {
-	p := &MappingProfile{
-		Mappings: []MappingRule{
-			{Input: "BTN_SOUTH", Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_ENTER"}}},
-			{Input: "BTN_EAST", Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_ESC"}}},
+	p := &mapping.MappingProfile{
+		Mappings: []mapping.MappingRule{
+			{Input: "BTN_SOUTH", Output: mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_ENTER"}}},
+			{Input: "BTN_EAST", Output: mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_ESC"}}},
 		},
 	}
-	idx := BuildRuleIndex(p)
-	state := NewEngineState()
+	idx := mapping.BuildRuleIndex(p)
+	state := mapping.NewEngineState()
 
 	rule := idx.Resolve("BTN_SOUTH", state)
 	if rule == nil {
@@ -223,23 +224,23 @@ func TestRuleIndex_BasicResolve(t *testing.T) {
 }
 
 func TestRuleIndex_AppOverride(t *testing.T) {
-	p := &MappingProfile{
-		Mappings: []MappingRule{
-			{Input: "BTN_SOUTH", Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_ENTER"}}, Description: "default"},
+	p := &mapping.MappingProfile{
+		Mappings: []mapping.MappingRule{
+			{Input: "BTN_SOUTH", Output: mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_ENTER"}}, Description: "default"},
 		},
-		AppOverrides: []AppOverride{
+		AppOverrides: []mapping.AppOverride{
 			{
 				WindowClass: "firefox",
-				Mappings: []MappingRule{
-					{Input: "BTN_SOUTH", Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_SPACE"}}, Description: "firefox"},
+				Mappings: []mapping.MappingRule{
+					{Input: "BTN_SOUTH", Output: mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_SPACE"}}, Description: "firefox"},
 				},
 			},
 		},
 	}
-	idx := BuildRuleIndex(p)
+	idx := mapping.BuildRuleIndex(p)
 
 	// Default context.
-	state := NewEngineState()
+	state := mapping.NewEngineState()
 	rule := idx.Resolve("BTN_SOUTH", state)
 	if rule == nil || rule.Description != "default" {
 		t.Errorf("expected default rule, got %v", rule)
@@ -254,16 +255,16 @@ func TestRuleIndex_AppOverride(t *testing.T) {
 }
 
 func TestRuleIndex_ModifierMatch(t *testing.T) {
-	p := &MappingProfile{
-		Mappings: []MappingRule{
-			{Input: "BTN_SOUTH", Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_ENTER"}}, Description: "plain"},
-			{Input: "BTN_SOUTH", Modifiers: []string{"BTN_TL"}, Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_Z"}}, Description: "with modifier", Priority: 1},
+	p := &mapping.MappingProfile{
+		Mappings: []mapping.MappingRule{
+			{Input: "BTN_SOUTH", Output: mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_ENTER"}}, Description: "plain"},
+			{Input: "BTN_SOUTH", Modifiers: []string{"BTN_TL"}, Output: mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_Z"}}, Description: "with modifier", Priority: 1},
 		},
 	}
-	idx := BuildRuleIndex(p)
+	idx := mapping.BuildRuleIndex(p)
 
 	// No modifier held → plain rule.
-	state := NewEngineState()
+	state := mapping.NewEngineState()
 	rule := idx.Resolve("BTN_SOUTH", state)
 	if rule == nil || rule.Description != "plain" {
 		t.Errorf("expected plain rule, got %v", rule)
@@ -278,25 +279,25 @@ func TestRuleIndex_ModifierMatch(t *testing.T) {
 }
 
 func TestRuleIndex_ConditionFilter(t *testing.T) {
-	p := &MappingProfile{
-		Mappings: []MappingRule{
+	p := &mapping.MappingProfile{
+		Mappings: []mapping.MappingRule{
 			{
 				Input:     "midi:cc:1",
-				Condition: &Condition{Variable: "recording", Equals: true},
-				Output:    OutputAction{Type: OutputOSC, Address: "/record/level"},
+				Condition: &mapping.Condition{Variable: "recording", Equals: true},
+				Output:    mapping.OutputAction{Type: mapping.OutputOSC, Address: "/record/level"},
 				Description: "recording mode",
 			},
 			{
 				Input:  "midi:cc:1",
-				Output: OutputAction{Type: OutputCommand, Exec: []string{"wpctl", "set-volume"}},
+				Output: mapping.OutputAction{Type: mapping.OutputCommand, Exec: []string{"wpctl", "set-volume"}},
 				Description: "default volume",
 			},
 		},
 	}
-	idx := BuildRuleIndex(p)
+	idx := mapping.BuildRuleIndex(p)
 
 	// No recording variable → default.
-	state := NewEngineState()
+	state := mapping.NewEngineState()
 	rule := idx.Resolve("midi:cc:1", state)
 	if rule == nil || rule.Description != "default volume" {
 		t.Errorf("expected default volume, got %v", rule)
@@ -315,7 +316,7 @@ func TestRuleIndex_ConditionFilter(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestParseLegacyInput_Simple(t *testing.T) {
-	rule := parseLegacyInput("BTN_SOUTH")
+	rule := mapping.ParseLegacyInput("BTN_SOUTH")
 	if rule.Input != "BTN_SOUTH" {
 		t.Errorf("got input=%q, want BTN_SOUTH", rule.Input)
 	}
@@ -325,7 +326,7 @@ func TestParseLegacyInput_Simple(t *testing.T) {
 }
 
 func TestParseLegacyInput_WithModifiers(t *testing.T) {
-	rule := parseLegacyInput("KEY_LEFTCTRL-KEY_LEFTSHIFT-BTN_SOUTH")
+	rule := mapping.ParseLegacyInput("KEY_LEFTCTRL-KEY_LEFTSHIFT-BTN_SOUTH")
 	if rule.Input != "BTN_SOUTH" {
 		t.Errorf("got input=%q, want BTN_SOUTH", rule.Input)
 	}
@@ -350,7 +351,7 @@ BTN_TL = ["hyprctl dispatch movefocus l"]
 LSTICK = "cursor"
 LSTICK_SENSITIVITY = "6"
 `
-	p, err := ParseMappingProfile(content, "TestController.toml")
+	p, err := mapping.ParseMappingProfile(content, "TestController.toml")
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
@@ -398,7 +399,7 @@ input_range = [0, 127]
 output_range = [0.0, 1.0]
 curve = "logarithmic"
 `
-	p, err := ParseMappingProfile(content, "test-unified.toml")
+	p, err := mapping.ParseMappingProfile(content, "test-unified.toml")
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
@@ -415,7 +416,7 @@ curve = "logarithmic"
 	if p.Mappings[1].Value == nil {
 		t.Fatal("mapping[1].value is nil")
 	}
-	if p.Mappings[1].Value.Curve != CurveLogarithmic {
+	if p.Mappings[1].Value.Curve != mapping.CurveLogarithmic {
 		t.Errorf("curve = %q, want logarithmic", p.Mappings[1].Value.Curve)
 	}
 }
@@ -432,12 +433,12 @@ BTN_TL = ["hyprctl dispatch movefocus l"]
 LSTICK = "cursor"
 LSTICK_SENSITIVITY = "6"
 `
-	p, err := ParseMappingProfile(content, "Xbox Controller.toml")
+	p, err := mapping.ParseMappingProfile(content, "Xbox Controller.toml")
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
 
-	unified := ConvertLegacyToUnified(p)
+	unified := mapping.ConvertLegacyToUnified(p)
 	if !unified.IsUnifiedFormat() {
 		t.Error("expected unified format after conversion")
 	}
@@ -463,12 +464,12 @@ func TestConvertLegacyToUnified_PerApp(t *testing.T) {
 [remap]
 BTN_SOUTH = ["KEY_ENTER"]
 `
-	p, err := ParseMappingProfile(content, "Xbox Controller::com.mitchellh.ghostty.toml")
+	p, err := mapping.ParseMappingProfile(content, "Xbox Controller::com.mitchellh.ghostty.toml")
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
 
-	unified := ConvertLegacyToUnified(p)
+	unified := mapping.ConvertLegacyToUnified(p)
 	if unified.Profile.AppClass != "com.mitchellh.ghostty" {
 		t.Errorf("app_class = %q, want com.mitchellh.ghostty", unified.Profile.AppClass)
 	}
@@ -485,13 +486,13 @@ BTN_SOUTH = ["KEY_ENTER"]
 // ---------------------------------------------------------------------------
 
 func TestValidateProfile_Valid(t *testing.T) {
-	p := &MappingProfile{
-		Profile: &ProfileMeta{SchemaVersion: 1},
-		Mappings: []MappingRule{
-			{Input: "BTN_SOUTH", Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_ENTER"}}},
+	p := &mapping.MappingProfile{
+		Profile: &mapping.ProfileMeta{SchemaVersion: 1},
+		Mappings: []mapping.MappingRule{
+			{Input: "BTN_SOUTH", Output: mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_ENTER"}}},
 		},
 	}
-	issues := ValidateProfile(p)
+	issues := mapping.ValidateProfile(p)
 	for _, issue := range issues {
 		if issue.Severity == "error" {
 			t.Errorf("unexpected error: %s: %s", issue.Field, issue.Message)
@@ -500,13 +501,13 @@ func TestValidateProfile_Valid(t *testing.T) {
 }
 
 func TestValidateProfile_MissingInput(t *testing.T) {
-	p := &MappingProfile{
-		Profile: &ProfileMeta{SchemaVersion: 1},
-		Mappings: []MappingRule{
-			{Output: OutputAction{Type: OutputKey}},
+	p := &mapping.MappingProfile{
+		Profile: &mapping.ProfileMeta{SchemaVersion: 1},
+		Mappings: []mapping.MappingRule{
+			{Output: mapping.OutputAction{Type: mapping.OutputKey}},
 		},
 	}
-	issues := ValidateProfile(p)
+	issues := mapping.ValidateProfile(p)
 	found := false
 	for _, issue := range issues {
 		if issue.Severity == "error" && issue.Field == "mapping[0].input" {
@@ -519,17 +520,17 @@ func TestValidateProfile_MissingInput(t *testing.T) {
 }
 
 func TestValidateProfile_InvalidCurve(t *testing.T) {
-	p := &MappingProfile{
-		Profile: &ProfileMeta{SchemaVersion: 1},
-		Mappings: []MappingRule{
+	p := &mapping.MappingProfile{
+		Profile: &mapping.ProfileMeta{SchemaVersion: 1},
+		Mappings: []mapping.MappingRule{
 			{
 				Input:  "midi:cc:1",
-				Output: OutputAction{Type: OutputOSC},
-				Value:  &ValueTransform{Curve: "banana"},
+				Output: mapping.OutputAction{Type: mapping.OutputOSC},
+				Value:  &mapping.ValueTransform{Curve: "banana"},
 			},
 		},
 	}
-	issues := ValidateProfile(p)
+	issues := mapping.ValidateProfile(p)
 	found := false
 	for _, issue := range issues {
 		if issue.Severity == "error" && issue.Field == "mapping[0].value.curve" {
@@ -542,10 +543,10 @@ func TestValidateProfile_InvalidCurve(t *testing.T) {
 }
 
 func TestValidateProfile_Legacy(t *testing.T) {
-	p := &MappingProfile{
+	p := &mapping.MappingProfile{
 		Remap: map[string][]string{"BTN_SOUTH": {"KEY_ENTER"}},
 	}
-	issues := ValidateProfile(p)
+	issues := mapping.ValidateProfile(p)
 	found := false
 	for _, issue := range issues {
 		if issue.Severity == "info" && issue.Field == "format" {
@@ -563,13 +564,13 @@ func TestValidateProfile_Legacy(t *testing.T) {
 
 func TestMappingProfile_MappingCount(t *testing.T) {
 	// Unified format.
-	p := &MappingProfile{
-		Profile: &ProfileMeta{SchemaVersion: 1},
-		Mappings: []MappingRule{
+	p := &mapping.MappingProfile{
+		Profile: &mapping.ProfileMeta{SchemaVersion: 1},
+		Mappings: []mapping.MappingRule{
 			{Input: "A"}, {Input: "B"},
 		},
-		AppOverrides: []AppOverride{
-			{WindowClass: "app", Mappings: []MappingRule{{Input: "C"}}},
+		AppOverrides: []mapping.AppOverride{
+			{WindowClass: "app", Mappings: []mapping.MappingRule{{Input: "C"}}},
 		},
 	}
 	if got := p.MappingCount(); got != 3 {
@@ -577,7 +578,7 @@ func TestMappingProfile_MappingCount(t *testing.T) {
 	}
 
 	// Legacy format.
-	p2 := &MappingProfile{
+	p2 := &mapping.MappingProfile{
 		Remap:    map[string][]string{"A": {"B"}, "C": {"D"}},
 		Commands: map[string][]string{"E": {"cmd"}},
 	}
@@ -603,7 +604,7 @@ func TestSanitizeProfile(t *testing.T) {
 }
 
 func TestExtractMappingKeys_Legacy(t *testing.T) {
-	p := &MappingProfile{
+	p := &mapping.MappingProfile{
 		Remap:    map[string][]string{"BTN_SOUTH": {"KEY_ENTER"}, "BTN_EAST": {"KEY_ESC"}},
 		Commands: map[string][]string{"BTN_TL": {"hyprctl dispatch movefocus l"}},
 	}
@@ -620,11 +621,11 @@ func TestExtractMappingKeys_Legacy(t *testing.T) {
 }
 
 func TestExtractMappingKeys_Unified(t *testing.T) {
-	p := &MappingProfile{
-		Profile: &ProfileMeta{SchemaVersion: 1},
-		Mappings: []MappingRule{
-			{Input: "BTN_SOUTH", Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_ENTER"}}},
-			{Input: "midi:cc:1", Output: OutputAction{Type: OutputOSC, Address: "/volume", Host: "localhost", Port: 7000}},
+	p := &mapping.MappingProfile{
+		Profile: &mapping.ProfileMeta{SchemaVersion: 1},
+		Mappings: []mapping.MappingRule{
+			{Input: "BTN_SOUTH", Output: mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_ENTER"}}},
+			{Input: "midi:cc:1", Output: mapping.OutputAction{Type: mapping.OutputOSC, Address: "/volume", Host: "localhost", Port: 7000}},
 		},
 	}
 	keys := extractMappingKeys(p)
@@ -641,12 +642,12 @@ func TestExtractMappingKeys_Unified(t *testing.T) {
 
 func TestDescribeOutput(t *testing.T) {
 	tests := []struct {
-		output OutputAction
+		output mapping.OutputAction
 		want   string
 	}{
-		{OutputAction{Type: OutputKey, Keys: []string{"KEY_A", "KEY_B"}}, "KEY_A+KEY_B"},
-		{OutputAction{Type: OutputCommand, Exec: []string{"echo", "hello"}}, "echo hello"},
-		{OutputAction{Type: OutputMovement, Target: "CURSOR_UP"}, "CURSOR_UP"},
+		{mapping.OutputAction{Type: mapping.OutputKey, Keys: []string{"KEY_A", "KEY_B"}}, "KEY_A+KEY_B"},
+		{mapping.OutputAction{Type: mapping.OutputCommand, Exec: []string{"echo", "hello"}}, "echo hello"},
+		{mapping.OutputAction{Type: mapping.OutputMovement, Target: "CURSOR_UP"}, "CURSOR_UP"},
 	}
 	for _, tt := range tests {
 		got := describeOutput(tt.output)
