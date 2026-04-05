@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/hairglasses-studio/dotfiles-mcp/internal/tracing"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
@@ -2951,11 +2952,19 @@ func main() {
 		return
 	}
 
+	// Initialize OpenTelemetry tracing (no-op unless OTEL_ENABLED=true).
+	ctx := context.Background()
+	shutdownTracing := tracing.Init(ctx, "2.1.0")
+	defer shutdownTracing(ctx)
+
+	mw := []registry.Middleware{
+		registry.AuditMiddleware(""),
+		registry.SafetyTierMiddleware(),
+		tracing.Middleware(),
+	}
+
 	reg := registry.NewToolRegistry(registry.Config{
-		Middleware: []registry.Middleware{
-			registry.AuditMiddleware(""),
-			registry.SafetyTierMiddleware(),
-		},
+		Middleware: mw,
 	})
 	registerDotfilesModules(reg)
 
