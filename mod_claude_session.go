@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -740,6 +741,36 @@ type RecoveryEvent struct {
 	Display   string `json:"display,omitempty"`
 }
 
+// ── claude_session_search ──
+
+type SessionSearchInput struct {
+	Query      string `json:"query" jsonschema:"required,description=Keyword or regex pattern to search for across all session logs. Wrap in /slashes/ for regex."`
+	Repo       string `json:"repo,omitempty" jsonschema:"description=Filter to a specific repo name (e.g. 'dotfiles-mcp')"`
+	Window     string `json:"window,omitempty" jsonschema:"description=Time window (e.g. '7d'\\, '24h'). Default searches all sessions."`
+	Status     string `json:"status,omitempty" jsonschema:"description=Filter by session status: alive\\, dead\\, or all (default all)"`
+	MaxResults int    `json:"max_results,omitempty" jsonschema:"description=Max results to return. Default 10\\, max 50."`
+}
+
+type SessionSearchOutput struct {
+	Query   string               `json:"query"`
+	Results []SessionSearchMatch `json:"results"`
+	Total   int                  `json:"total"`
+	Scanned int                  `json:"files_scanned"`
+	Elapsed string               `json:"elapsed"`
+}
+
+type SessionSearchMatch struct {
+	SessionID    string   `json:"session_id"`
+	Repo         string   `json:"repo"`
+	RepoName     string   `json:"repo_name"`
+	Title        string   `json:"title,omitempty"`
+	Status       string   `json:"status"`
+	LastActivity string   `json:"last_activity,omitempty"`
+	Relevance    int      `json:"relevance"`
+	Snippets     []string `json:"snippets"`
+	ResumeCmd    string   `json:"resume_cmd"`
+}
+
 // ── claude_fleet_recovery ──
 
 type FleetRecoveryInput struct {
@@ -1002,6 +1033,397 @@ func truncate(s string, max int) string {
 		return s[:max] + "..."
 	}
 	return s
+}
+
+// ---------------------------------------------------------------------------
+// Session search
+// ---------------------------------------------------------------------------
+
+// cwdFromJSONL extracts the CWD from the first user message in a JSONL file.
+func cwdFromJSONL(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Quick check before full parse.
+		if !strings.Contains(line, `"cwd"`) {
+			continue
+		}
+		var entry struct {
+			Type string `json:"type"`
+			CWD  string `json:"cwd"`
+		}
+		if json.Unmarshal([]byte(line), &entry) == nil && entry.CWD != "" {
+			return entry.CWD
+		}
+	}
+	return ""
+}
+
+// titleFromJSONL extracts the best title from a JSONL file (customTitle > agentName > slug).
+func titleFromJSONL(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	var slug string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, `"custom-title"`) || strings.Contains(line, `"customTitle"`) {
+			var entry struct {
+				Type        string `json:"type"`
+				CustomTitle string `json:"customTitle"`
+			}
+			if json.Unmarshal([]byte(line), &entry) == nil && entry.CustomTitle != "" {
+				return entry.CustomTitle
+			}
+		}
+		if strings.Contains(line, `"agent-name"`) {
+			var entry struct {
+				Type      string `json:"type"`
+				AgentName string `json:"agentName"`
+			}
+			if json.Unmarshal([]byte(line), &entry) == nil && entry.AgentName != "" {
+				return entry.AgentName
+			}
+		}
+		if slug == "" && strings.Contains(line, `"slug"`) {
+			var entry struct {
+				Slug string `json:"slug"`
+			}
+			if json.Unmarshal([]byte(line), &entry) == nil && entry.Slug != "" {
+				slug = entry.Slug
+			}
+		}
+	}
+	return slug
+}
+
+// searchSessionFile scans a single JSONL file for keyword matches.
+// Returns hit count and up to maxSnippets context snippets.
+func searchSessionFile(path string, queryLower string, useRegex bool, re *regexp.Regexp, maxSnippets int) (int, []string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, nil
+	}
+	defer f.Close()
+
+	hits := 0
+	var snippets []string
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Fast pre-check: does the raw line contain the query at all?
+		var matched bool
+		if useRegex {
+			matched = re.MatchString(line)
+		} else {
+			matched = strings.Contains(strings.ToLower(line), queryLower)
+		}
+		if !matched {
+			continue
+		}
+		hits++
+
+		// Extract a readable snippet from matching lines.
+		if len(snippets) < maxSnippets {
+			snippet := extractSnippet(line, queryLower)
+			if snippet != "" {
+				snippets = append(snippets, snippet)
+			}
+		}
+	}
+	return hits, snippets
+}
+
+// extractSnippet extracts a human-readable snippet from a matching JSONL line.
+func extractSnippet(line, queryLower string) string {
+	var entry map[string]any
+	if json.Unmarshal([]byte(line), &entry) != nil {
+		return ""
+	}
+
+	entryType, _ := entry["type"].(string)
+
+	// Extract text content based on entry type.
+	var text string
+	switch entryType {
+	case "user":
+		if msg, ok := entry["message"].(map[string]any); ok {
+			text, _ = msg["content"].(string)
+		}
+	case "assistant":
+		if msg, ok := entry["message"].(map[string]any); ok {
+			if content, ok := msg["content"].([]any); ok {
+				for _, block := range content {
+					if b, ok := block.(map[string]any); ok {
+						if t, ok := b["text"].(string); ok {
+							text = t
+							break
+						}
+					}
+				}
+			}
+		}
+	case "custom-title":
+		text, _ = entry["customTitle"].(string)
+	case "agent-name":
+		text, _ = entry["agentName"].(string)
+	}
+
+	if text == "" {
+		return ""
+	}
+
+	// Find the query location and extract surrounding context.
+	lower := strings.ToLower(text)
+	idx := strings.Index(lower, queryLower)
+	if idx < 0 {
+		return truncate(text, 150)
+	}
+
+	// Window around the match.
+	start := idx - 60
+	if start < 0 {
+		start = 0
+	}
+	end := idx + len(queryLower) + 60
+	if end > len(text) {
+		end = len(text)
+	}
+	snippet := text[start:end]
+	snippet = strings.ReplaceAll(snippet, "\n", " ")
+	snippet = strings.Join(strings.Fields(snippet), " ")
+	if start > 0 {
+		snippet = "..." + snippet
+	}
+	if end < len(text) {
+		snippet = snippet + "..."
+	}
+	return snippet
+}
+
+// searchSessions performs keyword search across all session JSONL files.
+func searchSessions(query string, repoFilter string, windowDur time.Duration, statusFilter string, maxResults int) ([]SessionSearchMatch, int, error) {
+	if maxResults <= 0 {
+		maxResults = 10
+	}
+	if maxResults > 50 {
+		maxResults = 50
+	}
+
+	// Determine search mode.
+	queryLower := strings.ToLower(query)
+	var useRegex bool
+	var re *regexp.Regexp
+	if strings.HasPrefix(query, "/") && strings.HasSuffix(query, "/") && len(query) > 2 {
+		pattern := query[1 : len(query)-1]
+		var err error
+		re, err = regexp.Compile("(?i)" + pattern)
+		if err != nil {
+			return nil, 0, fmt.Errorf("[%s] invalid regex: %w", handler.ErrInvalidParam, err)
+		}
+		useRegex = true
+	}
+
+	// Load metadata for status checking and title enrichment.
+	metas, _ := loadAllSessionMeta()
+	metaBySession := make(map[string]claudeSessionMeta)
+	for _, m := range metas {
+		metaBySession[m.SessionID] = m
+	}
+
+	lastActivity, lastDisplay, _ := loadHistoryIndex()
+
+	cutoff := time.Time{}
+	if windowDur > 0 {
+		cutoff = time.Now().Add(-windowDur)
+	}
+
+	// Discover all session JSONL files.
+	projectsDir := filepath.Join(claudeDir(), "projects")
+	projectDirs, err := os.ReadDir(projectsDir)
+	if err != nil {
+		return nil, 0, fmt.Errorf("[%s] cannot read projects dir: %w", handler.ErrNotFound, err)
+	}
+
+	type scanTarget struct {
+		path      string
+		sessionID string
+	}
+	var targets []scanTarget
+
+	for _, pd := range projectDirs {
+		if !pd.IsDir() {
+			continue
+		}
+		pdPath := filepath.Join(projectsDir, pd.Name())
+		files, err := os.ReadDir(pdPath)
+		if err != nil {
+			continue
+		}
+		for _, f := range files {
+			name := f.Name()
+			if !strings.HasSuffix(name, ".jsonl") || f.IsDir() {
+				continue
+			}
+			sessionID := strings.TrimSuffix(name, ".jsonl")
+			// Skip non-UUID filenames.
+			if len(sessionID) < 36 {
+				continue
+			}
+			targets = append(targets, scanTarget{
+				path:      filepath.Join(pdPath, name),
+				sessionID: sessionID,
+			})
+		}
+	}
+
+	// Parallel scan with semaphore.
+	type scanResult struct {
+		match SessionSearchMatch
+		hits  int
+	}
+	var mu sync.Mutex
+	var results []scanResult
+	scanned := 0
+
+	sem := make(chan struct{}, 8)
+	var wg sync.WaitGroup
+
+	for _, t := range targets {
+		wg.Add(1)
+		go func(tgt scanTarget) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			mu.Lock()
+			scanned++
+			mu.Unlock()
+
+			// Determine session status.
+			meta, hasMeta := metaBySession[tgt.sessionID]
+			status := "dead"
+			if hasMeta && isProcessAlive(meta.PID) {
+				status = "alive"
+			}
+
+			// Apply status filter.
+			if statusFilter != "" && statusFilter != "all" && status != statusFilter {
+				return
+			}
+
+			// Get CWD and repo info.
+			cwd := ""
+			if hasMeta {
+				cwd = meta.CWD
+			}
+			if cwd == "" {
+				cwd = cwdFromJSONL(tgt.path)
+			}
+			repoName := repoNameFromPath(cwd)
+
+			// Apply repo filter.
+			if repoFilter != "" && !strings.EqualFold(repoName, repoFilter) {
+				return
+			}
+
+			// Apply time window filter.
+			la := lastActivity[tgt.sessionID]
+			if la.IsZero() && hasMeta {
+				la = msToTime(float64(meta.StartedAt))
+			}
+			if la.IsZero() {
+				if info, err := os.Stat(tgt.path); err == nil {
+					la = info.ModTime()
+				}
+			}
+			if !cutoff.IsZero() && la.Before(cutoff) {
+				return
+			}
+
+			// Scan file for matches.
+			hits, snippets := searchSessionFile(tgt.path, queryLower, useRegex, re, 3)
+			if hits == 0 {
+				return
+			}
+
+			// Build title.
+			title := ""
+			if hasMeta && meta.Name != "" {
+				title = meta.Name
+			}
+			if title == "" {
+				if d, ok := lastDisplay[tgt.sessionID]; ok {
+					title = truncate(d, 80)
+				}
+			}
+			if title == "" {
+				title = titleFromJSONL(tgt.path)
+			}
+
+			// Build resume command.
+			resumeCmd := fmt.Sprintf("claude --resume %s", tgt.sessionID)
+			if cwd != "" {
+				resumeCmd = fmt.Sprintf("cd %s && claude --resume %s", cwd, tgt.sessionID)
+			}
+
+			match := SessionSearchMatch{
+				SessionID:    tgt.sessionID,
+				Repo:         cwd,
+				RepoName:     repoName,
+				Title:        title,
+				Status:       status,
+				LastActivity: la.Format(time.RFC3339),
+				Relevance:    hits,
+				Snippets:     snippets,
+				ResumeCmd:    resumeCmd,
+			}
+
+			mu.Lock()
+			results = append(results, scanResult{match: match, hits: hits})
+			mu.Unlock()
+		}(t)
+	}
+	wg.Wait()
+
+	// Sort by relevance (hit count) descending, alive sessions boosted.
+	sort.Slice(results, func(i, j int) bool {
+		boostI, boostJ := 0, 0
+		if results[i].match.Status == "alive" {
+			boostI = 1000
+		}
+		if results[j].match.Status == "alive" {
+			boostJ = 1000
+		}
+		return (results[i].hits + boostI) > (results[j].hits + boostJ)
+	})
+
+	// Trim to max results.
+	total := len(results)
+	if len(results) > maxResults {
+		results = results[:maxResults]
+	}
+
+	matches := make([]SessionSearchMatch, len(results))
+	for i, r := range results {
+		matches[i] = r.match
+	}
+	return matches, total, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -2245,6 +2667,64 @@ func (m *ClaudeSessionModule) Tools() []registry.ToolDefinition {
 				}
 
 				return out, nil
+			},
+		),
+
+		// ── claude_session_search ─────────────────────
+		handler.TypedHandler[SessionSearchInput, SessionSearchOutput](
+			"claude_session_search",
+			"Full-text keyword search across all Claude Code session JSONL logs. Finds sessions by topic, tool names, or content. Returns ranked matches with context snippets and resume commands.",
+			func(_ context.Context, input SessionSearchInput) (SessionSearchOutput, error) {
+				if input.Query == "" {
+					return SessionSearchOutput{}, fmt.Errorf("[%s] query is required", handler.ErrInvalidParam)
+				}
+
+				maxResults := input.MaxResults
+				if maxResults <= 0 {
+					maxResults = 10
+				}
+
+				var windowDur time.Duration
+				if input.Window != "" {
+					var err error
+					windowDur, err = parseDurationString(input.Window)
+					if err != nil {
+						return SessionSearchOutput{}, fmt.Errorf("[%s] invalid window: %w", handler.ErrInvalidParam, err)
+					}
+				}
+
+				start := time.Now()
+				matches, total, err := searchSessions(input.Query, input.Repo, windowDur, input.Status, maxResults)
+				if err != nil {
+					return SessionSearchOutput{}, err
+				}
+				elapsed := time.Since(start)
+
+				// Count scanned files for reporting.
+				projectsDir := filepath.Join(claudeDir(), "projects")
+				scanned := 0
+				if pds, err := os.ReadDir(projectsDir); err == nil {
+					for _, pd := range pds {
+						if !pd.IsDir() {
+							continue
+						}
+						if files, err := os.ReadDir(filepath.Join(projectsDir, pd.Name())); err == nil {
+							for _, f := range files {
+								if strings.HasSuffix(f.Name(), ".jsonl") && !f.IsDir() {
+									scanned++
+								}
+							}
+						}
+					}
+				}
+
+				return SessionSearchOutput{
+					Query:   input.Query,
+					Results: matches,
+					Total:   total,
+					Scanned: scanned,
+					Elapsed: elapsed.Round(time.Millisecond).String(),
+				}, nil
 			},
 		),
 	}
