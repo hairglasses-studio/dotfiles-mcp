@@ -550,13 +550,12 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 						name += "::" + input.AppClass
 					}
 					path := filepath.Join(makimaDir(), name+".toml")
-					p, _ := ParseMappingProfile(content, path)
+					_, _ = ParseMappingProfile(content, path)
 					return MappingGenerateOutput{
 						Content:      content,
 						PreviewPath:  path,
 						MappingCount: countTOMLMappings(content),
 					}, nil
-					_ = p
 				}
 
 				// Check MIDI templates.
