@@ -1,0 +1,351 @@
+package main
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/hairglasses-studio/mcpkit/registry"
+)
+
+// ---------------------------------------------------------------------------
+// detectFormat
+// ---------------------------------------------------------------------------
+
+func TestDetectFormat(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"config.toml", "toml"},
+		{"config.TOML", "toml"},
+		{"settings.json", "json"},
+		{"settings.jsonc", "json"},
+		{"config.yaml", "yaml"},
+		{"config.yml", "yaml"},
+		{"config.ini", "ini"},
+		{"config.conf", "ini"},
+		{"Makefile", "unknown"},
+		{"script.sh", "unknown"},
+		{"", "unknown"},
+		{"noext", "unknown"},
+	}
+	for _, tc := range tests {
+		got := detectFormat(tc.path)
+		if got != tc.want {
+			t.Errorf("detectFormat(%q) = %q, want %q", tc.path, got, tc.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// parseStringArray
+// ---------------------------------------------------------------------------
+
+func TestParseStringArray(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   any
+		want    []string
+		wantErr bool
+	}{
+		{
+			name:  "valid string array",
+			input: []any{"a", "b", "c"},
+			want:  []string{"a", "b", "c"},
+		},
+		{
+			name:  "mixed types (non-strings skipped)",
+			input: []any{"a", 42, "b", true},
+			want:  []string{"a", "b"},
+		},
+		{
+			name:  "empty array",
+			input: []any{},
+			want:  nil,
+		},
+		{
+			name:    "nil input",
+			input:   nil,
+			wantErr: true,
+		},
+		{
+			name:    "non-array input",
+			input:   "not an array",
+			wantErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseStringArray(tc.input)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Errorf("index %d: got %q, want %q", i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// dotfilesDir
+// ---------------------------------------------------------------------------
+
+func TestDotfilesDir_EnvOverride(t *testing.T) {
+	t.Setenv("DOTFILES_DIR", "/tmp/test-dotfiles")
+	got := dotfilesDir()
+	if got != "/tmp/test-dotfiles" {
+		t.Errorf("dotfilesDir() = %q, want /tmp/test-dotfiles", got)
+	}
+}
+
+func TestDotfilesDir_Default(t *testing.T) {
+	t.Setenv("DOTFILES_DIR", "")
+	got := dotfilesDir()
+	home, _ := os.UserHomeDir()
+	want := filepath.Join(home, "hairglasses-studio", "dotfiles")
+	if got != want {
+		t.Errorf("dotfilesDir() = %q, want %q", got, want)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ValidateConfig handler -- additional edge cases
+// ---------------------------------------------------------------------------
+
+func TestValidateConfig_InvalidJSON(t *testing.T) {
+	m := &DotfilesModule{}
+	td := findTool(t, m, "dotfiles_validate_config")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{
+		"content": `{"key": broken}`,
+		"format":  "json",
+	}
+
+	result, err := td.Handler(nil, req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	out := unmarshalValidateOutput(t, result)
+	if out.Valid {
+		t.Error("expected valid=false for broken JSON")
+	}
+	if out.Error == "" {
+		t.Error("expected non-empty error for broken JSON")
+	}
+}
+
+func TestValidateConfig_EmptyContent(t *testing.T) {
+	m := &DotfilesModule{}
+	td := findTool(t, m, "dotfiles_validate_config")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{
+		"content": "",
+		"format":  "toml",
+	}
+
+	result, err := td.Handler(nil, req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+	// Empty content should be rejected as invalid param
+	if result == nil || !result.IsError {
+		t.Fatal("expected error result for empty content")
+	}
+}
+
+func TestValidateConfig_EmptyJSON(t *testing.T) {
+	m := &DotfilesModule{}
+	td := findTool(t, m, "dotfiles_validate_config")
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{
+		"content": "{}",
+		"format":  "json",
+	}
+
+	result, err := td.Handler(nil, req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	out := unmarshalValidateOutput(t, result)
+	if !out.Valid {
+		t.Errorf("expected valid=true for empty JSON object, got error: %s", out.Error)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// reloadCommands map
+// ---------------------------------------------------------------------------
+
+func TestReloadCommands_AllPresent(t *testing.T) {
+	expected := []string{"hyprland", "mako", "eww", "waybar", "sway", "tmux"}
+	for _, svc := range expected {
+		if _, ok := reloadCommands[svc]; !ok {
+			t.Errorf("missing reload command for %s", svc)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// expectedSymlinks
+// ---------------------------------------------------------------------------
+
+func TestExpectedSymlinks_NonEmpty(t *testing.T) {
+	links := expectedSymlinks()
+	if len(links) == 0 {
+		t.Fatal("expected non-empty symlinks list")
+	}
+	for i, link := range links {
+		if link.src == "" || link.dst == "" {
+			t.Errorf("symlink %d has empty src=%q or dst=%q", i, link.src, link.dst)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Module Name/Description for all modules
+// ---------------------------------------------------------------------------
+
+func TestAllModuleNameDescription(t *testing.T) {
+	modules := dotfilesModules()
+	if len(modules) == 0 {
+		t.Fatal("dotfilesModules() returned empty list")
+	}
+
+	for _, m := range modules {
+		name := m.Name()
+		desc := m.Description()
+		if name == "" {
+			t.Error("module has empty name")
+		}
+		if desc == "" {
+			t.Errorf("module %q has empty description", name)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// dotfilesModules exhaustive list
+// ---------------------------------------------------------------------------
+
+func TestDotfilesModules_Count(t *testing.T) {
+	modules := dotfilesModules()
+	if len(modules) < 18 {
+		t.Errorf("expected at least 18 modules, got %d", len(modules))
+	}
+
+	names := make(map[string]bool)
+	for _, m := range modules {
+		names[m.Name()] = true
+	}
+
+	expected := []string{
+		"dotfiles", "hyprland", "shader", "input", "bluetooth",
+		"controller", "midi", "solaar", "workflow", "oss",
+		"mapping", "learn", "mapping_status", "mapping_daemon",
+		"screen", "input_simulate", "claude_session", "prompt_registry",
+	}
+	for _, name := range expected {
+		if !names[name] {
+			t.Errorf("missing module %q in dotfilesModules()", name)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// All module tools have valid structure (generic assertion)
+// ---------------------------------------------------------------------------
+
+func TestAllModuleToolsValid(t *testing.T) {
+	modules := dotfilesModules()
+	for _, m := range modules {
+		t.Run(m.Name(), func(t *testing.T) {
+			tools := m.Tools()
+			if len(tools) == 0 {
+				t.Fatalf("module %q has no tools", m.Name())
+			}
+
+			seen := make(map[string]bool)
+			for _, td := range tools {
+				if td.Tool.Name == "" {
+					t.Error("tool has empty name")
+				}
+				if td.Tool.Description == "" {
+					t.Errorf("tool %q has empty description", td.Tool.Name)
+				}
+				if td.Handler == nil {
+					t.Errorf("tool %q has nil handler", td.Tool.Name)
+				}
+				if seen[td.Tool.Name] {
+					t.Errorf("duplicate tool name: %s", td.Tool.Name)
+				}
+				seen[td.Tool.Name] = true
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Validate JSON round-trip for output types
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Input path helpers
+// ---------------------------------------------------------------------------
+
+func TestInputPathHelpers(t *testing.T) {
+	t.Setenv("DOTFILES_DIR", "/tmp/test-dotfiles")
+	if got := logiopsCfg(); got != "/tmp/test-dotfiles/logiops/logid.cfg" {
+		t.Errorf("logiopsCfg() = %q", got)
+	}
+	if got := makimaDir(); got != "/tmp/test-dotfiles/makima" {
+		t.Errorf("makimaDir() = %q", got)
+	}
+	if got := midiDir(); got != "/tmp/test-dotfiles/midi" {
+		t.Errorf("midiDir() = %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Validate JSON round-trip for output types
+// ---------------------------------------------------------------------------
+
+func TestRiceCheckOutput_JSONRoundTrip(t *testing.T) {
+	out := RiceCheckOutput{
+		Compositor: "hyprland",
+		Shader:     "none",
+		Wallpaper:  "none",
+		Services: []ServiceReloadStatus{
+			{Service: "eww", Action: "running"},
+		},
+	}
+	data, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded RiceCheckOutput
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if decoded.Compositor != "hyprland" {
+		t.Errorf("compositor = %q, want hyprland", decoded.Compositor)
+	}
+}
