@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/hairglasses-studio/mcpkit v0.1.0
+	github.com/hairglasses-studio/mcpkit v0.2.0
 	github.com/mark3labs/mcp-go v0.46.0
 )
 
@@ -25,5 +25,3 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/hairglasses-studio/mcpkit => ../mcpkit
