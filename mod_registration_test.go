@@ -152,8 +152,8 @@ func TestScreenModuleRegistration(t *testing.T) {
 	}
 
 	tools := m.Tools()
-	if len(tools) != 5 {
-		t.Fatalf("expected 5 screen tools, got %d", len(tools))
+	if len(tools) != 8 {
+		t.Fatalf("expected 8 screen tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -166,6 +166,9 @@ func TestScreenModuleRegistration(t *testing.T) {
 		"screen_record_stop",
 		"screen_ocr",
 		"screen_color_pick",
+		"screen_record_status",
+		"screen_annotate",
+		"screen_screenshot_annotated",
 	} {
 		if !srv.HasTool(want) {
 			t.Errorf("missing tool: %s", want)
