@@ -15,8 +15,8 @@ func TestRepoNameFromPath(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"/home/hg/hairglasses-studio/dotfiles-mcp", "dotfiles-mcp"},
-		{"/home/hg/hairglasses-studio/mcpkit", "mcpkit"},
+		{"/home/user/projects/dotfiles-mcp", "dotfiles-mcp"},
+		{"/home/user/projects/mcpkit", "mcpkit"},
 		{"/tmp/test", "test"},
 		{"/", "/"},
 		{"", "."},
@@ -37,13 +37,13 @@ func TestCwdFromJSONL_Found(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.jsonl")
 	content := `{"type":"system","subtype":"init"}
-{"type":"user","cwd":"/home/hg/hairglasses-studio/dotfiles-mcp","message":{"content":"hello"}}
+{"type":"user","cwd":"/home/user/projects/dotfiles-mcp","message":{"content":"hello"}}
 {"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}
 `
 	os.WriteFile(path, []byte(content), 0644)
 
 	got := cwdFromJSONL(path)
-	if got != "/home/hg/hairglasses-studio/dotfiles-mcp" {
+	if got != "/home/user/projects/dotfiles-mcp" {
 		t.Errorf("cwdFromJSONL() = %q, want dotfiles-mcp path", got)
 	}
 }
@@ -388,7 +388,7 @@ func TestExtractJSONLMeta_Full(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.jsonl")
 	content := `{"type":"custom-title","customTitle":"My Session"}
-{"type":"user","cwd":"/home/hg/project","gitBranch":"main","version":"1.0.0","message":{"content":"hi"}}
+{"type":"user","cwd":"/home/user/project","gitBranch":"main","version":"1.0.0","message":{"content":"hi"}}
 {"type":"assistant","slug":"my-slug","message":{"model":"claude-opus-4-6","content":[{"type":"text","text":"hello"}]}}
 `
 	os.WriteFile(path, []byte(content), 0644)
@@ -397,8 +397,8 @@ func TestExtractJSONLMeta_Full(t *testing.T) {
 	if title != "My Session" {
 		t.Errorf("title = %q, want 'My Session'", title)
 	}
-	if cwd != "/home/hg/project" {
-		t.Errorf("cwd = %q, want '/home/hg/project'", cwd)
+	if cwd != "/home/user/project" {
+		t.Errorf("cwd = %q, want '/home/user/project'", cwd)
 	}
 	if branch != "main" {
 		t.Errorf("branch = %q, want 'main'", branch)
