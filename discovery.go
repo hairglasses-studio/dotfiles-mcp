@@ -249,6 +249,8 @@ func dotfilesModules() []registry.ToolModule {
 		&MappingStatusModule{},
 		&MappingDaemonModule{},
 		&ScreenModule{},
+		&ClipboardModule{},
+		&NotifyModule{},
 		&InputSimulateModule{},
 		&ClaudeSessionModule{},
 		&PromptRegistryModule{},
