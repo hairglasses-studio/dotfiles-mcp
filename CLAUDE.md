@@ -10,7 +10,7 @@ go test ./... -count=1
 go install .
 ```
 
-## Tools (86)
+## Tools (87)
 
 ### Config Management (4)
 - `dotfiles_list_configs` — List dotfiles config directories with symlink health and format
@@ -53,12 +53,13 @@ go install .
 - `dotfiles_eww_get` — Query current eww variable value
 - `dotfiles_onboard_repo` — Add standard files to any repo (.editorconfig, CI, LICENSE)
 
-### Hyprland Desktop (12)
+### Hyprland Desktop (13)
 - `hypr_list_windows` — List all windows with address, title, class, workspace
 - `hypr_list_workspaces` — List workspaces with window count, monitor, focused status
 - `hypr_get_monitors` — List monitors with resolution, refresh rate, position, scale
 - `hypr_screenshot` — Capture screenshot (single monitor or all)
 - `hypr_screenshot_monitors` — Capture separate screenshots per monitor
+- `hypr_screenshot_window` — Capture a specific window by address or class (scale-aware, resized for LLM vision)
 - `hypr_focus_window` — Focus window by address or class name
 - `hypr_switch_workspace` — Switch to workspace by ID
 - `hypr_reload_config` — Reload Hyprland config and check for errors
