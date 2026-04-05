@@ -390,8 +390,8 @@ type GHBulkCloneOutput struct {
 // Tool 14: dotfiles_gh_pull_all
 
 type GHPullAllInput struct {
-	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory containing repos (default: ~/hairglasses-studio)"`
-	FetchOnly bool  `json:"fetch_only,omitempty" jsonschema:"description=Only fetch without merging (default: pull with ff-only)"`
+	LocalDir  string `json:"local_dir,omitempty" jsonschema:"description=Local directory containing repos (default: ~/hairglasses-studio)"`
+	FetchOnly bool   `json:"fetch_only,omitempty" jsonschema:"description=Only fetch without merging (default: pull with ff-only)"`
 }
 
 type PullResult struct {
@@ -462,7 +462,7 @@ type MCPKitSyncResult struct {
 }
 
 type MCPKitVersionSyncOutput struct {
-	LatestVersion string            `json:"latest_version"`
+	LatestVersion string             `json:"latest_version"`
 	Results       []MCPKitSyncResult `json:"results"`
 }
 
@@ -488,23 +488,23 @@ type FleetAuditInput struct {
 }
 
 type RepoAuditInfo struct {
-	Name            string `json:"name"`
-	Language        string `json:"language"`
-	GoVersion       string `json:"go_version,omitempty"`
-	CIStatus        string `json:"ci_status"` // pass, fail, running, none
-	TestCount       int    `json:"test_count"`
-	LastCommitDays  int    `json:"last_commit_days"`
-	HasPipelineMk   bool   `json:"has_pipeline_mk"`
-	HasCLAUDEmd     bool   `json:"has_claude_md"`
-	HasCI           bool   `json:"has_ci"`
+	Name           string `json:"name"`
+	Language       string `json:"language"`
+	GoVersion      string `json:"go_version,omitempty"`
+	CIStatus       string `json:"ci_status"` // pass, fail, running, none
+	TestCount      int    `json:"test_count"`
+	LastCommitDays int    `json:"last_commit_days"`
+	HasPipelineMk  bool   `json:"has_pipeline_mk"`
+	HasCLAUDEmd    bool   `json:"has_claude_md"`
+	HasCI          bool   `json:"has_ci"`
 }
 
 type FleetAuditOutput struct {
-	Total    int             `json:"total"`
-	Passing  int             `json:"passing"`
-	Failing  int             `json:"failing"`
-	GoRepos  int             `json:"go_repos"`
-	Repos    []RepoAuditInfo `json:"repos"`
+	Total   int             `json:"total"`
+	Passing int             `json:"passing"`
+	Failing int             `json:"failing"`
+	GoRepos int             `json:"go_repos"`
+	Repos   []RepoAuditInfo `json:"repos"`
 }
 
 // Tool 19: dotfiles_cascade_reload
@@ -536,11 +536,11 @@ type PaletteViolation struct {
 }
 
 type RiceCheckOutput struct {
-	Compositor        string             `json:"compositor"`
-	Shader            string             `json:"shader"`
-	Wallpaper         string             `json:"wallpaper"`
+	Compositor        string                `json:"compositor"`
+	Shader            string                `json:"shader"`
+	Wallpaper         string                `json:"wallpaper"`
 	Services          []ServiceReloadStatus `json:"services"`
-	PaletteViolations []PaletteViolation `json:"palette_violations,omitempty"`
+	PaletteViolations []PaletteViolation    `json:"palette_violations,omitempty"`
 }
 
 // Tool 21: dotfiles_bulk_pipeline
@@ -554,15 +554,15 @@ type BulkPipelineInput struct {
 }
 
 type PipelineResult struct {
-	Repo    string `json:"repo"`
-	Status  string `json:"status"` // pass, build-fail, test-fail, vet-fail, skip
-	Output  string `json:"output,omitempty"`
+	Repo   string `json:"repo"`
+	Status string `json:"status"` // pass, build-fail, test-fail, vet-fail, skip
+	Output string `json:"output,omitempty"`
 }
 
 type BulkPipelineOutput struct {
-	Total  int              `json:"total"`
-	Passed int              `json:"passed"`
-	Failed int              `json:"failed"`
+	Total   int              `json:"total"`
+	Passed  int              `json:"passed"`
+	Failed  int              `json:"failed"`
 	Results []PipelineResult `json:"results"`
 }
 
@@ -2944,19 +2944,7 @@ func main() {
 			registry.SafetyTierMiddleware(),
 		},
 	})
-	reg.RegisterModule(&DotfilesModule{})
-	reg.RegisterModule(&HyprlandModule{})
-	reg.RegisterModule(&ShaderModule{})
-	reg.RegisterModule(&InputModule{})
-	reg.RegisterModule(&BluetoothModule{})
-	reg.RegisterModule(&ControllerModule{})
-	reg.RegisterModule(&MidiModule{})
-	reg.RegisterModule(&SolaarModule{})
-	reg.RegisterModule(&WorkflowModule{})
-	reg.RegisterModule(&OSSModule{})
-	reg.RegisterModule(&MappingEngineModule{})
-	reg.RegisterModule(&LearnModule{})
-	reg.RegisterModule(&MappingStatusModule{})
+	registerDotfilesModules(reg)
 
 	s := registry.NewMCPServer("dotfiles-mcp", "2.1.0")
 	reg.RegisterWithServer(s)
