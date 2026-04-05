@@ -29,3 +29,7 @@ go test ./...
 - Go standard formatting (gofmt)
 - Error wrapping with context
 - All MCP tool handlers follow mcp-go patterns
+
+## Shared Research Repository
+
+Cross-project research lives at `~/hairglasses-studio/docs/` (git: hairglasses-studio/docs). When launching research agents, check existing docs first and write reusable research outputs back to the shared repo rather than local docs/.
