@@ -241,7 +241,7 @@ func TestRuleIndex_AppOverride(t *testing.T) {
 
 	// Default context.
 	state := mapping.NewEngineState()
-	rule := idx.Resolve("BTN_SOUTH", state, "")
+	rule := idx.Resolve("BTN_SOUTH", state)
 	if rule == nil || rule.Description != "default" {
 		t.Errorf("expected default rule, got %v", rule)
 	}
@@ -265,7 +265,7 @@ func TestRuleIndex_ModifierMatch(t *testing.T) {
 
 	// No modifier held → plain rule.
 	state := mapping.NewEngineState()
-	rule := idx.Resolve("BTN_SOUTH", state, "")
+	rule := idx.Resolve("BTN_SOUTH", state)
 	if rule == nil || rule.Description != "plain" {
 		t.Errorf("expected plain rule, got %v", rule)
 	}
@@ -298,7 +298,7 @@ func TestRuleIndex_ConditionFilter(t *testing.T) {
 
 	// No recording variable → default.
 	state := mapping.NewEngineState()
-	rule := idx.Resolve("midi:cc:1", state, "")
+	rule := idx.Resolve("midi:cc:1", state)
 	if rule == nil || rule.Description != "default volume" {
 		t.Errorf("expected default volume, got %v", rule)
 	}
