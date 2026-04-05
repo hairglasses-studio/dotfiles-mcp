@@ -4,7 +4,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -172,18 +174,21 @@ func (m *LearnModule) Tools() []registry.ToolDefinition {
 					deviceName = filepath.Base(eventPath)
 				}
 
-				// Capture events via evtest.
-				captureCtx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
-				defer cancel()
+				// Try IPC event streaming from mapitall first, fall back to evtest.
+				controls, totalEvents := captureEventsIPC(ctx, deviceName, duration)
+				if totalEvents < 0 {
+					// IPC unavailable, fall back to evtest.
+					captureCtx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
+					defer cancel()
 
-				cmd := exec.CommandContext(captureCtx, "evtest", eventPath)
-				var out bytes.Buffer
-				cmd.Stdout = &out
-				cmd.Stderr = &out
-				_ = cmd.Run()
+					cmd := exec.CommandContext(captureCtx, "evtest", eventPath)
+					var out bytes.Buffer
+					cmd.Stdout = &out
+					cmd.Stderr = &out
+					_ = cmd.Run()
 
-				// Parse captured events.
-				controls, totalEvents := parseEvtestOutput(out.String())
+					controls, totalEvents = parseEvtestOutput(out.String())
+				}
 
 				status := "captured"
 				if totalEvents == 0 {
@@ -235,26 +240,31 @@ func (m *LearnModule) Tools() []registry.ToolDefinition {
 					return MonitorOutput{Status: "no_device"}, fmt.Errorf("[%s] no controller found", handler.ErrNotFound)
 				}
 
-				captureCtx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
-				defer cancel()
+				// Try IPC event streaming from mapitall first, fall back to evtest.
+				events := monitorEventsIPC(ctx, deviceName, duration)
+				ipcFailed := events == nil
 
-				cmd := exec.CommandContext(captureCtx, "evtest", eventPath)
-				var out bytes.Buffer
-				cmd.Stdout = &out
-				cmd.Stderr = &out
-				_ = cmd.Run()
+				if ipcFailed {
+					captureCtx, cancel := context.WithTimeout(ctx, time.Duration(duration)*time.Second)
+					defer cancel()
 
-				eventRe := regexp.MustCompile(`time (\d+\.\d+), type \d+ \((\w+)\), code \d+ \((\w+)\), value (\S+)`)
-				var events []MonitorEvent
-				for _, line := range strings.Split(out.String(), "\n") {
-					m := eventRe.FindStringSubmatch(line)
-					if m != nil {
-						events = append(events, MonitorEvent{
-							Timestamp: m[1],
-							Type:      m[2],
-							Code:      m[3],
-							Value:     m[4],
-						})
+					cmd := exec.CommandContext(captureCtx, "evtest", eventPath)
+					var out bytes.Buffer
+					cmd.Stdout = &out
+					cmd.Stderr = &out
+					_ = cmd.Run()
+
+					eventRe := regexp.MustCompile(`time (\d+\.\d+), type \d+ \((\w+)\), code \d+ \((\w+)\), value (\S+)`)
+					for _, line := range strings.Split(out.String(), "\n") {
+						m := eventRe.FindStringSubmatch(line)
+						if m != nil {
+							events = append(events, MonitorEvent{
+								Timestamp: m[1],
+								Type:      m[2],
+								Code:      m[3],
+								Value:     m[4],
+							})
+						}
 					}
 				}
 
@@ -599,4 +609,234 @@ step = 5`,
 	}
 
 	return suggestions
+}
+
+// ---------------------------------------------------------------------------
+// IPC event streaming helpers (mapitall subscribe_events)
+// ---------------------------------------------------------------------------
+
+// ipcDeviceEvent mirrors the DeviceEvent type from mapitall's IPC event bus.
+type ipcDeviceEvent struct {
+	DeviceID  string  `json:"device_id"`
+	Type      string  `json:"type"`
+	Source    string  `json:"source"`
+	Timestamp string  `json:"timestamp"`
+	Value     float64 `json:"value,omitempty"`
+	Pressed   bool    `json:"pressed,omitempty"`
+	Code      uint16  `json:"code,omitempty"`
+	Channel   uint8   `json:"channel,omitempty"`
+	MIDINote  uint8   `json:"midi_note,omitempty"`
+	Velocity  uint8   `json:"velocity,omitempty"`
+	MIDIValue uint8   `json:"midi_value,omitempty"`
+}
+
+// ipcNotification is a JSON-RPC 2.0 notification from the mapitall event stream.
+type ipcNotification struct {
+	JSONRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+}
+
+// connectIPCEventStream opens a connection to the mapitall IPC socket,
+// sends a subscribe_events request, and returns the connection and decoder.
+// Returns nil, nil if mapitall is not running.
+func connectIPCEventStream(deviceID string) (net.Conn, *json.Decoder, error) {
+	socketPath := mapitallSocketPath()
+	conn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Build the subscribe_events request with optional device filter.
+	params := map[string]string{}
+	if deviceID != "" {
+		params["device_id"] = deviceID
+	}
+
+	req := jsonRPCRequest{JSONRPC: "2.0", Method: "subscribe_events", Params: params, ID: 1}
+	if err := json.NewEncoder(conn).Encode(req); err != nil {
+		conn.Close()
+		return nil, nil, err
+	}
+
+	dec := json.NewDecoder(conn)
+
+	// Read the initial ack response.
+	var resp jsonRPCResponse
+	if err := dec.Decode(&resp); err != nil {
+		conn.Close()
+		return nil, nil, err
+	}
+	if resp.Error != nil {
+		conn.Close()
+		return nil, nil, fmt.Errorf("rpc error %d: %s", resp.Error.Code, resp.Error.Message)
+	}
+
+	return conn, dec, nil
+}
+
+// captureEventsIPC subscribes to mapitall events and collects them for the given duration.
+// Returns controls and total event count. Returns nil, -1 if IPC is unavailable.
+func captureEventsIPC(ctx context.Context, deviceName string, durationSec int) ([]CapturedControl, int) {
+	conn, dec, err := connectIPCEventStream(deviceName)
+	if err != nil {
+		return nil, -1 // signal caller to fall back to evtest
+	}
+	defer conn.Close()
+
+	deadline := time.Now().Add(time.Duration(durationSec) * time.Second)
+	conn.SetReadDeadline(deadline)
+
+	type eventData struct {
+		evType string
+		code   string
+		values map[string]bool
+		count  int
+	}
+	byCode := make(map[string]*eventData)
+	totalEvents := 0
+
+	for {
+		var notif ipcNotification
+		if err := dec.Decode(&notif); err != nil {
+			break // timeout or disconnect
+		}
+		if notif.Method != "event" {
+			continue
+		}
+
+		var ev ipcDeviceEvent
+		if err := json.Unmarshal(notif.Params, &ev); err != nil {
+			continue
+		}
+
+		// Skip sync-like events.
+		if ev.Type == "" || ev.Source == "" {
+			continue
+		}
+
+		totalEvents++
+		ed, ok := byCode[ev.Source]
+		if !ok {
+			ed = &eventData{evType: ev.Type, code: ev.Source, values: make(map[string]bool)}
+			byCode[ev.Source] = ed
+		}
+		ed.values[fmt.Sprintf("%.6g", ev.Value)] = true
+		if ev.Pressed {
+			ed.values["1"] = true
+		}
+		ed.count++
+
+		select {
+		case <-ctx.Done():
+			break
+		default:
+		}
+	}
+
+	// Convert to CapturedControl (same classification logic as parseEvtestOutput).
+	var controls []CapturedControl
+	for _, ed := range byCode {
+		var values []string
+		for v := range ed.values {
+			values = append(values, v)
+		}
+
+		cc := CapturedControl{
+			Code:       ed.code,
+			Source:     ed.code,
+			Values:     values,
+			EventCount: ed.count,
+			Continuous: len(ed.values) > 2,
+		}
+
+		switch ed.evType {
+		case "button", "key":
+			cc.Type = "button"
+		case "axis":
+			if cc.Continuous {
+				cc.Type = "axis"
+			} else {
+				cc.Type = "button"
+			}
+		case "encoder":
+			cc.Type = "encoder"
+		case "midi_note":
+			cc.Type = "midi_note"
+		case "midi_cc":
+			cc.Type = "midi_cc"
+		default:
+			cc.Type = ed.evType
+		}
+
+		if len(values) > 0 {
+			cc.MinValue = values[0]
+			cc.MaxValue = values[0]
+			for _, v := range values {
+				if v < cc.MinValue {
+					cc.MinValue = v
+				}
+				if v > cc.MaxValue {
+					cc.MaxValue = v
+				}
+			}
+		}
+
+		controls = append(controls, cc)
+	}
+
+	return controls, totalEvents
+}
+
+// monitorEventsIPC subscribes to mapitall events and returns them as MonitorEvents.
+// Returns nil if IPC is unavailable (caller should fall back to evtest).
+func monitorEventsIPC(ctx context.Context, deviceName string, durationSec int) []MonitorEvent {
+	conn, dec, err := connectIPCEventStream(deviceName)
+	if err != nil {
+		return nil // signal caller to fall back to evtest
+	}
+	defer conn.Close()
+
+	deadline := time.Now().Add(time.Duration(durationSec) * time.Second)
+	conn.SetReadDeadline(deadline)
+
+	var events []MonitorEvent
+
+	for {
+		var notif ipcNotification
+		if err := dec.Decode(&notif); err != nil {
+			break // timeout or disconnect
+		}
+		if notif.Method != "event" {
+			continue
+		}
+
+		var ev ipcDeviceEvent
+		if err := json.Unmarshal(notif.Params, &ev); err != nil {
+			continue
+		}
+
+		if ev.Type == "" || ev.Source == "" {
+			continue
+		}
+
+		events = append(events, MonitorEvent{
+			Timestamp: ev.Timestamp,
+			Type:      ev.Type,
+			Code:      ev.Source,
+			Value:     fmt.Sprintf("%.6g", ev.Value),
+		})
+
+		select {
+		case <-ctx.Done():
+			break
+		default:
+		}
+	}
+
+	// Return empty non-nil slice to distinguish from "IPC unavailable" (nil).
+	if events == nil {
+		events = []MonitorEvent{}
+	}
+	return events
 }
