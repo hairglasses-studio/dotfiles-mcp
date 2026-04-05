@@ -249,6 +249,7 @@ func dotfilesModules() []registry.ToolModule {
 		&MappingStatusModule{},
 		&ScreenModule{},
 		&InputSimulateModule{},
+		&ClaudeSessionModule{},
 	}
 }
 
