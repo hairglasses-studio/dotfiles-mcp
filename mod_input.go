@@ -632,6 +632,91 @@ hw = "%s"
 36 = { type = "command", action = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" }
 37 = { type = "command", action = "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle" }
 `,
+	"vj-control": `# MIDI mapping — %s
+# Template: vj-control — VJ/DJ live performance (Resolume, TouchDesigner, OBS)
+# Device: %s
+
+[device]
+name = "%s"
+hw = "%s"
+
+[cc]
+# Encoders → OSC/WebSocket outputs for VJ software
+# Row 1 (CC 32-35): Layer opacity / effect intensity
+32 = { type = "osc", action = "/composition/layers/1/video/opacity {value}" }
+33 = { type = "osc", action = "/composition/layers/2/video/opacity {value}" }
+34 = { type = "osc", action = "/composition/layers/3/video/opacity {value}" }
+35 = { type = "osc", action = "/composition/layers/4/video/opacity {value}" }
+# Row 2 (CC 36-39): Effect parameters
+36 = { type = "osc", action = "/composition/layers/1/video/effects/1/param1 {value}" }
+37 = { type = "osc", action = "/composition/layers/2/video/effects/1/param1 {value}" }
+38 = { type = "osc", action = "/composition/layers/3/video/effects/1/param1 {value}" }
+39 = { type = "osc", action = "/composition/layers/4/video/effects/1/param1 {value}" }
+# Row 3 (CC 40-43): Clip transport / speed
+40 = { type = "osc", action = "/composition/layers/1/clips/1/transport/position {value}" }
+41 = { type = "osc", action = "/composition/layers/2/clips/1/transport/position {value}" }
+42 = { type = "osc", action = "/composition/layers/3/clips/1/transport/position {value}" }
+43 = { type = "osc", action = "/composition/layers/4/clips/1/transport/position {value}" }
+# Row 4 (CC 44-47): Master / crossfader / BPM
+44 = { type = "osc", action = "/composition/master/video/opacity {value}" }
+45 = { type = "osc", action = "/composition/crossfader/phase {value}" }
+46 = { type = "osc", action = "/composition/tempocontroller/tempo {value}" }
+47 = { type = "osc", action = "/composition/master/audio/volume {value}" }
+
+[note]
+# Encoder push buttons → clip triggers / layer toggles
+32 = { type = "osc", action = "/composition/layers/1/clips/1/connect 1" }
+33 = { type = "osc", action = "/composition/layers/2/clips/1/connect 1" }
+34 = { type = "osc", action = "/composition/layers/3/clips/1/connect 1" }
+35 = { type = "osc", action = "/composition/layers/4/clips/1/connect 1" }
+36 = { type = "osc", action = "/composition/layers/1/bypassed 1" }
+37 = { type = "osc", action = "/composition/layers/2/bypassed 1" }
+38 = { type = "osc", action = "/composition/layers/3/bypassed 1" }
+39 = { type = "osc", action = "/composition/layers/4/bypassed 1" }
+`,
+	"en16-default": `# MIDI mapping — %s
+# Template: en16-default — Intech Studio Grid EN16 (16 encoders + push buttons)
+# Device: %s
+# Default MIDI: CC 32-47 ch0 (encoders), Note On/Off (push buttons)
+
+[device]
+name = "%s"
+hw = "%s"
+
+[cc]
+# 16 endless encoders (CC 32-47, factory default)
+# Row 1: System controls
+32 = { type = "command", action = "wpctl set-volume @DEFAULT_AUDIO_SINK@ {value}%%" }
+33 = { type = "command", action = "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ {value}%%" }
+34 = { type = "command", action = "brightnessctl set {value}%%" }
+35 = { type = "command", action = "playerctl volume {value}" }
+# Row 2: Workspace navigation
+36 = { type = "command", action = "hyprctl dispatch workspace 1" }
+37 = { type = "command", action = "hyprctl dispatch workspace 2" }
+38 = { type = "command", action = "hyprctl dispatch workspace 3" }
+39 = { type = "command", action = "hyprctl dispatch workspace 4" }
+# Row 3: Shader / wallpaper
+40 = { type = "command", action = "hg shader next" }
+41 = { type = "command", action = "hg shader random" }
+42 = { type = "command", action = "hg wallpaper next" }
+43 = { type = "command", action = "hg wallpaper random" }
+# Row 4: Media
+44 = { type = "command", action = "playerctl previous" }
+45 = { type = "command", action = "playerctl play-pause" }
+46 = { type = "command", action = "playerctl next" }
+47 = { type = "command", action = "playerctl position {value}" }
+
+[note]
+# Encoder push buttons (same note numbers as CC)
+32 = { type = "command", action = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle" }
+33 = { type = "command", action = "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle" }
+40 = { type = "command", action = "hg shader set bloom-soft" }
+41 = { type = "command", action = "hg shader set crt-chromatic" }
+44 = { type = "command", action = "playerctl previous" }
+45 = { type = "command", action = "playerctl play-pause" }
+46 = { type = "command", action = "playerctl next" }
+47 = { type = "command", action = "playerctl stop" }
+`,
 }
 
 // Solaar setting names we expose for management.
