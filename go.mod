@@ -13,6 +13,7 @@ require (
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/hairglasses-studio/prompt-improver v0.0.0-local
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modelcontextprotocol/go-sdk v1.4.1 // indirect
@@ -25,3 +26,5 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/hairglasses-studio/prompt-improver => ../prompt-improver

@@ -1,0 +1,17 @@
+preamble: |
+  Context: MCP server in Go using mcpkit framework.
+  Follows handler.TypedHandler pattern. Returns (*mcp.CallToolResult, nil).
+
+rules:
+  - match: "tool|handler|mcp"
+    prepend: "Use handler.TypedHandler[In, Out]. Use handler.CodedErrorResult for errors. Never return (nil, error)."
+  - match: "module|register"
+    prepend: "Modules implement Name(), Description(), Tools() []registry.ToolDefinition. Register in discovery.go."
+  - match: "test"
+    prepend: "Integration tests use mcptest.NewServer(). Unit tests use stdlib testing."
+
+hook:
+  skip_score_threshold: 70
+  min_word_count: 5
+
+default_task_type: code
