@@ -399,7 +399,7 @@ func (m *LearnModule) Tools() []registry.ToolDefinition {
 					Devices: results,
 				}
 
-				// Restart makima if executing and gamepads were generated.
+				// Restart mapitall if executing and gamepads were generated.
 				if input.Execute {
 					hasNewGamepad := false
 					for _, r := range results {
@@ -409,10 +409,10 @@ func (m *LearnModule) Tools() []registry.ToolDefinition {
 						}
 					}
 					if hasNewGamepad {
-						if _, _, err := inputRunCmd("sudo", "systemctl", "restart", "makima.service"); err == nil {
-							out.Restart = "makima restarted"
+						if _, _, err := inputRunCmd("sudo", "systemctl", "restart", "mapitall.service"); err == nil {
+							out.Restart = "mapitall restarted"
 						} else {
-							out.Restart = "makima restart failed (may need sudo)"
+							out.Restart = "mapitall restart failed (may need sudo)"
 						}
 					}
 				}
