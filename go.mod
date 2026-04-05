@@ -5,7 +5,7 @@ go 1.26.1
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/hairglasses-studio/mapping v0.1.0
-	github.com/hairglasses-studio/mcpkit v0.2.1-0.20260405135316-085ccea5cc77
+	github.com/hairglasses-studio/mcpkit v0.3.0
 	github.com/hairglasses-studio/prompt-improver v0.1.0
 	github.com/mark3labs/mcp-go v0.47.0
 	go.opentelemetry.io/otel v1.43.0
