@@ -13,7 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -2938,6 +2938,10 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 // ---------------------------------------------------------------------------
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})).With("service", "dotfiles-mcp"))
+
 	reg := registry.NewToolRegistry(registry.Config{
 		Middleware: []registry.Middleware{
 			registry.AuditMiddleware(""),
@@ -2950,6 +2954,7 @@ func main() {
 	reg.RegisterWithServer(s)
 
 	if err := registry.ServeAuto(s); err != nil {
-		log.Fatal(err)
+		slog.Error("server stopped", "error", err)
+		os.Exit(1)
 	}
 }
