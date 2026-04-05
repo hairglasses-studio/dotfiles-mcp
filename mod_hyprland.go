@@ -114,6 +114,10 @@ type monitorInfo struct {
 	Focused         bool   `json:"focused"`
 }
 
+type monitorsResult struct {
+	Monitors []monitorInfo `json:"monitors"`
+}
+
 // ---------- module ----------
 
 type HyprlandModule struct{}
@@ -535,18 +539,18 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 		),
 
 		// ── hypr_get_monitors ─────────────────────────
-		handler.TypedHandler[EmptyInput, []monitorInfo](
+		handler.TypedHandler[EmptyInput, monitorsResult](
 			"hypr_get_monitors",
 			"List connected monitors with resolution, refresh rate, position, scale, and active workspace.",
-			func(_ context.Context, _ EmptyInput) ([]monitorInfo, error) {
+			func(_ context.Context, _ EmptyInput) (monitorsResult, error) {
 				out, err := runHyprctl("monitors", "-j")
 				if err != nil {
-					return nil, err
+					return monitorsResult{}, err
 				}
 
 				var monitors []map[string]interface{}
 				if err := json.Unmarshal([]byte(out), &monitors); err != nil {
-					return nil, fmt.Errorf("failed to parse monitors JSON: %w", err)
+					return monitorsResult{}, fmt.Errorf("failed to parse monitors JSON: %w", err)
 				}
 
 				var result []monitorInfo
@@ -588,7 +592,7 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 					result = append(result, mi)
 				}
 
-				return result, nil
+				return monitorsResult{Monitors: result}, nil
 			},
 		),
 

@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -605,6 +604,166 @@ type RecoveryPriorityEntry struct {
 	OpenTasks    int    `json:"open_tasks"`
 	LastActivity string `json:"last_activity,omitempty"`
 	ResumeCmd    string `json:"resume_cmd"`
+}
+
+// ── claude_session_health ──
+
+type SessionHealthInput struct {
+	SessionID string `json:"session_id" jsonschema:"required,description=The session UUID to score"`
+}
+
+type SessionHealthOutput struct {
+	SessionID       string            `json:"session_id"`
+	IsAlive         bool              `json:"is_alive"`
+	OverallScore    int               `json:"overall_score"` // 0-100
+	Dimensions      []HealthDimension `json:"dimensions"`
+	Recommendations []string          `json:"recommendations,omitempty"`
+}
+
+type HealthDimension struct {
+	Category string `json:"category"`
+	Score    int    `json:"score"` // 0-100
+	Detail   string `json:"detail,omitempty"`
+}
+
+// ── claude_session_compare ──
+
+type SessionCompareInput struct {
+	SessionID1 string `json:"session_id_1" jsonschema:"required,description=First session UUID"`
+	SessionID2 string `json:"session_id_2" jsonschema:"required,description=Second session UUID"`
+}
+
+type SessionCompareOutput struct {
+	SessionID1 string            `json:"session_id_1"`
+	SessionID2 string            `json:"session_id_2"`
+	Repo       string            `json:"repo"`
+	SameRepo   bool              `json:"same_repo"`
+	Diff       SessionCompareDiff `json:"diff"`
+}
+
+type SessionCompareDiff struct {
+	Session1Tasks      int    `json:"session1_tasks"`
+	Session1Completed  int    `json:"session1_completed"`
+	Session1Status     string `json:"session1_status"`
+	Session2Tasks      int    `json:"session2_tasks"`
+	Session2Completed  int    `json:"session2_completed"`
+	Session2Status     string `json:"session2_status"`
+	TaskCompletionDelta int   `json:"task_completion_delta"`
+	TimeBetween        string `json:"time_between,omitempty"`
+}
+
+// ── claude_session_replay ──
+
+type SessionReplayInput struct {
+	SessionID    string `json:"session_id" jsonschema:"required,description=Session UUID to replay"`
+	MaxExchanges int    `json:"max_exchanges,omitempty" jsonschema:"description=Max conversation exchanges to return. Defaults to 50."`
+}
+
+type SessionReplayOutput struct {
+	SessionID  string                 `json:"session_id"`
+	Repo       string                 `json:"repo"`
+	TotalLines int                    `json:"total_lines"`
+	Exchanges  []ConversationExchange `json:"exchanges"`
+}
+
+type ConversationExchange struct {
+	Order            int      `json:"order"`
+	UserText         string   `json:"user_text,omitempty"`
+	AssistantSummary string   `json:"assistant_summary,omitempty"`
+	ToolsUsed        []string `json:"tools_used,omitempty"`
+	Timestamp        string   `json:"timestamp,omitempty"`
+}
+
+// ── claude_workspace_snapshot ──
+
+type WorkspaceSnapshotInput struct {
+	StudioPath string `json:"studio_path,omitempty" jsonschema:"description=Path to studio directory. Defaults to ~/hairglasses-studio."`
+}
+
+type WorkspaceSnapshotOutput struct {
+	SnapshotID   string `json:"snapshot_id"`
+	SavedTo      string `json:"saved_to"`
+	SessionCount int    `json:"session_count"`
+	RepoCount    int    `json:"repo_count"`
+	Size         int64  `json:"size_bytes"`
+}
+
+type WorkspaceSnapshot struct {
+	Timestamp  string             `json:"timestamp"`
+	StudioPath string             `json:"studio_path"`
+	SnapshotID string             `json:"snapshot_id"`
+	Sessions   []SessionScanEntry `json:"sessions"`
+	Repos      []RepoStatusOutput `json:"repos"`
+}
+
+// ── claude_repo_roadmap_status ──
+
+type RepoRoadmapInput struct {
+	RepoPath  string `json:"repo_path" jsonschema:"required,description=Absolute path to repo with ROADMAP.md"`
+	SessionID string `json:"session_id,omitempty" jsonschema:"description=Optional session UUID to compare tasks against roadmap"`
+}
+
+type RepoRoadmapOutput struct {
+	RepoPath              string        `json:"repo_path"`
+	RepoName              string        `json:"repo_name"`
+	TotalCount            int           `json:"total_count"`
+	CompletedCount        int           `json:"completed_count"`
+	ProgressPercent       int           `json:"progress_percent"`
+	Items                 []RoadmapItem `json:"items,omitempty"`
+	SessionTaskCount      int           `json:"session_task_count,omitempty"`
+	SessionCompletedCount int           `json:"session_completed_count,omitempty"`
+}
+
+type RoadmapItem struct {
+	Text       string `json:"text"`
+	IsChecked  bool   `json:"is_checked"`
+	LineNumber int    `json:"line_number"`
+}
+
+// ── claude_recovery_history ──
+
+type RecoveryHistoryInput struct {
+	Days int `json:"days,omitempty" jsonschema:"description=Look back N days. Defaults to 7."`
+}
+
+type RecoveryHistoryOutput struct {
+	LookbackDays int             `json:"lookback_days"`
+	Events       []RecoveryEvent `json:"events,omitempty"`
+	Total        int             `json:"total"`
+}
+
+type RecoveryEvent struct {
+	Timestamp string `json:"timestamp"`
+	Type      string `json:"type"` // crash, resume
+	SessionID string `json:"session_id,omitempty"`
+	RepoName  string `json:"repo_name,omitempty"`
+	Display   string `json:"display,omitempty"`
+}
+
+// ── claude_fleet_recovery ──
+
+type FleetRecoveryInput struct {
+	Window     string `json:"window,omitempty" jsonschema:"description=Time window (e.g. '4h'). Default '4h'."`
+	StudioPath string `json:"studio_path,omitempty" jsonschema:"description=Path to studio. Default ~/hairglasses-studio."`
+	Execute    bool   `json:"execute,omitempty" jsonschema:"description=Set to true to execute recovery. Default false (dry-run)."`
+}
+
+type FleetRecoveryOutput struct {
+	TotalDeadSessions int            `json:"total_dead_sessions"`
+	Steps             []RecoveryStep `json:"steps"`
+	DryRun            bool           `json:"dry_run"`
+	Summary           string         `json:"summary"`
+	Warnings          []string       `json:"warnings,omitempty"`
+}
+
+type RecoveryStep struct {
+	Rank      int    `json:"rank"`
+	SessionID string `json:"session_id"`
+	RepoName  string `json:"repo_name"`
+	OpenTasks int    `json:"open_tasks"`
+	Action    string `json:"action"` // stash, resume, verify
+	Message   string `json:"message"`
+	ResumeCmd string `json:"resume_cmd,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -1445,8 +1604,648 @@ func (m *ClaudeSessionModule) Tools() []registry.ToolDefinition {
 				return report, nil
 			},
 		),
+
+		// ── claude_session_health ─────────────────────
+		handler.TypedHandler[SessionHealthInput, SessionHealthOutput](
+			"claude_session_health",
+			"Health score (0-100) for a Claude Code session across 5 dimensions: process_alive, tasks_completion, git_clean, recency, plan_progress. Returns per-dimension scores and actionable recommendations.",
+			func(_ context.Context, input SessionHealthInput) (SessionHealthOutput, error) {
+				if input.SessionID == "" {
+					return SessionHealthOutput{}, fmt.Errorf("[%s] session_id is required", handler.ErrInvalidParam)
+				}
+
+				metas, err := loadAllSessionMeta()
+				if err != nil {
+					return SessionHealthOutput{}, fmt.Errorf("[%s] failed to load sessions: %w", handler.ErrNotFound, err)
+				}
+
+				var meta *claudeSessionMeta
+				for _, m := range metas {
+					if m.SessionID == input.SessionID {
+						meta = &m
+						break
+					}
+				}
+				if meta == nil {
+					return SessionHealthOutput{}, fmt.Errorf("[%s] session %s not found", handler.ErrNotFound, input.SessionID)
+				}
+
+				out := SessionHealthOutput{SessionID: meta.SessionID, IsAlive: isProcessAlive(meta.PID)}
+
+				var dims []HealthDimension
+				var total int
+
+				// Dimension 1: Process alive.
+				procScore := 0
+				if out.IsAlive {
+					procScore = 100
+				}
+				dims = append(dims, HealthDimension{Category: "process_alive", Score: procScore, Detail: fmt.Sprintf("PID %d", meta.PID)})
+				total += procScore
+
+				// Dimension 2: Task completion.
+				tasks, _ := loadSessionTasks(meta.SessionID)
+				taskScore := 100
+				openCount := 0
+				for _, t := range tasks {
+					if t.Status != "completed" {
+						openCount++
+					}
+				}
+				if len(tasks) > 0 {
+					taskScore = (len(tasks) - openCount) * 100 / len(tasks)
+				}
+				dims = append(dims, HealthDimension{Category: "tasks_completion", Score: taskScore, Detail: fmt.Sprintf("%d/%d completed", len(tasks)-openCount, len(tasks))})
+				total += taskScore
+
+				// Dimension 3: Git clean.
+				gitScore := 100
+				repoStatus, _ := getRepoStatus(meta.CWD)
+				if repoStatus.IsGitRepo {
+					if repoStatus.HasUncommitted {
+						gitScore -= 40
+					}
+					if repoStatus.UntrackedCount > 5 {
+						gitScore -= 20
+					}
+					if gitScore < 0 {
+						gitScore = 0
+					}
+				}
+				dims = append(dims, HealthDimension{Category: "git_clean", Score: gitScore, Detail: fmt.Sprintf("staged=%d unstaged=%d untracked=%d", repoStatus.StagedCount, repoStatus.UnstagedCount, repoStatus.UntrackedCount)})
+				total += gitScore
+
+				// Dimension 4: Recency.
+				lastActivity, _, _ := loadHistoryIndex()
+				recencyScore := 0
+				la := lastActivity[meta.SessionID]
+				if !la.IsZero() {
+					age := time.Since(la)
+					switch {
+					case age < 1*time.Hour:
+						recencyScore = 100
+					case age < 4*time.Hour:
+						recencyScore = 75
+					case age < 24*time.Hour:
+						recencyScore = 50
+					case age < 7*24*time.Hour:
+						recencyScore = 25
+					}
+				}
+				dims = append(dims, HealthDimension{Category: "recency", Score: recencyScore, Detail: fmt.Sprintf("last active: %s", la.Format(time.RFC3339))})
+				total += recencyScore
+
+				// Dimension 5: Plan progress.
+				planScore := 50 // neutral if no plan
+				projectDir := findSessionProjectDir(meta.CWD)
+				if projectDir != "" {
+					planFile := findRecentPlanFile(projectDir, meta.SessionID)
+					if planFile != "" {
+						planScore = 75 // has a plan
+						if taskScore > 50 {
+							planScore = 90 // plan + good task progress
+						}
+					}
+				}
+				dims = append(dims, HealthDimension{Category: "plan_progress", Score: planScore, Detail: ""})
+				total += planScore
+
+				out.Dimensions = dims
+				out.OverallScore = total / len(dims)
+
+				// Recommendations.
+				if procScore == 0 {
+					out.Recommendations = append(out.Recommendations, fmt.Sprintf("Session is dead. Resume with: claude --resume %s", meta.SessionID))
+				}
+				if openCount > 0 {
+					out.Recommendations = append(out.Recommendations, fmt.Sprintf("%d tasks still open — review task list", openCount))
+				}
+				if repoStatus.HasUncommitted {
+					out.Recommendations = append(out.Recommendations, "Uncommitted changes detected — commit or stash")
+				}
+				if recencyScore < 50 {
+					out.Recommendations = append(out.Recommendations, "Session inactive for >4 hours — check if work is complete")
+				}
+
+				return out, nil
+			},
+		),
+
+		// ── claude_session_compare ────────────────────
+		handler.TypedHandler[SessionCompareInput, SessionCompareOutput](
+			"claude_session_compare",
+			"Compare progress between two Claude Code sessions: task completion delta, commit delta, file change count, and time gap.",
+			func(_ context.Context, input SessionCompareInput) (SessionCompareOutput, error) {
+				if input.SessionID1 == "" || input.SessionID2 == "" {
+					return SessionCompareOutput{}, fmt.Errorf("[%s] both session_id_1 and session_id_2 are required", handler.ErrInvalidParam)
+				}
+
+				metas, err := loadAllSessionMeta()
+				if err != nil {
+					return SessionCompareOutput{}, fmt.Errorf("[%s] failed to load sessions: %w", handler.ErrNotFound, err)
+				}
+
+				findMeta := func(id string) *claudeSessionMeta {
+					for _, m := range metas {
+						if m.SessionID == id {
+							return &m
+						}
+					}
+					return nil
+				}
+
+				m1 := findMeta(input.SessionID1)
+				m2 := findMeta(input.SessionID2)
+				if m1 == nil {
+					return SessionCompareOutput{}, fmt.Errorf("[%s] session %s not found", handler.ErrNotFound, input.SessionID1)
+				}
+				if m2 == nil {
+					return SessionCompareOutput{}, fmt.Errorf("[%s] session %s not found", handler.ErrNotFound, input.SessionID2)
+				}
+
+				out := SessionCompareOutput{
+					SessionID1: input.SessionID1,
+					SessionID2: input.SessionID2,
+				}
+
+				// Task comparison.
+				tasks1, _ := loadSessionTasks(input.SessionID1)
+				tasks2, _ := loadSessionTasks(input.SessionID2)
+				completed1, completed2 := 0, 0
+				for _, t := range tasks1 {
+					if t.Status == "completed" {
+						completed1++
+					}
+				}
+				for _, t := range tasks2 {
+					if t.Status == "completed" {
+						completed2++
+					}
+				}
+				out.Diff.Session1Tasks = len(tasks1)
+				out.Diff.Session1Completed = completed1
+				out.Diff.Session2Tasks = len(tasks2)
+				out.Diff.Session2Completed = completed2
+				out.Diff.TaskCompletionDelta = completed2 - completed1
+
+				// Time comparison.
+				lastActivity, _, _ := loadHistoryIndex()
+				la1, la2 := lastActivity[input.SessionID1], lastActivity[input.SessionID2]
+				if !la1.IsZero() && !la2.IsZero() {
+					out.Diff.TimeBetween = la2.Sub(la1).String()
+				}
+
+				// Repo comparison (if same repo).
+				if m1.CWD == m2.CWD {
+					out.Repo = m1.CWD
+					out.SameRepo = true
+				} else {
+					out.Repo = fmt.Sprintf("%s vs %s", repoNameFromPath(m1.CWD), repoNameFromPath(m2.CWD))
+				}
+
+				// Status.
+				out.Diff.Session1Status = "dead"
+				if isProcessAlive(m1.PID) {
+					out.Diff.Session1Status = "alive"
+				}
+				out.Diff.Session2Status = "dead"
+				if isProcessAlive(m2.PID) {
+					out.Diff.Session2Status = "alive"
+				}
+
+				return out, nil
+			},
+		),
+
+		// ── claude_session_replay ─────────────────────
+		handler.TypedHandler[SessionReplayInput, SessionReplayOutput](
+			"claude_session_replay",
+			"Reconstruct the conversation thread from a session's JSONL log as user/assistant exchange pairs with tool use summaries.",
+			func(_ context.Context, input SessionReplayInput) (SessionReplayOutput, error) {
+				if input.SessionID == "" {
+					return SessionReplayOutput{}, fmt.Errorf("[%s] session_id is required", handler.ErrInvalidParam)
+				}
+				maxExchanges := input.MaxExchanges
+				if maxExchanges <= 0 {
+					maxExchanges = 50
+				}
+
+				metas, err := loadAllSessionMeta()
+				if err != nil {
+					return SessionReplayOutput{}, fmt.Errorf("[%s] failed to load sessions: %w", handler.ErrNotFound, err)
+				}
+
+				var meta *claudeSessionMeta
+				for _, m := range metas {
+					if m.SessionID == input.SessionID {
+						meta = &m
+						break
+					}
+				}
+				if meta == nil {
+					return SessionReplayOutput{}, fmt.Errorf("[%s] session %s not found", handler.ErrNotFound, input.SessionID)
+				}
+
+				projectDir := findSessionProjectDir(meta.CWD)
+				if projectDir == "" {
+					return SessionReplayOutput{}, fmt.Errorf("[%s] project directory not found", handler.ErrNotFound)
+				}
+
+				jsonlPath := findSessionJSONL(projectDir, meta.SessionID)
+				if jsonlPath == "" {
+					return SessionReplayOutput{}, fmt.Errorf("[%s] session JSONL not found", handler.ErrNotFound)
+				}
+
+				allEntries, err := readJSONLAll(jsonlPath)
+				if err != nil {
+					return SessionReplayOutput{}, fmt.Errorf("failed to read JSONL: %w", err)
+				}
+
+				// Build conversation exchanges.
+				var exchanges []ConversationExchange
+				order := 0
+				var currentExchange *ConversationExchange
+
+				for _, entry := range allEntries {
+					entryType, _ := entry["type"].(string)
+					ts, _ := entry["timestamp"].(string)
+
+					switch entryType {
+					case "user":
+						// Start new exchange.
+						if currentExchange != nil {
+							exchanges = append(exchanges, *currentExchange)
+						}
+						order++
+						currentExchange = &ConversationExchange{Order: order, Timestamp: ts}
+						if msg, ok := entry["message"].(map[string]any); ok {
+							if content, ok := msg["content"].(string); ok {
+								currentExchange.UserText = truncate(content, 300)
+							}
+						}
+
+					case "assistant":
+						if currentExchange == nil {
+							order++
+							currentExchange = &ConversationExchange{Order: order, Timestamp: ts}
+						}
+						if msg, ok := entry["message"].(map[string]any); ok {
+							if content, ok := msg["content"].([]any); ok {
+								for _, block := range content {
+									if b, ok := block.(map[string]any); ok {
+										switch b["type"] {
+										case "text":
+											text, _ := b["text"].(string)
+											currentExchange.AssistantSummary = truncate(text, 300)
+										case "tool_use":
+											name, _ := b["name"].(string)
+											currentExchange.ToolsUsed = append(currentExchange.ToolsUsed, name)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				// Flush last exchange.
+				if currentExchange != nil {
+					exchanges = append(exchanges, *currentExchange)
+				}
+
+				// Take last N exchanges.
+				if len(exchanges) > maxExchanges {
+					exchanges = exchanges[len(exchanges)-maxExchanges:]
+				}
+
+				return SessionReplayOutput{
+					SessionID:  input.SessionID,
+					Repo:       meta.CWD,
+					TotalLines: len(allEntries),
+					Exchanges:  exchanges,
+				}, nil
+			},
+		),
+
+		// ── claude_workspace_snapshot ─────────────────
+		handler.TypedHandler[WorkspaceSnapshotInput, WorkspaceSnapshotOutput](
+			"claude_workspace_snapshot",
+			"Capture a point-in-time snapshot of all Claude Code sessions and repo git states across the studio directory. Saves to ~/.claude/snapshots/ for later comparison.",
+			func(_ context.Context, input WorkspaceSnapshotInput) (WorkspaceSnapshotOutput, error) {
+				studioPath := input.StudioPath
+				if studioPath == "" {
+					studioPath = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+				if strings.HasPrefix(studioPath, "~/") {
+					studioPath = filepath.Join(homeDir(), studioPath[2:])
+				}
+
+				// Scan sessions.
+				sessions, err := scanSessions(0)
+				if err != nil {
+					return WorkspaceSnapshotOutput{}, err
+				}
+
+				// Scan repos (parallel, semaphore=8).
+				var repoPaths []string
+				if entries, err := os.ReadDir(studioPath); err == nil {
+					for _, e := range entries {
+						if e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
+							repoPaths = append(repoPaths, filepath.Join(studioPath, e.Name()))
+						}
+					}
+				}
+
+				type repoSnap struct {
+					path   string
+					status RepoStatusOutput
+				}
+				var mu sync.Mutex
+				var repoSnaps []repoSnap
+				sem := make(chan struct{}, 8)
+				var wg sync.WaitGroup
+				for _, rp := range repoPaths {
+					rp := rp
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						sem <- struct{}{}
+						defer func() { <-sem }()
+						status, _ := getRepoStatus(rp)
+						if status.IsGitRepo {
+							mu.Lock()
+							repoSnaps = append(repoSnaps, repoSnap{path: rp, status: status})
+							mu.Unlock()
+						}
+					}()
+				}
+				wg.Wait()
+
+				sort.Slice(repoSnaps, func(i, j int) bool {
+					return repoSnaps[i].status.RepoName < repoSnaps[j].status.RepoName
+				})
+
+				// Build snapshot.
+				snap := WorkspaceSnapshot{
+					Timestamp:  time.Now().Format(time.RFC3339),
+					StudioPath: studioPath,
+					SnapshotID: fmt.Sprintf("%d", time.Now().UnixMilli()),
+					Sessions:   sessions,
+				}
+				for _, rs := range repoSnaps {
+					snap.Repos = append(snap.Repos, rs.status)
+				}
+
+				// Save to disk.
+				snapDir := filepath.Join(claudeDir(), "snapshots")
+				if err := os.MkdirAll(snapDir, 0755); err != nil {
+					return WorkspaceSnapshotOutput{}, fmt.Errorf("failed to create snapshots dir: %w", err)
+				}
+
+				snapFile := filepath.Join(snapDir, fmt.Sprintf("%s.json", snap.SnapshotID))
+				data, err := json.MarshalIndent(snap, "", "  ")
+				if err != nil {
+					return WorkspaceSnapshotOutput{}, fmt.Errorf("failed to marshal snapshot: %w", err)
+				}
+				if err := os.WriteFile(snapFile, data, 0644); err != nil {
+					return WorkspaceSnapshotOutput{}, fmt.Errorf("failed to write snapshot: %w", err)
+				}
+
+				return WorkspaceSnapshotOutput{
+					SnapshotID:   snap.SnapshotID,
+					SavedTo:      snapFile,
+					SessionCount: len(sessions),
+					RepoCount:    len(repoSnaps),
+					Size:         int64(len(data)),
+				}, nil
+			},
+		),
+
+		// ── claude_repo_roadmap_status ────────────────
+		handler.TypedHandler[RepoRoadmapInput, RepoRoadmapOutput](
+			"claude_repo_roadmap_status",
+			"Parse ROADMAP.md checkbox items and compare completion against a session's task list. Returns progress percentage and unchecked items.",
+			func(_ context.Context, input RepoRoadmapInput) (RepoRoadmapOutput, error) {
+				if input.RepoPath == "" {
+					return RepoRoadmapOutput{}, fmt.Errorf("[%s] repo_path is required", handler.ErrInvalidParam)
+				}
+
+				out := RepoRoadmapOutput{RepoPath: input.RepoPath, RepoName: repoNameFromPath(input.RepoPath)}
+
+				// Read ROADMAP.md.
+				roadmapPath := filepath.Join(input.RepoPath, "ROADMAP.md")
+				data, err := os.ReadFile(roadmapPath)
+				if err != nil {
+					return RepoRoadmapOutput{}, fmt.Errorf("[%s] ROADMAP.md not found in %s", handler.ErrNotFound, input.RepoPath)
+				}
+
+				// Parse checkbox items.
+				scanner := bufio.NewScanner(strings.NewReader(string(data)))
+				lineNum := 0
+				for scanner.Scan() {
+					lineNum++
+					line := strings.TrimSpace(scanner.Text())
+					if strings.HasPrefix(line, "- [x]") || strings.HasPrefix(line, "- [X]") {
+						text := strings.TrimSpace(line[5:])
+						out.Items = append(out.Items, RoadmapItem{Text: text, IsChecked: true, LineNumber: lineNum})
+						out.CompletedCount++
+					} else if strings.HasPrefix(line, "- [ ]") {
+						text := strings.TrimSpace(line[5:])
+						out.Items = append(out.Items, RoadmapItem{Text: text, IsChecked: false, LineNumber: lineNum})
+					}
+				}
+				out.TotalCount = len(out.Items)
+				if out.TotalCount > 0 {
+					out.ProgressPercent = out.CompletedCount * 100 / out.TotalCount
+				}
+
+				// If session provided, compare tasks.
+				if input.SessionID != "" {
+					tasks, _ := loadSessionTasks(input.SessionID)
+					out.SessionTaskCount = len(tasks)
+					sessionCompleted := 0
+					for _, t := range tasks {
+						if t.Status == "completed" {
+							sessionCompleted++
+						}
+					}
+					out.SessionCompletedCount = sessionCompleted
+				}
+
+				return out, nil
+			},
+		),
+
+		// ── claude_recovery_history ───────────────────
+		handler.TypedHandler[RecoveryHistoryInput, RecoveryHistoryOutput](
+			"claude_recovery_history",
+			"Audit trail of crash and recovery events extracted from history.jsonl. Shows crash timestamps, resume attempts, and session outcomes.",
+			func(_ context.Context, input RecoveryHistoryInput) (RecoveryHistoryOutput, error) {
+				days := input.Days
+				if days <= 0 {
+					days = 7
+				}
+				cutoff := time.Now().AddDate(0, 0, -days)
+
+				histPath := filepath.Join(claudeDir(), "history.jsonl")
+				entries, err := readJSONLAll(histPath)
+				if err != nil {
+					if os.IsNotExist(err) {
+						return RecoveryHistoryOutput{LookbackDays: days}, nil
+					}
+					return RecoveryHistoryOutput{}, fmt.Errorf("failed to read history: %w", err)
+				}
+
+				var events []RecoveryEvent
+				for _, entry := range entries {
+					ts, _ := entry["timestamp"].(float64)
+					if ts == 0 {
+						continue
+					}
+					t := msToTime(ts)
+					if t.Before(cutoff) {
+						continue
+					}
+
+					display, _ := entry["display"].(string)
+					sid, _ := entry["sessionId"].(string)
+					project, _ := entry["project"].(string)
+					lower := strings.ToLower(display)
+
+					var eventType string
+					if strings.Contains(lower, "session crashed") || strings.Contains(lower, "crash") {
+						eventType = "crash"
+					} else if strings.Contains(lower, "--resume") || strings.Contains(lower, "resume") {
+						eventType = "resume"
+					} else {
+						continue
+					}
+
+					events = append(events, RecoveryEvent{
+						Timestamp: t.Format(time.RFC3339),
+						Type:      eventType,
+						SessionID: sid,
+						RepoName:  repoNameFromPath(project),
+						Display:   truncate(display, 200),
+					})
+				}
+
+				return RecoveryHistoryOutput{
+					LookbackDays: days,
+					Events:       events,
+					Total:        len(events),
+				}, nil
+			},
+		),
+
+		// ── claude_fleet_recovery ─────────────────────
+		handler.TypedHandler[FleetRecoveryInput, FleetRecoveryOutput](
+			"claude_fleet_recovery",
+			"Composed recovery workflow: detect dead sessions across all repos, analyze git state, generate recovery steps with resume commands. Dry-run by default — set execute=true to trigger resumes.",
+			func(_ context.Context, input FleetRecoveryInput) (FleetRecoveryOutput, error) {
+				window := input.Window
+				if window == "" {
+					window = "4h"
+				}
+				studioPath := input.StudioPath
+				if studioPath == "" {
+					studioPath = filepath.Join(homeDir(), "hairglasses-studio")
+				}
+				if strings.HasPrefix(studioPath, "~/") {
+					studioPath = filepath.Join(homeDir(), studioPath[2:])
+				}
+
+				windowDur, err := parseDurationString(window)
+				if err != nil {
+					return FleetRecoveryOutput{}, fmt.Errorf("[%s] invalid window: %w", handler.ErrInvalidParam, err)
+				}
+
+				// Step 1: Scan sessions.
+				sessions, err := scanSessions(windowDur)
+				if err != nil {
+					return FleetRecoveryOutput{}, err
+				}
+
+				out := FleetRecoveryOutput{DryRun: !input.Execute}
+				var steps []RecoveryStep
+				rank := 0
+
+				// Collect dead sessions with enrichment.
+				type enrichedSession struct {
+					scan  SessionScanEntry
+					tasks []SessionTask
+					repo  RepoStatusOutput
+				}
+				var dead []enrichedSession
+				for _, s := range sessions {
+					if s.Status != "dead" {
+						continue
+					}
+					tasks, _ := loadSessionTasks(s.SessionID)
+					repoStatus, _ := getRepoStatus(s.Repo)
+					dead = append(dead, enrichedSession{scan: s, tasks: tasks, repo: repoStatus})
+				}
+
+				// Sort by open tasks descending.
+				sort.Slice(dead, func(i, j int) bool {
+					openI, openJ := 0, 0
+					for _, t := range dead[i].tasks {
+						if t.Status != "completed" {
+							openI++
+						}
+					}
+					for _, t := range dead[j].tasks {
+						if t.Status != "completed" {
+							openJ++
+						}
+					}
+					return openI > openJ
+				})
+
+				out.TotalDeadSessions = len(dead)
+
+				for _, d := range dead {
+					rank++
+					openTasks := 0
+					for _, t := range d.tasks {
+						if t.Status != "completed" {
+							openTasks++
+						}
+					}
+
+					// Step: Stash if dirty.
+					if d.repo.HasUncommitted {
+						steps = append(steps, RecoveryStep{
+							Rank:      rank,
+							SessionID: d.scan.SessionID,
+							RepoName:  d.scan.RepoName,
+							OpenTasks: openTasks,
+							Action:    "stash",
+							Message:   fmt.Sprintf("Stash %d uncommitted changes", d.repo.StagedCount+d.repo.UnstagedCount),
+						})
+						out.Warnings = append(out.Warnings, fmt.Sprintf("%s: has uncommitted changes — stash before resume", d.scan.RepoName))
+					}
+
+					// Step: Resume.
+					steps = append(steps, RecoveryStep{
+						Rank:      rank,
+						SessionID: d.scan.SessionID,
+						RepoName:  d.scan.RepoName,
+						OpenTasks: openTasks,
+						Action:    "resume",
+						Message:   fmt.Sprintf("Resume session with %d open tasks", openTasks),
+						ResumeCmd: fmt.Sprintf("claude --resume %s", d.scan.SessionID),
+					})
+				}
+
+				out.Steps = steps
+				if len(dead) == 0 {
+					out.Summary = "No dead sessions found — fleet is healthy."
+				} else {
+					out.Summary = fmt.Sprintf("%d dead sessions detected. %d recovery steps planned.", len(dead), len(steps))
+				}
+
+				return out, nil
+			},
+		),
 	}
 }
-
-// Ensure unused import is consumed.
-var _ io.Reader

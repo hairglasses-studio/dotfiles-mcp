@@ -20,8 +20,8 @@ func TestClaudeSessionModuleRegistration(t *testing.T) {
 	}
 
 	tools := m.Tools()
-	if len(tools) != 8 {
-		t.Fatalf("expected 8 tools, got %d", len(tools))
+	if len(tools) != 15 {
+		t.Fatalf("expected 15 tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -480,6 +480,299 @@ func TestSessionScan_MockFixture(t *testing.T) {
 	}
 	if sessions[0].Name != "test-session" {
 		t.Errorf("expected name test-session, got %s", sessions[0].Name)
+	}
+}
+
+// TestClaudeSessionModuleHas15Tools verifies the expanded tool count.
+func TestClaudeSessionModuleHas15Tools(t *testing.T) {
+	m := &ClaudeSessionModule{}
+	tools := m.Tools()
+	if len(tools) != 15 {
+		t.Fatalf("expected 15 tools, got %d", len(tools))
+	}
+
+	for _, want := range []string{
+		"claude_session_health",
+		"claude_session_compare",
+		"claude_session_replay",
+		"claude_workspace_snapshot",
+		"claude_repo_roadmap_status",
+		"claude_recovery_history",
+		"claude_fleet_recovery",
+	} {
+		found := false
+		for _, td := range tools {
+			if td.Tool.Name == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("missing tool: %s", want)
+		}
+	}
+}
+
+// TestClaudeSessionHealth_MockFixture tests health scoring with mock data.
+func TestClaudeSessionHealth_MockFixture(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	// Create a dead session.
+	sessDir := filepath.Join(dir, ".claude", "sessions")
+	if err := os.MkdirAll(sessDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	meta := claudeSessionMeta{
+		PID: 999999997, SessionID: "health-test-001",
+		CWD: dir, StartedAt: time.Now().Add(-2 * time.Hour).UnixMilli(),
+		Kind: "interactive", Name: "health-test",
+	}
+	data, _ := json.Marshal(meta)
+	os.WriteFile(filepath.Join(sessDir, "999999997.json"), data, 0644)
+
+	// Create history.
+	histEntry := fmt.Sprintf(`{"sessionId":"health-test-001","timestamp":%d,"display":"test"}`, time.Now().Add(-30*time.Minute).UnixMilli())
+	os.WriteFile(filepath.Join(dir, ".claude", "history.jsonl"), []byte(histEntry+"\n"), 0644)
+
+	// Create tasks.
+	taskDir := filepath.Join(dir, ".claude", "tasks", "health-test-001")
+	os.MkdirAll(taskDir, 0755)
+	for _, task := range []SessionTask{
+		{ID: "1", Subject: "Done", Status: "completed"},
+		{ID: "2", Subject: "Open", Status: "pending"},
+	} {
+		d, _ := json.Marshal(task)
+		os.WriteFile(filepath.Join(taskDir, task.ID+".json"), d, 0644)
+	}
+
+	m := &ClaudeSessionModule{}
+	td := findClaudeTool(t, m, "claude_session_health")
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"session_id": "health-test-001"}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	var out SessionHealthOutput
+	text := extractText(t, result)
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v; text=%s", err, text)
+	}
+
+	if out.IsAlive {
+		t.Error("expected dead session")
+	}
+	if out.OverallScore < 0 || out.OverallScore > 100 {
+		t.Errorf("score out of range: %d", out.OverallScore)
+	}
+	if len(out.Dimensions) != 5 {
+		t.Errorf("expected 5 dimensions, got %d", len(out.Dimensions))
+	}
+	if len(out.Recommendations) == 0 {
+		t.Error("expected at least one recommendation for dead session")
+	}
+}
+
+// TestClaudeSessionCompare_SameSession tests comparing a session to itself.
+func TestClaudeSessionCompare_SameSession(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	sessDir := filepath.Join(dir, ".claude", "sessions")
+	os.MkdirAll(sessDir, 0755)
+	os.WriteFile(filepath.Join(dir, ".claude", "history.jsonl"), []byte(""), 0644)
+
+	for _, m := range []claudeSessionMeta{
+		{PID: 999999991, SessionID: "cmp-001", CWD: "/tmp/repo-a", StartedAt: time.Now().UnixMilli(), Kind: "interactive"},
+		{PID: 999999992, SessionID: "cmp-002", CWD: "/tmp/repo-a", StartedAt: time.Now().UnixMilli(), Kind: "interactive"},
+	} {
+		d, _ := json.Marshal(m)
+		os.WriteFile(filepath.Join(sessDir, fmt.Sprintf("%d.json", m.PID)), d, 0644)
+	}
+
+	mod := &ClaudeSessionModule{}
+	td := findClaudeTool(t, mod, "claude_session_compare")
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"session_id_1": "cmp-001", "session_id_2": "cmp-002"}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	var out SessionCompareOutput
+	text := extractText(t, result)
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v; text=%s", err, text)
+	}
+	if !out.SameRepo {
+		t.Error("expected same_repo=true")
+	}
+}
+
+// TestClaudeRepoRoadmapStatus_ParsesCheckboxes tests ROADMAP.md parsing.
+func TestClaudeRepoRoadmapStatus_ParsesCheckboxes(t *testing.T) {
+	dir := t.TempDir()
+
+	roadmap := `# ROADMAP
+- [x] Build feature A
+- [x] Write tests
+- [ ] Deploy to production
+- [ ] Update docs
+`
+	os.WriteFile(filepath.Join(dir, "ROADMAP.md"), []byte(roadmap), 0644)
+
+	m := &ClaudeSessionModule{}
+	td := findClaudeTool(t, m, "claude_repo_roadmap_status")
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"repo_path": dir}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	var out RepoRoadmapOutput
+	text := extractText(t, result)
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v; text=%s", err, text)
+	}
+
+	if out.TotalCount != 4 {
+		t.Errorf("expected 4 items, got %d", out.TotalCount)
+	}
+	if out.CompletedCount != 2 {
+		t.Errorf("expected 2 completed, got %d", out.CompletedCount)
+	}
+	if out.ProgressPercent != 50 {
+		t.Errorf("expected 50%%, got %d%%", out.ProgressPercent)
+	}
+}
+
+// TestClaudeRecoveryHistory_EmptyHistory tests with no history file.
+func TestClaudeRecoveryHistory_EmptyHistory(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	// No history.jsonl file.
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+
+	m := &ClaudeSessionModule{}
+	td := findClaudeTool(t, m, "claude_recovery_history")
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"days": 7}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	var out RecoveryHistoryOutput
+	text := extractText(t, result)
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v; text=%s", err, text)
+	}
+	if out.Total != 0 {
+		t.Errorf("expected 0 events, got %d", out.Total)
+	}
+}
+
+// TestClaudeFleetRecovery_DryRun tests fleet recovery in dry-run mode.
+func TestClaudeFleetRecovery_DryRun(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	sessDir := filepath.Join(dir, ".claude", "sessions")
+	os.MkdirAll(sessDir, 0755)
+	os.WriteFile(filepath.Join(dir, ".claude", "history.jsonl"), []byte(""), 0644)
+
+	// Create 2 dead sessions.
+	for i, m := range []claudeSessionMeta{
+		{PID: 999999993, SessionID: "fleet-001", CWD: "/tmp/repo-a", StartedAt: time.Now().UnixMilli(), Kind: "interactive", Name: "session-a"},
+		{PID: 999999994, SessionID: "fleet-002", CWD: "/tmp/repo-b", StartedAt: time.Now().UnixMilli(), Kind: "interactive", Name: "session-b"},
+	} {
+		d, _ := json.Marshal(m)
+		os.WriteFile(filepath.Join(sessDir, fmt.Sprintf("%d.json", 999999993+i)), d, 0644)
+	}
+
+	mod := &ClaudeSessionModule{}
+	td := findClaudeTool(t, mod, "claude_fleet_recovery")
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"window": "4h"}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	var out FleetRecoveryOutput
+	text := extractText(t, result)
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v; text=%s", err, text)
+	}
+
+	if out.TotalDeadSessions != 2 {
+		t.Errorf("expected 2 dead sessions, got %d", out.TotalDeadSessions)
+	}
+	if !out.DryRun {
+		t.Error("expected dry_run=true")
+	}
+	if len(out.Steps) < 2 {
+		t.Errorf("expected at least 2 steps, got %d", len(out.Steps))
+	}
+}
+
+// TestClaudeWorkspaceSnapshot_CreatesFile tests snapshot creation.
+func TestClaudeWorkspaceSnapshot_CreatesFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	// Create minimal claude dir.
+	os.MkdirAll(filepath.Join(dir, ".claude", "sessions"), 0755)
+	os.WriteFile(filepath.Join(dir, ".claude", "history.jsonl"), []byte(""), 0644)
+
+	// Create a fake studio dir with a git repo.
+	studioDir := filepath.Join(dir, "studio")
+	repoDir := filepath.Join(studioDir, "test-repo")
+	os.MkdirAll(repoDir, 0755)
+	runTestGit(t, repoDir, "init")
+	runTestGit(t, repoDir, "config", "user.email", "t@t.com")
+	runTestGit(t, repoDir, "config", "user.name", "T")
+	os.WriteFile(filepath.Join(repoDir, "f.txt"), []byte("x"), 0644)
+	runTestGit(t, repoDir, "add", "f.txt")
+	runTestGit(t, repoDir, "commit", "-m", "init")
+
+	m := &ClaudeSessionModule{}
+	td := findClaudeTool(t, m, "claude_workspace_snapshot")
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"studio_path": studioDir}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	var out WorkspaceSnapshotOutput
+	text := extractText(t, result)
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v; text=%s", err, text)
+	}
+
+	if out.SnapshotID == "" {
+		t.Error("expected non-empty snapshot_id")
+	}
+	if out.RepoCount != 1 {
+		t.Errorf("expected 1 repo, got %d", out.RepoCount)
+	}
+	if out.Size == 0 {
+		t.Error("expected non-zero size")
+	}
+	// Check file exists.
+	if _, err := os.Stat(out.SavedTo); err != nil {
+		t.Errorf("snapshot file not found: %s", out.SavedTo)
 	}
 }
 
