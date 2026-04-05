@@ -1,0 +1,2 @@
+source "$HOME/hairglasses-studio/dotfiles/make/ralphrc-base"
+PROJECT_NAME="dotfiles-mcp"
