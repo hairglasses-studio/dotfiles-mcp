@@ -149,6 +149,55 @@ func windowRegion(x, y, w, h int, scale float64) (px, py, pw, ph int) {
 	return
 }
 
+// ---------- window resolution ----------
+
+// resolveHyprWindow finds a window by address (exact match) or class (first
+// case-insensitive match) and returns the canonical "address:0x..." selector
+// string usable in hyprctl dispatch commands. The clientsJSON parameter, if
+// non-empty, is used directly instead of calling hyprctl (useful for testing).
+func resolveHyprWindow(address, class, clientsJSON string) (string, error) {
+	if address == "" && class == "" {
+		return "", fmt.Errorf("[%s] must specify either address or class", handler.ErrInvalidParam)
+	}
+
+	if clientsJSON == "" {
+		out, err := runHyprctl("clients", "-j")
+		if err != nil {
+			return "", fmt.Errorf("hyprctl clients failed: %w", err)
+		}
+		clientsJSON = out
+	}
+
+	var clients []hyprClient
+	if err := json.Unmarshal([]byte(clientsJSON), &clients); err != nil {
+		return "", fmt.Errorf("parse clients: %w", err)
+	}
+
+	// Address match takes priority — search it first across all clients.
+	if address != "" {
+		for i := range clients {
+			if clients[i].Address == address {
+				return "address:" + clients[i].Address, nil
+			}
+		}
+	}
+
+	// Fall back to class match (first case-insensitive match).
+	if class != "" {
+		for i := range clients {
+			if strings.EqualFold(clients[i].Class, class) {
+				return "address:" + clients[i].Address, nil
+			}
+		}
+	}
+
+	selector := address
+	if selector == "" {
+		selector = class
+	}
+	return "", fmt.Errorf("window not found: %s", selector)
+}
+
 // ---------- module ----------
 
 type HyprlandModule struct{}
@@ -393,14 +442,9 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 			"hypr_focus_window",
 			"Focus a window by its address or class name.",
 			func(_ context.Context, input FocusWindowInput) (string, error) {
-				var selector string
-				switch {
-				case input.Address != "":
-					selector = "address:" + input.Address
-				case input.Class != "":
-					selector = "class:" + input.Class
-				default:
-					return "", fmt.Errorf("[%s] must specify either address or class", handler.ErrInvalidParam)
+				selector, err := resolveHyprWindow(input.Address, input.Class, "")
+				if err != nil {
+					return "", err
 				}
 
 				out, err := runHyprctl("dispatch", "focuswindow", selector)
@@ -691,6 +735,161 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 			},
 		),
 
+		// ── hypr_move_window ──────────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "hypr_move_window",
+				Description: "Move a window to exact pixel coordinates. Resolves window by address or class.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"address": map[string]any{
+							"type":        "string",
+							"description": "Window address (e.g. '0x5a3b2c1d'). Get from hypr_list_windows.",
+						},
+						"class": map[string]any{
+							"type":        "string",
+							"description": "Window class name (e.g. 'foot', 'firefox'). First match is used.",
+						},
+						"x": map[string]any{
+							"type":        "integer",
+							"description": "Target X coordinate in pixels.",
+						},
+						"y": map[string]any{
+							"type":        "integer",
+							"description": "Target Y coordinate in pixels.",
+						},
+					},
+					Required: []string{"x", "y"},
+				},
+			},
+			Handler: handleHyprMoveWindow,
+		},
+
+		// ── hypr_resize_window ───────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "hypr_resize_window",
+				Description: "Resize a window to exact pixel dimensions. Resolves window by address or class.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"address": map[string]any{
+							"type":        "string",
+							"description": "Window address (e.g. '0x5a3b2c1d'). Get from hypr_list_windows.",
+						},
+						"class": map[string]any{
+							"type":        "string",
+							"description": "Window class name (e.g. 'foot', 'firefox'). First match is used.",
+						},
+						"width": map[string]any{
+							"type":        "integer",
+							"description": "Target width in pixels.",
+						},
+						"height": map[string]any{
+							"type":        "integer",
+							"description": "Target height in pixels.",
+						},
+					},
+					Required: []string{"width", "height"},
+				},
+			},
+			Handler: handleHyprResizeWindow,
+		},
+
+		// ── hypr_close_window ────────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "hypr_close_window",
+				Description: "Close a window. Resolves window by address or class.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"address": map[string]any{
+							"type":        "string",
+							"description": "Window address (e.g. '0x5a3b2c1d'). Get from hypr_list_windows.",
+						},
+						"class": map[string]any{
+							"type":        "string",
+							"description": "Window class name (e.g. 'foot', 'firefox'). First match is used.",
+						},
+					},
+				},
+			},
+			Handler: handleHyprCloseWindow,
+		},
+
+		// ── hypr_toggle_floating ─────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "hypr_toggle_floating",
+				Description: "Toggle floating state of a window. Resolves window by address or class.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"address": map[string]any{
+							"type":        "string",
+							"description": "Window address (e.g. '0x5a3b2c1d'). Get from hypr_list_windows.",
+						},
+						"class": map[string]any{
+							"type":        "string",
+							"description": "Window class name (e.g. 'foot', 'firefox'). First match is used.",
+						},
+					},
+				},
+			},
+			Handler: handleHyprToggleFloating,
+		},
+
+		// ── hypr_minimize_window ─────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "hypr_minimize_window",
+				Description: "Minimize a window by moving it to the special:minimized workspace. Resolves window by address or class.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"address": map[string]any{
+							"type":        "string",
+							"description": "Window address (e.g. '0x5a3b2c1d'). Get from hypr_list_windows.",
+						},
+						"class": map[string]any{
+							"type":        "string",
+							"description": "Window class name (e.g. 'foot', 'firefox'). First match is used.",
+						},
+					},
+				},
+			},
+			Handler: handleHyprMinimizeWindow,
+		},
+
+		// ── hypr_fullscreen_window ───────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "hypr_fullscreen_window",
+				Description: "Toggle fullscreen for a window. Focuses the window first, then applies fullscreen. Resolves window by address or class.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"address": map[string]any{
+							"type":        "string",
+							"description": "Window address (e.g. '0x5a3b2c1d'). Get from hypr_list_windows.",
+						},
+						"class": map[string]any{
+							"type":        "string",
+							"description": "Window class name (e.g. 'foot', 'firefox'). First match is used.",
+						},
+						"mode": map[string]any{
+							"type":        "integer",
+							"description": "Fullscreen mode: 0 = real fullscreen, 1 = maximize (keep gaps/bar). Defaults to 0.",
+							"default":     0,
+						},
+					},
+				},
+			},
+			Handler: handleHyprFullscreenWindow,
+		},
+
 		// ── hypr_screenshot_window ────────────────────
 		// Raw handler: returns mcp.ImageContent directly.
 		{
@@ -720,6 +919,188 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 			Category: "hyprland",
 		},
 	}
+}
+
+// ---------- window manipulation handlers ----------
+
+func handleHyprMoveWindow(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+	var input struct {
+		Address string  `json:"address"`
+		Class   string  `json:"class"`
+		X       float64 `json:"x"`
+		Y       float64 `json:"y"`
+	}
+	if req.Params.Arguments != nil {
+		b, _ := json.Marshal(req.Params.Arguments)
+		json.Unmarshal(b, &input)
+	}
+
+	selector, err := resolveHyprWindow(input.Address, input.Class, "")
+	if err != nil {
+		return handler.ErrorResult(err), nil
+	}
+
+	arg := fmt.Sprintf("exact %d %d,%s", int(input.X), int(input.Y), selector)
+	out, err := runHyprctl("dispatch", "movewindowpixel", arg)
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("movewindowpixel failed: %w", err)), nil
+	}
+	return &registry.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{
+			Type: "text",
+			Text: fmt.Sprintf("moved window to (%d, %d): %s", int(input.X), int(input.Y), strings.TrimSpace(out)),
+		}},
+	}, nil
+}
+
+func handleHyprResizeWindow(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+	var input struct {
+		Address string  `json:"address"`
+		Class   string  `json:"class"`
+		Width   float64 `json:"width"`
+		Height  float64 `json:"height"`
+	}
+	if req.Params.Arguments != nil {
+		b, _ := json.Marshal(req.Params.Arguments)
+		json.Unmarshal(b, &input)
+	}
+
+	selector, err := resolveHyprWindow(input.Address, input.Class, "")
+	if err != nil {
+		return handler.ErrorResult(err), nil
+	}
+
+	arg := fmt.Sprintf("exact %d %d,%s", int(input.Width), int(input.Height), selector)
+	out, err := runHyprctl("dispatch", "resizewindowpixel", arg)
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("resizewindowpixel failed: %w", err)), nil
+	}
+	return &registry.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{
+			Type: "text",
+			Text: fmt.Sprintf("resized window to %dx%d: %s", int(input.Width), int(input.Height), strings.TrimSpace(out)),
+		}},
+	}, nil
+}
+
+func handleHyprCloseWindow(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+	var input struct {
+		Address string `json:"address"`
+		Class   string `json:"class"`
+	}
+	if req.Params.Arguments != nil {
+		b, _ := json.Marshal(req.Params.Arguments)
+		json.Unmarshal(b, &input)
+	}
+
+	selector, err := resolveHyprWindow(input.Address, input.Class, "")
+	if err != nil {
+		return handler.ErrorResult(err), nil
+	}
+
+	out, err := runHyprctl("dispatch", "closewindow", selector)
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("closewindow failed: %w", err)), nil
+	}
+	return &registry.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{
+			Type: "text",
+			Text: fmt.Sprintf("closed window: %s", strings.TrimSpace(out)),
+		}},
+	}, nil
+}
+
+func handleHyprToggleFloating(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+	var input struct {
+		Address string `json:"address"`
+		Class   string `json:"class"`
+	}
+	if req.Params.Arguments != nil {
+		b, _ := json.Marshal(req.Params.Arguments)
+		json.Unmarshal(b, &input)
+	}
+
+	selector, err := resolveHyprWindow(input.Address, input.Class, "")
+	if err != nil {
+		return handler.ErrorResult(err), nil
+	}
+
+	out, err := runHyprctl("dispatch", "togglefloating", selector)
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("togglefloating failed: %w", err)), nil
+	}
+	return &registry.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{
+			Type: "text",
+			Text: fmt.Sprintf("toggled floating: %s", strings.TrimSpace(out)),
+		}},
+	}, nil
+}
+
+func handleHyprMinimizeWindow(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+	var input struct {
+		Address string `json:"address"`
+		Class   string `json:"class"`
+	}
+	if req.Params.Arguments != nil {
+		b, _ := json.Marshal(req.Params.Arguments)
+		json.Unmarshal(b, &input)
+	}
+
+	selector, err := resolveHyprWindow(input.Address, input.Class, "")
+	if err != nil {
+		return handler.ErrorResult(err), nil
+	}
+
+	arg := fmt.Sprintf("special:minimized,%s", selector)
+	out, err := runHyprctl("dispatch", "movetoworkspacesilent", arg)
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("minimize failed: %w", err)), nil
+	}
+	return &registry.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{
+			Type: "text",
+			Text: fmt.Sprintf("minimized window: %s", strings.TrimSpace(out)),
+		}},
+	}, nil
+}
+
+func handleHyprFullscreenWindow(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+	var input struct {
+		Address string  `json:"address"`
+		Class   string  `json:"class"`
+		Mode    float64 `json:"mode"`
+	}
+	if req.Params.Arguments != nil {
+		b, _ := json.Marshal(req.Params.Arguments)
+		json.Unmarshal(b, &input)
+	}
+
+	selector, err := resolveHyprWindow(input.Address, input.Class, "")
+	if err != nil {
+		return handler.ErrorResult(err), nil
+	}
+
+	// Focus the window first so fullscreen applies to it
+	if _, err := runHyprctl("dispatch", "focuswindow", selector); err != nil {
+		return handler.ErrorResult(fmt.Errorf("focuswindow failed: %w", err)), nil
+	}
+
+	mode := int(input.Mode)
+	out, err := runHyprctl("dispatch", "fullscreen", strconv.Itoa(mode))
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("fullscreen failed: %w", err)), nil
+	}
+	modeLabel := "fullscreen"
+	if mode == 1 {
+		modeLabel = "maximize"
+	}
+	return &registry.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{
+			Type: "text",
+			Text: fmt.Sprintf("toggled %s: %s", modeLabel, strings.TrimSpace(out)),
+		}},
+	}, nil
 }
 
 // ---------- hypr_screenshot_window handler ----------
