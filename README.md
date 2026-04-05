@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
-MCP server for desktop environment management -- Hyprland, Ghostty shaders, Bluetooth, MIDI, input devices, GitHub org lifecycle, fleet auditing, and open-source readiness scoring. 89 tools across 15 modules.
+MCP server for desktop environment management -- Hyprland, Ghostty shaders, Bluetooth, MIDI, input devices, GitHub org lifecycle, fleet auditing, and open-source readiness scoring. 90 tools across 15 modules.
 
 ## Install
 
@@ -58,7 +58,7 @@ Control how many tools load at startup via `DOTFILES_MCP_PROFILE`:
 |---------|----------|-------------|
 | `default` | Discovery tools loaded, rest deferred on demand | ~2K tokens |
 | `ops` | Operational subset (config, desktop, fleet) loaded eagerly | ~15K tokens |
-| `full` | All 89 tools loaded immediately | ~40K tokens |
+| `full` | All 90 tools loaded immediately | ~40K tokens |
 
 Set in your MCP config:
 
