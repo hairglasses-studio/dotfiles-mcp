@@ -6,10 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 
@@ -116,6 +118,35 @@ type monitorInfo struct {
 
 type monitorsResult struct {
 	Monitors []monitorInfo `json:"monitors"`
+}
+
+// ---------- hyprctl JSON types ----------
+
+type hyprClient struct {
+	Address string `json:"address"`
+	At      [2]int `json:"at"`
+	Size    [2]int `json:"size"`
+	Class   string `json:"class"`
+	Title   string `json:"title"`
+	Monitor int    `json:"monitor"`
+	Workspace struct {
+		ID int `json:"id"`
+	} `json:"workspace"`
+}
+
+type hyprMonitor struct {
+	ID    int     `json:"id"`
+	Scale float64 `json:"scale"`
+}
+
+// windowRegion calculates the physical pixel region for grim from logical
+// coordinates and a monitor scale factor.
+func windowRegion(x, y, w, h int, scale float64) (px, py, pw, ph int) {
+	px = int(math.Round(float64(x) * scale))
+	py = int(math.Round(float64(y) * scale))
+	pw = int(math.Round(float64(w) * scale))
+	ph = int(math.Round(float64(h) * scale))
+	return
 }
 
 // ---------- module ----------
@@ -659,7 +690,159 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 				return fmt.Sprintf("monitor %s configured: %s. %s", input.Name, monitorArg, strings.TrimSpace(out)), nil
 			},
 		),
+
+		// ── hypr_screenshot_window ────────────────────
+		// Raw handler: returns mcp.ImageContent directly.
+		{
+			Tool: mcp.Tool{
+				Name:        "hypr_screenshot_window",
+				Description: "Take a screenshot of a specific window by address or class name. Returns the image inline for LLM vision.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"address": map[string]any{
+							"type":        "string",
+							"description": "Window address (e.g. '0x5a3b2c1d'). Get from hypr_list_windows.",
+						},
+						"class": map[string]any{
+							"type":        "string",
+							"description": "Window class name (e.g. 'foot', 'firefox'). First match is used.",
+						},
+						"max_size": map[string]any{
+							"type":        "integer",
+							"description": "Max dimension for resizing (default 1568). Smaller = fewer tokens.",
+							"default":     1568,
+						},
+					},
+				},
+			},
+			Handler:  handleHyprScreenshotWindow,
+			Category: "hyprland",
+		},
 	}
+}
+
+// ---------- hypr_screenshot_window handler ----------
+
+func handleHyprScreenshotWindow(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+	var address, class string
+	maxSize := 1568
+
+	if req.Params.Arguments != nil {
+		var input struct {
+			Address string  `json:"address"`
+			Class   string  `json:"class"`
+			MaxSize float64 `json:"max_size"`
+		}
+		b, _ := json.Marshal(req.Params.Arguments)
+		json.Unmarshal(b, &input)
+		address = input.Address
+		class = input.Class
+		if input.MaxSize > 0 {
+			maxSize = int(input.MaxSize)
+		}
+	}
+
+	if address == "" && class == "" {
+		return handler.ErrorResult(fmt.Errorf("[%s] must specify either address or class", handler.ErrInvalidParam)), nil
+	}
+
+	// 1. Get window list from hyprctl
+	clientsJSON, err := runHyprctl("clients", "-j")
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("hyprctl clients failed: %w", err)), nil
+	}
+
+	var clients []hyprClient
+	if err := json.Unmarshal([]byte(clientsJSON), &clients); err != nil {
+		return handler.ErrorResult(fmt.Errorf("parse clients: %w", err)), nil
+	}
+
+	// 2. Find the target window
+	var target *hyprClient
+	for i := range clients {
+		c := &clients[i]
+		if address != "" && c.Address == address {
+			target = c
+			break
+		}
+		if class != "" && strings.EqualFold(c.Class, class) {
+			target = c
+			break
+		}
+	}
+	if target == nil {
+		selector := address
+		if selector == "" {
+			selector = class
+		}
+		return handler.ErrorResult(fmt.Errorf("window not found: %s", selector)), nil
+	}
+
+	// 3. Get monitor scale
+	monsJSON, err := runHyprctl("monitors", "-j")
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("hyprctl monitors failed: %w", err)), nil
+	}
+
+	var monitors []hyprMonitor
+	if err := json.Unmarshal([]byte(monsJSON), &monitors); err != nil {
+		return handler.ErrorResult(fmt.Errorf("parse monitors: %w", err)), nil
+	}
+
+	scale := 1.0
+	for _, m := range monitors {
+		if m.ID == target.Monitor {
+			scale = m.Scale
+			break
+		}
+	}
+	if scale < 1 {
+		scale = 1
+	}
+
+	// 4. Calculate physical pixel region
+	px, py, pw, ph := windowRegion(target.At[0], target.At[1], target.Size[0], target.Size[1], scale)
+	region := fmt.Sprintf("%d,%d %dx%d", px, py, pw, ph)
+
+	ts := time.Now().UnixMilli()
+	raw := fmt.Sprintf("/tmp/window-screenshot-%d.png", ts)
+	resized := fmt.Sprintf("/tmp/window-screenshot-%d-resized.png", ts)
+	defer os.Remove(raw)
+	defer os.Remove(resized)
+
+	// 5. Capture with grim
+	if _, err := runHyprCmd("grim", "-g", region, raw); err != nil {
+		return handler.ErrorResult(fmt.Errorf("grim capture failed (region %s): %w", region, err)), nil
+	}
+
+	// 6. Resize with ImageMagick
+	resizeSpec := fmt.Sprintf("%dx%d>", maxSize, maxSize)
+	if _, err := runHyprCmd("magick", raw, "-resize", resizeSpec, resized); err != nil {
+		return handler.ErrorResult(fmt.Errorf("magick resize failed: %w", err)), nil
+	}
+
+	// 7. Read and base64 encode
+	data, err := os.ReadFile(resized)
+	if err != nil {
+		return handler.ErrorResult(fmt.Errorf("failed to read screenshot: %w", err)), nil
+	}
+	b64 := base64.StdEncoding.EncodeToString(data)
+
+	return &registry.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: fmt.Sprintf("Window: %s (%s) — workspace %d, region %s, file %s",
+					target.Class, target.Title, target.Workspace.ID, region, resized),
+			},
+			mcp.ImageContent{
+				Type:     "image",
+				Data:     b64,
+				MIMEType: "image/png",
+			},
+		},
+	}, nil
 }
 
 // ---------- main ----------
