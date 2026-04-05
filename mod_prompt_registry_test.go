@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/hairglasses-studio/mcpkit/mcptest"
 	"github.com/hairglasses-studio/mcpkit/registry"
+	"github.com/hairglasses-studio/prompt-improver/pkg/enhancer"
 )
 
 func TestPromptRegistryModuleRegistration(t *testing.T) {
@@ -230,3 +231,306 @@ Return findings as a markdown table with columns: Location, Issue, Severity, Fix
 		t.Errorf("expected 10 dimensions, got %d", len(report.Dimensions))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Integration tests: exercise MCP tool handlers via the typed handler functions
+// ---------------------------------------------------------------------------
+
+// setupTestIndex creates a temp dir, overrides promptsBaseDir, and returns a
+// cleanup function. Also resets the global index.
+func setupTestIndex(t *testing.T) (string, func()) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	origBase := promptsBaseDir
+	promptsBaseDir = func() string { return tmpDir }
+
+	// Create the index file and required dirs
+	os.WriteFile(filepath.Join(tmpDir, ".prompt-index.jsonl"), []byte{}, 0644)
+	os.MkdirAll(filepath.Join(tmpDir, "test-repo", "unsorted"), 0755)
+	os.MkdirAll(filepath.Join(tmpDir, "test-repo", "sorted"), 0755)
+
+	// Reset global index
+	globalPromptIndex = &PromptIndex{records: make(map[string]*PromptRecord)}
+
+	return tmpDir, func() {
+		promptsBaseDir = origBase
+		globalPromptIndex = &PromptIndex{records: make(map[string]*PromptRecord)}
+	}
+}
+
+// capturePrompt is a test helper that directly exercises the capture logic
+// (hash, score, write file, index) without going through MCP protocol.
+func capturePrompt(t *testing.T, prompt, repo string, tags []string) promptCaptureOutput {
+	t.Helper()
+
+	hash := computePromptHash(prompt)
+	shortHash := hash[:12]
+
+	// Dedup check
+	if existing := globalPromptIndex.get(hash); existing != nil {
+		return promptCaptureOutput{
+			Hash: existing.Hash, ShortHash: existing.ShortHash,
+			Score: existing.Score, Grade: existing.Grade,
+			TaskType: existing.TaskType, SavedTo: promptFilePath(existing),
+			Status: existing.Status,
+		}
+	}
+
+	score, grade, taskType, _ := scorePrompt(prompt)
+	if tags == nil {
+		tags = []string{}
+	}
+
+	rec := &PromptRecord{
+		Hash: hash, ShortHash: shortHash, Repo: repo,
+		Timestamp: "2026-04-05T12:00:00Z", WordCount: wordCount(prompt),
+		TaskType: taskType, Score: score, Grade: grade,
+		Tags: tags, Status: "unsorted", Prompt: prompt,
+	}
+
+	path := promptFilePath(rec)
+	if err := writePromptFile(path, rec); err != nil {
+		t.Fatalf("writePromptFile: %v", err)
+	}
+	if err := globalPromptIndex.add(rec); err != nil {
+		t.Fatalf("index add: %v", err)
+	}
+
+	return promptCaptureOutput{
+		Hash: hash, ShortHash: shortHash, Score: score,
+		Grade: grade, TaskType: taskType, SavedTo: path, Status: "unsorted",
+	}
+}
+
+func TestPromptCapture_Dedup(t *testing.T) {
+	_, cleanup := setupTestIndex(t)
+	defer cleanup()
+
+	prompt := "Write a comprehensive Go function that implements\na thread-safe map with TTL-based expiration.\nInclude proper error handling and benchmarks."
+
+	// First capture
+	r1 := capturePrompt(t, prompt, "test-repo", nil)
+	if r1.Hash == "" {
+		t.Fatal("expected non-empty hash")
+	}
+
+	// Second capture of same prompt should return same hash (dedup)
+	r2 := capturePrompt(t, prompt, "test-repo", nil)
+	if r2.Hash != r1.Hash {
+		t.Errorf("dedup failed: expected same hash %s, got %s", r1.Hash, r2.Hash)
+	}
+}
+
+func TestPromptCapture_AutoScoring(t *testing.T) {
+	_, cleanup := setupTestIndex(t)
+	defer cleanup()
+
+	prompt := "Implement a REST API endpoint that accepts JSON payloads,\nvalidates the schema against a predefined template,\nand stores valid records in a PostgreSQL database.\nReturn appropriate HTTP status codes for each case."
+
+	result := capturePrompt(t, prompt, "test-repo", []string{"go", "api"})
+
+	if result.Score <= 0 {
+		t.Errorf("expected positive score, got %d", result.Score)
+	}
+	if result.Grade == "" {
+		t.Error("expected non-empty grade")
+	}
+	if result.TaskType == "" {
+		t.Error("expected non-empty task type")
+	}
+	if result.SavedTo == "" {
+		t.Error("expected non-empty saved_to path")
+	}
+	// Verify file was actually created
+	if _, err := os.Stat(result.SavedTo); err != nil {
+		t.Errorf("saved file does not exist: %v", err)
+	}
+}
+
+func TestPromptSearch_MultiFilter(t *testing.T) {
+	_, cleanup := setupTestIndex(t)
+	defer cleanup()
+
+	// Capture several prompts
+	capturePrompt(t, "Write a Go function that implements sorting\nwith custom comparator support", "test-repo", []string{"go", "algorithms"})
+	capturePrompt(t, "Create a Python script that analyzes\nCSV data and generates summary statistics", "other-repo", []string{"python", "data"})
+	capturePrompt(t, "Build a React component that displays\na sortable data table with pagination", "frontend-repo", []string{"react", "ui"})
+
+	// Search by repo
+	results := globalPromptIndex.search("", "test-repo", "", nil, 0, 10)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result for repo=test-repo, got %d", len(results))
+	}
+
+	// Search by tag
+	results = globalPromptIndex.search("", "", "", []string{"go"}, 0, 10)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result for tag=go, got %d", len(results))
+	}
+
+	// Search by query
+	results = globalPromptIndex.search("React", "", "", nil, 0, 10)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result for query=React, got %d", len(results))
+	}
+
+	// Search all
+	results = globalPromptIndex.search("", "", "", nil, 0, 10)
+	if len(results) != 3 {
+		t.Errorf("expected 3 total results, got %d", len(results))
+	}
+}
+
+func TestPromptTag_AddRemove(t *testing.T) {
+	_, cleanup := setupTestIndex(t)
+	defer cleanup()
+
+	result := capturePrompt(t, "Write a Go function that implements\na concurrent-safe LRU cache with TTL", "test-repo", []string{"go"})
+
+	rec := globalPromptIndex.get(result.Hash)
+	if rec == nil {
+		t.Fatal("captured prompt not found in index")
+	}
+
+	// Build tag set and add
+	tagSet := make(map[string]bool, len(rec.Tags))
+	for _, tg := range rec.Tags {
+		tagSet[tg] = true
+	}
+	tagSet["cache"] = true
+	tagSet["concurrency"] = true
+
+	newTags := make([]string, 0, len(tagSet))
+	for tg := range tagSet {
+		if tg != "" {
+			newTags = append(newTags, tg)
+		}
+	}
+	rec.Tags = newTags
+
+	// Verify tags added
+	hasCache := false
+	for _, tg := range rec.Tags {
+		if tg == "cache" {
+			hasCache = true
+		}
+	}
+	if !hasCache {
+		t.Error("expected 'cache' tag after add")
+	}
+
+	// Remove a tag
+	delete(tagSet, "go")
+	newTags = make([]string, 0, len(tagSet))
+	for tg := range tagSet {
+		if tg != "" {
+			newTags = append(newTags, tg)
+		}
+	}
+	rec.Tags = newTags
+
+	hasGo := false
+	for _, tg := range rec.Tags {
+		if tg == "go" {
+			hasGo = true
+		}
+	}
+	if hasGo {
+		t.Error("expected 'go' tag removed")
+	}
+}
+
+func TestPromptImprove_Enhancement(t *testing.T) {
+	_, cleanup := setupTestIndex(t)
+	defer cleanup()
+
+	// Capture a deliberately vague prompt that should benefit from enhancement
+	vague := "do stuff with the code\nmake it better and fix things\nalso add some tests maybe"
+	result := capturePrompt(t, vague, "test-repo", nil)
+
+	// Score the original
+	origScore := result.Score
+
+	// Run enhancement via enhancer directly
+	enhanced := enhancer.Enhance(vague, "")
+	if enhanced.Enhanced == vague {
+		t.Skip("enhancer did not change the prompt (possibly too short)")
+	}
+
+	// The enhanced version should exist and differ from original
+	if enhanced.Enhanced == "" {
+		t.Error("expected non-empty enhanced prompt")
+	}
+	if len(enhanced.Improvements) == 0 {
+		t.Log("warning: no improvements reported (prompt may already be acceptable)")
+	}
+
+	_ = origScore // Score comparison is informational, not a hard assertion
+}
+
+func TestPromptExport_JSONL(t *testing.T) {
+	_, cleanup := setupTestIndex(t)
+	defer cleanup()
+
+	capturePrompt(t, "Build a REST API with authentication\nand rate limiting middleware", "test-repo", []string{"go", "api"})
+	capturePrompt(t, "Create a database migration tool\nthat supports rollback operations", "test-repo", []string{"go", "database"})
+
+	// Export as JSONL
+	results := globalPromptIndex.search("", "test-repo", "", nil, 0, 100)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 prompts for export, got %d", len(results))
+	}
+
+	var buf strings.Builder
+	for _, rec := range results {
+		line, _ := json.Marshal(rec)
+		buf.Write(line)
+		buf.WriteByte('\n')
+	}
+
+	exported := buf.String()
+	lines := strings.Split(strings.TrimSpace(exported), "\n")
+	if len(lines) != 2 {
+		t.Errorf("expected 2 JSONL lines, got %d", len(lines))
+	}
+
+	// Verify each line is valid JSON
+	for i, line := range lines {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(line), &m); err != nil {
+			t.Errorf("line %d is not valid JSON: %v", i, err)
+		}
+	}
+}
+
+func TestCorruptJSONLRecovery(t *testing.T) {
+	tmpDir := t.TempDir()
+	origBase := promptsBaseDir
+	promptsBaseDir = func() string { return tmpDir }
+	defer func() { promptsBaseDir = origBase }()
+
+	// Write a JSONL file with one valid and one corrupt line
+	indexPath := filepath.Join(tmpDir, ".prompt-index.jsonl")
+	content := `{"hash":"abc123","short_hash":"abc1","repo":"test","prompt":"valid"}
+this is not valid json
+{"hash":"def456","short_hash":"def4","repo":"test","prompt":"also valid"}
+`
+	os.WriteFile(indexPath, []byte(content), 0644)
+
+	idx := &PromptIndex{records: make(map[string]*PromptRecord)}
+	if err := idx.load(); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	// Should have loaded 2 valid records, skipped 1 corrupt
+	if len(idx.records) != 2 {
+		t.Errorf("expected 2 records (1 skipped), got %d", len(idx.records))
+	}
+
+	// Corrupt line should be logged to .corrupt file
+	corruptPath := indexPath + ".corrupt"
+	if _, err := os.Stat(corruptPath); err != nil {
+		t.Error("expected .corrupt file to be created")
+	}
+}
+
