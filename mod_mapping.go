@@ -516,7 +516,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				state := mapping.NewEngineState()
 				state.ActiveApp = input.App
 
-				rule := idx.Resolve(input.Source, state)
+				rule := idx.Resolve(input.Source, state, "")
 				if rule == nil {
 					return MappingResolveTestOutput{
 						Matched: false,
