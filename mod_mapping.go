@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/hairglasses-studio/mapping"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
@@ -27,8 +28,8 @@ type MappingListInput struct {
 }
 
 type MappingListOutput struct {
-	Profiles []MappingProfileSummary `json:"profiles"`
-	Total    int                     `json:"total"`
+	Profiles []mapping.MappingProfileSummary `json:"profiles"`
+	Total    int                             `json:"total"`
 }
 
 // ── Get ──
@@ -38,9 +39,9 @@ type MappingGetInput struct {
 }
 
 type MappingGetOutput struct {
-	Profile *MappingProfile `json:"profile"`
-	Format  string          `json:"format"`
-	Raw     string          `json:"raw"`
+	Profile *mapping.MappingProfile `json:"profile"`
+	Format  string                  `json:"format"`
+	Raw     string                  `json:"raw"`
 }
 
 // ── Set ──
@@ -53,7 +54,7 @@ type MappingSetInput struct {
 type MappingSetOutput struct {
 	Written string            `json:"written"`
 	Valid   bool              `json:"valid"`
-	Issues  []ValidationIssue `json:"issues,omitempty"`
+	Issues  []mapping.ValidationIssue `json:"issues,omitempty"`
 }
 
 // ── Delete ──
@@ -78,7 +79,7 @@ type MappingValidateOutput struct {
 	Format        string            `json:"format"`
 	MappingCount  int               `json:"mapping_count"`
 	DeviceName    string            `json:"device_name,omitempty"`
-	Issues        []ValidationIssue `json:"issues"`
+	Issues        []mapping.ValidationIssue `json:"issues"`
 }
 
 // ── Migrate Legacy ──
@@ -111,7 +112,7 @@ type MappingResolveTestInput struct {
 
 type MappingResolveTestOutput struct {
 	Matched     bool         `json:"matched"`
-	Rule        *MappingRule `json:"rule,omitempty"`
+	Rule        *mapping.MappingRule `json:"rule,omitempty"`
 	Context     string       `json:"context"` // "default", "app_override"
 	Description string       `json:"description,omitempty"`
 }
@@ -158,7 +159,7 @@ type MappingImportOutput struct {
 	Written string            `json:"written,omitempty"`
 	Name    string            `json:"name"`
 	Format  string            `json:"format"`
-	Issues  []ValidationIssue `json:"issues,omitempty"`
+	Issues  []mapping.ValidationIssue `json:"issues,omitempty"`
 	DryRun  bool              `json:"dry_run"`
 	Exists  bool              `json:"exists,omitempty"`
 }
@@ -205,12 +206,12 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 			"mapping_list_profiles",
 			"List all mapping profiles with device info, format, and mapping counts. Supports filtering by format (unified/legacy), device name, and tag.",
 			func(_ context.Context, input MappingListInput) (MappingListOutput, error) {
-				profiles, err := ListMappingProfiles()
+				profiles, err := listMappingProfiles()
 				if err != nil {
 					return MappingListOutput{}, fmt.Errorf("list profiles: %w", err)
 				}
 
-				var filtered []MappingProfileSummary
+				var filtered []mapping.MappingProfileSummary
 				for _, p := range profiles {
 					if input.Format != "" && p.Format != input.Format {
 						continue
@@ -253,7 +254,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				if err != nil {
 					return MappingGetOutput{}, fmt.Errorf("[%s] profile %q not found: %w", handler.ErrNotFound, input.Name, err)
 				}
-				p, err := ParseMappingProfile(string(raw), path)
+				p, err := mapping.ParseMappingProfile(string(raw), path)
 				if err != nil {
 					return MappingGetOutput{}, fmt.Errorf("parse profile: %w", err)
 				}
@@ -284,7 +285,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				// Validate TOML syntax.
 				var raw map[string]any
 				if _, err := toml.Decode(input.Content, &raw); err != nil {
-					return MappingSetOutput{Valid: false, Issues: []ValidationIssue{{
+					return MappingSetOutput{Valid: false, Issues: []mapping.ValidationIssue{{
 						Severity: "error",
 						Field:    "content",
 						Message:  fmt.Sprintf("invalid TOML: %v", err),
@@ -292,16 +293,16 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				}
 
 				// Parse and validate semantically.
-				p, err := ParseMappingProfile(input.Content, input.Name+".toml")
+				p, err := mapping.ParseMappingProfile(input.Content, input.Name+".toml")
 				if err != nil {
-					return MappingSetOutput{Valid: false, Issues: []ValidationIssue{{
+					return MappingSetOutput{Valid: false, Issues: []mapping.ValidationIssue{{
 						Severity: "error",
 						Field:    "content",
 						Message:  err.Error(),
 					}}}, nil
 				}
 
-				issues := ValidateProfile(p)
+				issues := mapping.ValidateProfile(p)
 				hasErrors := false
 				for _, issue := range issues {
 					if issue.Severity == "error" {
@@ -368,11 +369,11 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 					return MappingValidateOutput{}, fmt.Errorf("[%s] provide either content or name", handler.ErrInvalidParam)
 				}
 
-				p, err := ParseMappingProfile(content, input.Name+".toml")
+				p, err := mapping.ParseMappingProfile(content, input.Name+".toml")
 				if err != nil {
 					return MappingValidateOutput{
 						Valid: false,
-						Issues: []ValidationIssue{{
+						Issues: []mapping.ValidationIssue{{
 							Severity: "error",
 							Field:    "content",
 							Message:  err.Error(),
@@ -380,7 +381,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 					}, nil
 				}
 
-				issues := ValidateProfile(p)
+				issues := mapping.ValidateProfile(p)
 				hasErrors := false
 				for _, issue := range issues {
 					if issue.Severity == "error" {
@@ -419,7 +420,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 					dryRun = input.DryRun
 				}
 
-				profiles, err := ListMappingProfiles()
+				profiles, err := listMappingProfiles()
 				if err != nil {
 					return MappingMigrateOutput{}, fmt.Errorf("list profiles: %w", err)
 				}
@@ -437,7 +438,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 						continue
 					}
 
-					p, err := LoadMappingProfile(summary.Path)
+					p, err := mapping.LoadMappingProfile(summary.Path)
 					if err != nil {
 						results = append(results, MigrationResult{
 							Name:   summary.Name,
@@ -447,7 +448,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 						continue
 					}
 
-					unified := ConvertLegacyToUnified(p)
+					unified := mapping.ConvertLegacyToUnified(p)
 
 					var buf bytes.Buffer
 					enc := toml.NewEncoder(&buf)
@@ -501,18 +502,18 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				}
 
 				path := resolveMappingPath(input.Name)
-				p, err := LoadMappingProfile(path)
+				p, err := mapping.LoadMappingProfile(path)
 				if err != nil {
 					return MappingResolveTestOutput{}, fmt.Errorf("[%s] profile %q: %w", handler.ErrNotFound, input.Name, err)
 				}
 
 				// Convert legacy if needed for resolution.
 				if p.IsLegacyFormat() {
-					p = ConvertLegacyToUnified(p)
+					p = mapping.ConvertLegacyToUnified(p)
 				}
 
-				idx := BuildRuleIndex(p)
-				state := NewEngineState()
+				idx := mapping.BuildRuleIndex(p)
+				state := mapping.NewEngineState()
 				state.ActiveApp = input.App
 
 				rule := idx.Resolve(input.Source, state)
@@ -550,7 +551,6 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 						name += "::" + input.AppClass
 					}
 					path := filepath.Join(makimaDir(), name+".toml")
-					_, _ = ParseMappingProfile(content, path)
 					return MappingGenerateOutput{
 						Content:      content,
 						PreviewPath:  path,
@@ -618,11 +618,11 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				}
 
 				// Parse and validate.
-				p, err := ParseMappingProfile(input.Content, "import.toml")
+				p, err := mapping.ParseMappingProfile(input.Content, "import.toml")
 				if err != nil {
 					return MappingImportOutput{
 						Valid: false,
-						Issues: []ValidationIssue{{
+						Issues: []mapping.ValidationIssue{{
 							Severity: "error",
 							Field:    "content",
 							Message:  err.Error(),
@@ -630,7 +630,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 					}, nil
 				}
 
-				issues := ValidateProfile(p)
+				issues := mapping.ValidateProfile(p)
 				hasErrors := false
 				for _, issue := range issues {
 					if issue.Severity == "error" {
@@ -670,7 +670,7 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				if _, err := os.Stat(path); err == nil {
 					result.Exists = true
 					if !input.Force && !input.DryRun {
-						result.Issues = append(result.Issues, ValidationIssue{
+						result.Issues = append(result.Issues, mapping.ValidationIssue{
 							Severity: "warning",
 							Field:    "name",
 							Message:  fmt.Sprintf("Profile %q already exists. Use force=true to overwrite.", name),
@@ -705,11 +705,11 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 					return MappingDiffOutput{}, fmt.Errorf("[%s] name1 and name2 are required", handler.ErrInvalidParam)
 				}
 
-				p1, err := LoadMappingProfile(resolveMappingPath(input.Name1))
+				p1, err := mapping.LoadMappingProfile(resolveMappingPath(input.Name1))
 				if err != nil {
 					return MappingDiffOutput{}, fmt.Errorf("[%s] profile %q: %w", handler.ErrNotFound, input.Name1, err)
 				}
-				p2, err := LoadMappingProfile(resolveMappingPath(input.Name2))
+				p2, err := mapping.LoadMappingProfile(resolveMappingPath(input.Name2))
 				if err != nil {
 					return MappingDiffOutput{}, fmt.Errorf("[%s] profile %q: %w", handler.ErrNotFound, input.Name2, err)
 				}
@@ -818,7 +818,7 @@ func sanitizeProfile(content string) string {
 }
 
 // extractMappingKeys returns a map of input->output description for diffing.
-func extractMappingKeys(p *MappingProfile) map[string]string {
+func extractMappingKeys(p *mapping.MappingProfile) map[string]string {
 	keys := make(map[string]string)
 
 	if p.IsUnifiedFormat() {
@@ -840,15 +840,15 @@ func extractMappingKeys(p *MappingProfile) map[string]string {
 	return keys
 }
 
-func describeOutput(o OutputAction) string {
+func describeOutput(o mapping.OutputAction) string {
 	switch o.Type {
-	case OutputKey:
+	case mapping.OutputKey:
 		return strings.Join(o.Keys, "+")
-	case OutputCommand:
+	case mapping.OutputCommand:
 		return strings.Join(o.Exec, " ")
-	case OutputMovement:
+	case mapping.OutputMovement:
 		return o.Target
-	case OutputOSC:
+	case mapping.OutputOSC:
 		return fmt.Sprintf("%s:%d%s", o.Host, o.Port, o.Address)
 	default:
 		return string(o.Type)

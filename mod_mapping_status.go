@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/hairglasses-studio/mapping"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
@@ -32,7 +33,7 @@ type ConnectedDevice struct {
 type MappingStatusOutput struct {
 	Gamepads       []ConnectedDevice         `json:"gamepads"`
 	MIDIDevices    []ConnectedDevice         `json:"midi_devices"`
-	Profiles       []MappingProfileSummary   `json:"profiles"`
+	Profiles       []mapping.MappingProfileSummary `json:"profiles"`
 	ProfileCount   int                       `json:"profile_count"`
 	TemplateCount  int                       `json:"template_count"`
 	MakimaDir      string                    `json:"makima_dir"`
@@ -108,7 +109,7 @@ func (m *MappingStatusModule) Tools() []registry.ToolDefinition {
 				}
 
 				// List profiles.
-				profiles, _ := ListMappingProfiles()
+				profiles, _ := listMappingProfiles()
 				result.Profiles = profiles
 				result.ProfileCount = len(profiles)
 
