@@ -2729,3 +2729,264 @@ func (m *ClaudeSessionModule) Tools() []registry.ToolDefinition {
 		),
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Session Index for ccg (CLI mode: --session-index)
+// ---------------------------------------------------------------------------
+
+// SessionIndexEntry is the output schema matching ccg.sh's expected format.
+type SessionIndexEntry struct {
+	SessionID    string `json:"sessionId"`
+	CWD          string `json:"cwd"`
+	Repo         string `json:"repo"`
+	Title        string `json:"title"`
+	Branch       string `json:"branch"`
+	Model        string `json:"model"`
+	Version      string `json:"version"`
+	Status       string `json:"status"`
+	PID          int    `json:"pid"`
+	LastActivity int64  `json:"lastActivity"`
+	FileSize     int64  `json:"fileSize"`
+	OpenTasks    int    `json:"openTasks"`
+	TotalTasks   int    `json:"totalTasks"`
+	Slug         string `json:"slug"`
+	CustomTitle  string `json:"customTitle"`
+}
+
+// extractJSONLMeta reads the first ~200 lines of a session JSONL file to extract
+// metadata without parsing the entire file.
+func extractJSONLMeta(path string) (customTitle, cwd, branch, version, model, slug string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	linesRead := 0
+	gotUser, gotAssistant := false, false
+
+	for scanner.Scan() && linesRead < 200 {
+		linesRead++
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		lineStr := string(line)
+
+		if customTitle == "" && strings.Contains(lineStr, `"custom-title"`) {
+			var entry struct {
+				Type        string `json:"type"`
+				CustomTitle string `json:"customTitle"`
+			}
+			if json.Unmarshal(line, &entry) == nil && entry.Type == "custom-title" {
+				customTitle = entry.CustomTitle
+			}
+		}
+		if !gotUser && strings.Contains(lineStr, `"type":"user"`) {
+			var entry struct {
+				Type      string `json:"type"`
+				CWD       string `json:"cwd"`
+				GitBranch string `json:"gitBranch"`
+				Version   string `json:"version"`
+			}
+			if json.Unmarshal(line, &entry) == nil && entry.Type == "user" {
+				cwd = entry.CWD
+				branch = entry.GitBranch
+				version = entry.Version
+				gotUser = true
+			}
+		}
+		if !gotAssistant && strings.Contains(lineStr, `"type":"assistant"`) {
+			var entry struct {
+				Type    string `json:"type"`
+				Slug    string `json:"slug"`
+				Message struct {
+					Model string `json:"model"`
+				} `json:"message"`
+			}
+			if json.Unmarshal(line, &entry) == nil && entry.Type == "assistant" {
+				model = entry.Message.Model
+				slug = entry.Slug
+				gotAssistant = true
+			}
+		}
+		if gotUser && gotAssistant && customTitle != "" {
+			break
+		}
+	}
+	return
+}
+
+// buildSessionIndex produces the full session index for ccg.
+func buildSessionIndex() ([]SessionIndexEntry, error) {
+	sessions, err := loadAllSessionMeta()
+	if err != nil {
+		return nil, fmt.Errorf("load session meta: %w", err)
+	}
+
+	lastActivity, lastDisplay, err := loadHistoryIndex()
+	if err != nil {
+		return nil, fmt.Errorf("load history: %w", err)
+	}
+
+	type metaInfo struct {
+		PID       int
+		Name      string
+		StartedAt int64
+		CWD       string
+	}
+	metaByID := make(map[string]metaInfo, len(sessions))
+	for _, s := range sessions {
+		metaByID[s.SessionID] = metaInfo{PID: s.PID, Name: s.Name, StartedAt: s.StartedAt, CWD: s.CWD}
+	}
+
+	projectsDir := filepath.Join(claudeDir(), "projects")
+	dirEntries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		return nil, fmt.Errorf("read projects: %w", err)
+	}
+
+	type fileEntry struct {
+		path, sessionID string
+		size, mtime     int64
+	}
+	var files []fileEntry
+	for _, de := range dirEntries {
+		if !de.IsDir() || strings.HasPrefix(de.Name(), "-tmp-") {
+			continue
+		}
+		matches, _ := filepath.Glob(filepath.Join(projectsDir, de.Name(), "*.jsonl"))
+		for _, m := range matches {
+			sid := strings.TrimSuffix(filepath.Base(m), ".jsonl")
+			if len(sid) < 36 {
+				continue
+			}
+			info, err := os.Stat(m)
+			if err != nil {
+				continue
+			}
+			files = append(files, fileEntry{path: m, sessionID: sid, size: info.Size(), mtime: info.ModTime().Unix()})
+		}
+	}
+
+	type indexResult struct {
+		entry SessionIndexEntry
+		ok    bool
+	}
+	results := make([]indexResult, len(files))
+	sem := make(chan struct{}, 16)
+	var wg sync.WaitGroup
+
+	for i, fi := range files {
+		i, fi := i, fi
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			customTitle, cwdVal, branch, version, model, slug := extractJSONLMeta(fi.path)
+			if cwdVal == "" {
+				if m, ok := metaByID[fi.sessionID]; ok {
+					cwdVal = m.CWD
+				}
+			}
+			if cwdVal == "" {
+				return
+			}
+
+			lastAct := fi.mtime
+			if t, ok := lastActivity[fi.sessionID]; ok {
+				lastAct = t.Unix()
+			}
+
+			title := customTitle
+			if title == "" {
+				if m, ok := metaByID[fi.sessionID]; ok {
+					title = m.Name
+				}
+			}
+			if title == "" {
+				title = slug
+			}
+			if title == "" {
+				if d, ok := lastDisplay[fi.sessionID]; ok && len(d) > 0 {
+					if len(d) > 60 {
+						d = d[:60]
+					}
+					title = d
+				}
+			}
+			if title == "" {
+				title = "(untitled)"
+			}
+
+			pid := 0
+			status := "dead"
+			if m, ok := metaByID[fi.sessionID]; ok {
+				pid = m.PID
+				if isProcessAlive(pid) {
+					status = "alive"
+				}
+			}
+
+			tasks, _ := loadSessionTasks(fi.sessionID)
+			openTasks, totalTasks := 0, len(tasks)
+			for _, t := range tasks {
+				if t.Status != "completed" {
+					openTasks++
+				}
+			}
+
+			repo := repoNameFromPath(cwdVal)
+			studio := filepath.Join(homeDir(), "hairglasses-studio")
+			if strings.HasPrefix(cwdVal, studio+"/") {
+				rel := strings.TrimPrefix(cwdVal, studio+"/")
+				if idx := strings.IndexByte(rel, '/'); idx >= 0 {
+					repo = rel[:idx]
+				} else {
+					repo = rel
+				}
+			} else if cwdVal == studio {
+				repo = "hairglasses-studio"
+			}
+
+			results[i] = indexResult{ok: true, entry: SessionIndexEntry{
+				SessionID: fi.sessionID, CWD: cwdVal, Repo: repo, Title: title,
+				Branch: branch, Model: model, Version: version, Status: status,
+				PID: pid, LastActivity: lastAct, FileSize: fi.size,
+				OpenTasks: openTasks, TotalTasks: totalTasks, Slug: slug, CustomTitle: customTitle,
+			}}
+		}()
+	}
+	wg.Wait()
+
+	var index []SessionIndexEntry
+	for _, r := range results {
+		if r.ok {
+			index = append(index, r.entry)
+		}
+	}
+	sort.Slice(index, func(i, j int) bool {
+		return index[i].LastActivity > index[j].LastActivity
+	})
+	return index, nil
+}
+
+// outputSessionIndex writes the session index as JSONL to stdout.
+func outputSessionIndex() error {
+	index, err := buildSessionIndex()
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(os.Stdout)
+	for _, entry := range index {
+		if err := enc.Encode(entry); err != nil {
+			return err
+		}
+	}
+	return nil
+}
