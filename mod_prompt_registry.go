@@ -8,11 +8,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/hairglasses-studio/mcpkit/handler"
@@ -86,22 +88,31 @@ func (idx *PromptIndex) load() error {
 		}
 		return err
 	}
-	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+	var corruptCount int
+	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 		var rec PromptRecord
 		if err := json.Unmarshal([]byte(line), &rec); err != nil {
-			continue // skip corrupt lines
+			corruptCount++
+			// Append corrupt line to recovery file
+			corruptPath := path + ".corrupt"
+			entry := fmt.Sprintf("[%s] line %d: %s\n%s\n", time.Now().UTC().Format(time.RFC3339), i+1, err, line)
+			_ = os.WriteFile(corruptPath, append(readFileOrEmpty(corruptPath), []byte(entry)...), 0644)
+			continue
 		}
 		idx.records[rec.Hash] = &rec
+	}
+	if corruptCount > 0 {
+		slog.Warn("prompt index: skipped corrupt lines", "count", corruptCount, "path", path)
 	}
 	idx.loaded = true
 	return nil
 }
 
-// add inserts a record into the in-memory index and appends to JSONL.
+// add inserts a record into the in-memory index and appends to JSONL with file locking.
 func (idx *PromptIndex) add(rec *PromptRecord) error {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
@@ -116,6 +127,11 @@ func (idx *PromptIndex) add(rec *PromptRecord) error {
 		return err
 	}
 	defer f.Close()
+	// Exclusive flock for cross-process safety (capture hook may write concurrently)
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("flock: %w", err)
+	}
+	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 	_, err = fmt.Fprintf(f, "%s\n", line)
 	return err
 }
@@ -291,6 +307,11 @@ func (idx *PromptIndex) stats(repoFilter string) promptStatsResult {
 func computePromptHash(prompt string) string {
 	h := sha256.Sum256([]byte(prompt))
 	return fmt.Sprintf("%x", h)
+}
+
+func readFileOrEmpty(path string) []byte {
+	data, _ := os.ReadFile(path)
+	return data
 }
 
 func wordCount(s string) int {
