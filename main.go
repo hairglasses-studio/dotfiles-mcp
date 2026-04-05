@@ -2937,10 +2937,41 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 // main
 // ---------------------------------------------------------------------------
 
+// outputSessionIndex writes a JSONL session index for the ccg global session browser.
+func outputSessionIndex() error {
+	home := os.Getenv("HOME")
+	if home == "" {
+		return fmt.Errorf("HOME not set")
+	}
+	sessDir := filepath.Join(home, ".claude", "projects")
+	entries, err := os.ReadDir(sessDir)
+	if err != nil {
+		return fmt.Errorf("reading session projects: %w", err)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		info := map[string]string{"project": e.Name(), "path": filepath.Join(sessDir, e.Name())}
+		_ = enc.Encode(info)
+	}
+	return nil
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})).With("service", "dotfiles-mcp"))
+
+	// Handle --session-index: output session index as JSONL for ccg.
+	if len(os.Args) > 1 && os.Args[1] == "--session-index" {
+		if err := outputSessionIndex(); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	reg := registry.NewToolRegistry(registry.Config{
 		Middleware: []registry.Middleware{
