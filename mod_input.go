@@ -714,7 +714,7 @@ type InputDeleteMakimaOutput struct {
 }
 
 type InputRestartInput struct {
-	Service string `json:"service" jsonschema:"required,description=Which service to restart,enum=logid,enum=makima,enum=both"`
+	Service string `json:"service" jsonschema:"required,description=Which service to restart,enum=logid,enum=mapitall,enum=both"`
 }
 type InputRestartOutput struct {
 	Services []serviceStatus `json:"services"`
@@ -956,17 +956,17 @@ type SolaarSetOutput struct {
 type InputModule struct{}
 
 func (m *InputModule) Name() string        { return "input" }
-func (m *InputModule) Description() string { return "Input device management (logiops, makima, services)" }
+func (m *InputModule) Description() string { return "Input device management (logiops, mapitall, services)" }
 
 func (m *InputModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{
 		handler.TypedHandler[InputStatusInput, InputStatusOutput](
 			"input_status",
-			"Show running state of input services (logid, makima) and battery levels for connected Bluetooth devices.",
+			"Show running state of input services (logid, mapitall) and battery levels for connected Bluetooth devices.",
 			func(_ context.Context, _ InputStatusInput) (InputStatusOutput, error) {
 				var result InputStatusOutput
 
-				for _, svc := range []string{"logid", "makima"} {
+				for _, svc := range []string{"logid", "mapitall"} {
 					_, _, err := inputRunCmd("systemctl", "is-active", svc+".service")
 					result.Services = append(result.Services, serviceStatus{
 						Name:   svc,
@@ -1141,12 +1141,12 @@ func (m *InputModule) Tools() []registry.ToolDefinition {
 				switch input.Service {
 				case "logid":
 					targets = []string{"logid"}
-				case "makima":
-					targets = []string{"makima"}
+				case "mapitall":
+					targets = []string{"mapitall"}
 				case "both":
-					targets = []string{"logid", "makima"}
+					targets = []string{"logid", "mapitall"}
 				default:
-					return InputRestartOutput{}, fmt.Errorf("[%s] service must be logid, makima, or both", handler.ErrInvalidParam)
+					return InputRestartOutput{}, fmt.Errorf("[%s] service must be logid, mapitall, or both", handler.ErrInvalidParam)
 				}
 
 				var result InputRestartOutput
@@ -1891,7 +1891,7 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 					Controllers: results,
 				}
 
-				// Restart makima if we actually wrote any profiles
+				// Restart mapitall if we actually wrote any profiles
 				if input.Execute {
 					wroteAny := false
 					for _, r := range results {
@@ -1901,7 +1901,7 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 						}
 					}
 					if wroteAny {
-						_, stderr, err := inputRunCmd("sudo", "systemctl", "restart", "makima.service")
+						_, stderr, err := inputRunCmd("sudo", "systemctl", "restart", "mapitall.service")
 						if err != nil {
 							result.MakimaRestart = fmt.Sprintf("restart failed: %s", stderr)
 						} else {

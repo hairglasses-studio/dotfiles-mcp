@@ -4,8 +4,8 @@ go 1.26.1
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/hairglasses-studio/mapping v0.0.0-20260405122440-e25a61bb44b7
-	github.com/hairglasses-studio/mcpkit v0.2.0
+	github.com/hairglasses-studio/mapping v0.0.0-20260405135305-b22ce0994254
+	github.com/hairglasses-studio/mcpkit v0.2.1-0.20260405135316-085ccea5cc77
 	github.com/hairglasses-studio/prompt-improver v0.0.0-20260405131120-e5db99d88cd5
 	github.com/mark3labs/mcp-go v0.47.0
 )

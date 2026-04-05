@@ -30,6 +30,14 @@ type ConnectedDevice struct {
 	HasProfile bool   `json:"has_profile"`
 }
 
+type DaemonStatus struct {
+	Running       bool   `json:"running"`
+	UptimeSeconds float64 `json:"uptime_seconds,omitempty"`
+	Profiles      int    `json:"profiles,omitempty"`
+	Devices       int    `json:"devices,omitempty"`
+	Error         string `json:"error,omitempty"`
+}
+
 type MappingStatusOutput struct {
 	Gamepads       []ConnectedDevice         `json:"gamepads"`
 	MIDIDevices    []ConnectedDevice         `json:"midi_devices"`
@@ -38,6 +46,7 @@ type MappingStatusOutput struct {
 	TemplateCount  int                       `json:"template_count"`
 	MakimaDir      string                    `json:"makima_dir"`
 	MidiDir        string                    `json:"midi_dir"`
+	Daemon         *DaemonStatus             `json:"daemon,omitempty"`
 }
 
 // ── Quick Map ──
@@ -117,6 +126,28 @@ func (m *MappingStatusModule) Tools() []registry.ToolDefinition {
 				result.TemplateCount = len(controllerTemplates) + len(midiTemplates)
 				result.MakimaDir = makimaDir()
 				result.MidiDir = midiDir()
+
+				// Try to get live daemon status via IPC.
+				ds := &DaemonStatus{}
+				raw, err := mapitallCall(mapitallSocketPath(), "status", nil)
+				if err != nil {
+					ds.Running = false
+					ds.Error = err.Error()
+				} else {
+					ds.Running = true
+					if m, ok := raw.(map[string]any); ok {
+						if v, ok := m["uptime_seconds"].(float64); ok {
+							ds.UptimeSeconds = v
+						}
+						if v, ok := m["profiles"].(float64); ok {
+							ds.Profiles = int(v)
+						}
+						if v, ok := m["devices"].(float64); ok {
+							ds.Devices = int(v)
+						}
+					}
+				}
+				result.Daemon = ds
 
 				return result, nil
 			},

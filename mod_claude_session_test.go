@@ -21,8 +21,8 @@ func TestClaudeSessionModuleRegistration(t *testing.T) {
 	}
 
 	tools := m.Tools()
-	if len(tools) != 15 {
-		t.Fatalf("expected 15 tools, got %d", len(tools))
+	if len(tools) != 16 {
+		t.Fatalf("expected 16 tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -485,11 +485,11 @@ func TestSessionScan_MockFixture(t *testing.T) {
 }
 
 // TestClaudeSessionModuleHas15Tools verifies the expanded tool count.
-func TestClaudeSessionModuleHas15Tools(t *testing.T) {
+func TestClaudeSessionModuleHas16Tools(t *testing.T) {
 	m := &ClaudeSessionModule{}
 	tools := m.Tools()
-	if len(tools) != 15 {
-		t.Fatalf("expected 15 tools, got %d", len(tools))
+	if len(tools) != 16 {
+		t.Fatalf("expected 16 tools, got %d", len(tools))
 	}
 
 	for _, want := range []string{
