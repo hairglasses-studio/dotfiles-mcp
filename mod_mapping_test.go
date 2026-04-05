@@ -209,7 +209,7 @@ func TestRuleIndex_BasicResolve(t *testing.T) {
 	idx := mapping.BuildRuleIndex(p)
 	state := mapping.NewEngineState()
 
-	rule := idx.Resolve("BTN_SOUTH", state, "")
+	rule := idx.Resolve("BTN_SOUTH", state)
 	if rule == nil {
 		t.Fatal("expected rule for BTN_SOUTH")
 	}
@@ -217,7 +217,7 @@ func TestRuleIndex_BasicResolve(t *testing.T) {
 		t.Errorf("got keys=%v, want [KEY_ENTER]", rule.Output.Keys)
 	}
 
-	rule = idx.Resolve("BTN_WEST", state, "")
+	rule = idx.Resolve("BTN_WEST", state)
 	if rule != nil {
 		t.Error("expected nil for unmapped BTN_WEST")
 	}
@@ -241,14 +241,14 @@ func TestRuleIndex_AppOverride(t *testing.T) {
 
 	// Default context.
 	state := mapping.NewEngineState()
-	rule := idx.Resolve("BTN_SOUTH", state, "")
+	rule := idx.Resolve("BTN_SOUTH", state)
 	if rule == nil || rule.Description != "default" {
 		t.Errorf("expected default rule, got %v", rule)
 	}
 
 	// Firefox context.
 	state.ActiveApp = "firefox"
-	rule = idx.Resolve("BTN_SOUTH", state, "")
+	rule = idx.Resolve("BTN_SOUTH", state)
 	if rule == nil || rule.Description != "firefox" {
 		t.Errorf("expected firefox override, got %v", rule)
 	}
@@ -265,14 +265,14 @@ func TestRuleIndex_ModifierMatch(t *testing.T) {
 
 	// No modifier held → plain rule.
 	state := mapping.NewEngineState()
-	rule := idx.Resolve("BTN_SOUTH", state, "")
+	rule := idx.Resolve("BTN_SOUTH", state)
 	if rule == nil || rule.Description != "plain" {
 		t.Errorf("expected plain rule, got %v", rule)
 	}
 
 	// Modifier held → modified rule (higher priority).
 	state.ActiveModifiers["BTN_TL"] = true
-	rule = idx.Resolve("BTN_SOUTH", state, "")
+	rule = idx.Resolve("BTN_SOUTH", state)
 	if rule == nil || rule.Description != "with modifier" {
 		t.Errorf("expected modified rule, got %v", rule)
 	}
@@ -298,14 +298,14 @@ func TestRuleIndex_ConditionFilter(t *testing.T) {
 
 	// No recording variable → default.
 	state := mapping.NewEngineState()
-	rule := idx.Resolve("midi:cc:1", state, "")
+	rule := idx.Resolve("midi:cc:1", state)
 	if rule == nil || rule.Description != "default volume" {
 		t.Errorf("expected default volume, got %v", rule)
 	}
 
 	// Recording = true → recording mode.
 	state.Variables["recording"] = true
-	rule = idx.Resolve("midi:cc:1", state, "")
+	rule = idx.Resolve("midi:cc:1", state)
 	if rule == nil || rule.Description != "recording mode" {
 		t.Errorf("expected recording mode, got %v", rule)
 	}
@@ -654,5 +654,86 @@ func TestDescribeOutput(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("describeOutput(%v) = %q, want %q", tt.output.Type, got, tt.want)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// resolveContext
+// ---------------------------------------------------------------------------
+
+func TestResolveContext(t *testing.T) {
+	if got := resolveContext("firefox"); got != "app_override" {
+		t.Errorf("resolveContext('firefox') = %q, want app_override", got)
+	}
+	if got := resolveContext(""); got != "default" {
+		t.Errorf("resolveContext('') = %q, want default", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// countTOMLMappings
+// ---------------------------------------------------------------------------
+
+func TestCountTOMLMappings(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    int
+	}{
+		{
+			name: "remap section",
+			content: `[remap]
+BTN_SOUTH = ["KEY_ENTER"]
+BTN_EAST = ["KEY_ESC"]
+
+[settings]
+LSTICK = "cursor"
+`,
+			want: 2,
+		},
+		{
+			name: "mixed sections",
+			content: `[remap]
+BTN_SOUTH = ["KEY_ENTER"]
+
+[commands]
+BTN_TL = ["hyprctl dispatch movefocus l"]
+BTN_TR = ["hyprctl dispatch movefocus r"]
+
+[settings]
+not_counted = "value"
+`,
+			want: 3,
+		},
+		{
+			name:    "empty",
+			content: "",
+			want:    0,
+		},
+		{
+			name: "comments ignored",
+			content: `[remap]
+# This is a comment
+BTN_SOUTH = ["KEY_ENTER"]
+`,
+			want: 1,
+		},
+		{
+			name: "no matching sections",
+			content: `[settings]
+LSTICK = "cursor"
+[profile]
+schema_version = 1
+`,
+			want: 0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := countTOMLMappings(tc.content)
+			if got != tc.want {
+				t.Errorf("countTOMLMappings() = %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
