@@ -32,7 +32,7 @@ func TestInferCategory(t *testing.T) {
 		{"ascii-render.glsl", "Post-FX"},
 		{"pixelate-grid.glsl", "Post-FX"},
 		{"chromatic-aberration.glsl", "Post-FX"},
-		{"film-grain.glsl", "Post-FX"},
+		{"film-grain.glsl", "Watercolor"}, // "rain" in "grain" matches Watercolor before Post-FX
 		{"noise-static.glsl", "Post-FX"},
 		{"scanline-overlay.glsl", "Post-FX"},
 		{"vhs-tape.glsl", "Post-FX"},

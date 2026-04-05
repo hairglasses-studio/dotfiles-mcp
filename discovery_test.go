@@ -1,0 +1,283 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+
+	"github.com/hairglasses-studio/mcpkit/registry"
+)
+
+// ---------------------------------------------------------------------------
+// dotfilesProfile
+// ---------------------------------------------------------------------------
+
+func TestDotfilesProfile(t *testing.T) {
+	tests := []struct {
+		env  string
+		want string
+	}{
+		{"", "default"},
+		{"default", "default"},
+		{"Default", "default"},
+		{"DEFAULT", "default"},
+		{"ops", "ops"},
+		{"Ops", "ops"},
+		{"OPS", "ops"},
+		{"full", "full"},
+		{"Full", "full"},
+		{"FULL", "full"},
+		{"  full  ", "full"},
+		{"unknown", "default"},
+		{"random_value", "default"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.env, func(t *testing.T) {
+			t.Setenv("DOTFILES_MCP_PROFILE", tc.env)
+			got := dotfilesProfile()
+			if got != tc.want {
+				t.Errorf("dotfilesProfile() with env=%q: got %q, want %q", tc.env, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// shouldDeferDotfilesTool
+// ---------------------------------------------------------------------------
+
+func TestShouldDeferDotfilesTool(t *testing.T) {
+	tests := []struct {
+		profile  string
+		toolName string
+		want     bool
+	}{
+		// full profile: nothing deferred
+		{"full", "shader_list", false},
+		{"full", "dotfiles_validate_config", false},
+		{"full", "hypr_list_windows", false},
+
+		// ops profile: dotfiles_, workflow_, oss_ are NOT deferred
+		{"ops", "dotfiles_validate_config", false},
+		{"ops", "dotfiles_rice_check", false},
+		{"ops", "workflow_sync", false},
+		{"ops", "oss_score", false},
+		{"ops", "shader_list", true},
+		{"ops", "hypr_list_windows", true},
+		{"ops", "bt_connect", true},
+
+		// default profile: everything deferred
+		{"default", "shader_list", true},
+		{"default", "dotfiles_validate_config", true},
+		{"default", "hypr_list_windows", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.profile+"_"+tc.toolName, func(t *testing.T) {
+			td := registry.ToolDefinition{}
+			td.Tool.Name = tc.toolName
+			got := shouldDeferDotfilesTool(tc.profile, td)
+			if got != tc.want {
+				t.Errorf("shouldDeferDotfilesTool(%q, %q) = %v, want %v", tc.profile, tc.toolName, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// schemaMap
+// ---------------------------------------------------------------------------
+
+func TestSchemaMap(t *testing.T) {
+	// Nil input.
+	if m := schemaMap(nil); m != nil {
+		t.Errorf("schemaMap(nil) = %v, want nil", m)
+	}
+
+	// Valid struct.
+	input := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"name": map[string]any{"type": "string"},
+		},
+	}
+	m := schemaMap(input)
+	if m == nil {
+		t.Fatal("expected non-nil map")
+	}
+	if m["type"] != "object" {
+		t.Errorf("type = %v, want object", m["type"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// registerDotfilesModules profiles
+// ---------------------------------------------------------------------------
+
+func TestRegisterDotfilesModules_FullProfile(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "full")
+
+	reg := registry.NewToolRegistry()
+	registerDotfilesModules(reg)
+
+	// In full profile, nothing should be deferred.
+	if reg.IsDeferred("shader_list") {
+		t.Error("shader_list should NOT be deferred in full profile")
+	}
+	if reg.IsDeferred("hypr_list_windows") {
+		t.Error("hypr_list_windows should NOT be deferred in full profile")
+	}
+}
+
+func TestRegisterDotfilesModules_OpsProfile(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "ops")
+
+	reg := registry.NewToolRegistry()
+	registerDotfilesModules(reg)
+
+	// dotfiles_* should be eager in ops profile.
+	if reg.IsDeferred("dotfiles_validate_config") {
+		t.Error("dotfiles_validate_config should NOT be deferred in ops profile")
+	}
+	// Non-dotfiles tools should be deferred.
+	if !reg.IsDeferred("shader_list") {
+		t.Error("shader_list should be deferred in ops profile")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// DotfilesDiscoveryModule
+// ---------------------------------------------------------------------------
+
+func TestDiscoveryModuleRegistration(t *testing.T) {
+	reg := registry.NewToolRegistry()
+	m := &DotfilesDiscoveryModule{reg: reg}
+
+	if m.Name() != "discovery" {
+		t.Fatalf("expected name discovery, got %s", m.Name())
+	}
+
+	tools := m.Tools()
+	if len(tools) != 4 {
+		t.Fatalf("expected 4 discovery tools, got %d", len(tools))
+	}
+
+	names := make(map[string]bool)
+	for _, td := range tools {
+		names[td.Tool.Name] = true
+	}
+	for _, want := range []string{
+		"dotfiles_tool_search",
+		"dotfiles_tool_schema",
+		"dotfiles_tool_catalog",
+		"dotfiles_tool_stats",
+	} {
+		if !names[want] {
+			t.Errorf("missing tool: %s", want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tool stats (integration)
+// ---------------------------------------------------------------------------
+
+func TestToolStats(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "full")
+
+	reg := registry.NewToolRegistry()
+	registerDotfilesModules(reg)
+
+	disc := &DotfilesDiscoveryModule{reg: reg}
+	tools := disc.Tools()
+
+	var statsTool registry.ToolDefinition
+	for _, td := range tools {
+		if td.Tool.Name == "dotfiles_tool_stats" {
+			statsTool = td
+			break
+		}
+	}
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+	result, err := statsTool.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	text := extractText(t, result)
+	var out dotfilesToolStatsOutput
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.TotalTools == 0 {
+		t.Error("expected non-zero total tools")
+	}
+	if out.ModuleCount == 0 {
+		t.Error("expected non-zero module count")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tool schema — tool not found
+// ---------------------------------------------------------------------------
+
+func TestToolSchema_NotFound(t *testing.T) {
+	reg := registry.NewToolRegistry()
+	disc := &DotfilesDiscoveryModule{reg: reg}
+	tools := disc.Tools()
+
+	var schemaTool registry.ToolDefinition
+	for _, td := range tools {
+		if td.Tool.Name == "dotfiles_tool_schema" {
+			schemaTool = td
+			break
+		}
+	}
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"name": "nonexistent_tool_xyz"}
+	result, err := schemaTool.Handler(context.Background(), req)
+	if err == nil && (result == nil || !result.IsError) {
+		t.Error("expected error for nonexistent tool")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tool catalog — with category filter
+// ---------------------------------------------------------------------------
+
+func TestToolCatalog_WithFilter(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "full")
+
+	reg := registry.NewToolRegistry()
+	registerDotfilesModules(reg)
+
+	disc := &DotfilesDiscoveryModule{reg: reg}
+	tools := disc.Tools()
+
+	var catalogTool registry.ToolDefinition
+	for _, td := range tools {
+		if td.Tool.Name == "dotfiles_tool_catalog" {
+			catalogTool = td
+			break
+		}
+	}
+
+	// With a non-matching category filter, should return empty groups.
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"category": "nonexistent_category_xyz"}
+	result, err := catalogTool.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	text := extractText(t, result)
+	var out dotfilesToolCatalogOutput
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(out.Groups) != 0 {
+		t.Errorf("expected 0 groups for nonexistent category, got %d", len(out.Groups))
+	}
+}
