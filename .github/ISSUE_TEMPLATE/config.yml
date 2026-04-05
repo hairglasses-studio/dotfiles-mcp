@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussion
+    url: https://github.com/hairglasses-studio/dotfiles-mcp/discussions
+    about: Ask questions, share ideas, or discuss features in GitHub Discussions
+  - name: Discord Community
+    url: https://discord.gg/hairglasses-studio
+    about: Chat with the community in real-time on Discord
+  - name: Security Vulnerability
+    url: https://github.com/hairglasses-studio/dotfiles-mcp/security/advisories/new
+    about: Report a security vulnerability privately (do NOT create a public issue)
