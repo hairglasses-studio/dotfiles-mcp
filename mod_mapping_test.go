@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/hairglasses-studio/mcpkit/mcptest"
@@ -16,8 +17,8 @@ func TestMappingModuleRegistration(t *testing.T) {
 	m := &MappingEngineModule{}
 
 	tools := m.Tools()
-	if len(tools) != 8 {
-		t.Fatalf("expected 8 mapping tools, got %d", len(tools))
+	if len(tools) != 11 {
+		t.Fatalf("expected 11 mapping tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -33,6 +34,9 @@ func TestMappingModuleRegistration(t *testing.T) {
 		"mapping_migrate_legacy",
 		"mapping_resolve_test",
 		"mapping_generate",
+		"mapping_export",
+		"mapping_import",
+		"mapping_diff",
 	} {
 		if !srv.HasTool(want) {
 			t.Errorf("missing tool: %s", want)
@@ -579,5 +583,75 @@ func TestMappingProfile_MappingCount(t *testing.T) {
 	}
 	if got := p2.MappingCount(); got != 3 {
 		t.Errorf("legacy MappingCount = %d, want 3", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Import/Export helpers
+// ---------------------------------------------------------------------------
+
+func TestSanitizeProfile(t *testing.T) {
+	home := homeDir()
+	content := "# Profile for " + home + "/stuff\n[commands]\nBTN_SOUTH = [\"" + home + "/scripts/do-thing.sh\"]\n"
+	sanitized := sanitizeProfile(content)
+	if strings.Contains(sanitized, home) {
+		t.Errorf("sanitized content still contains home dir %q", home)
+	}
+	if !strings.Contains(sanitized, "~") {
+		t.Error("sanitized content should contain ~ placeholder")
+	}
+}
+
+func TestExtractMappingKeys_Legacy(t *testing.T) {
+	p := &MappingProfile{
+		Remap:    map[string][]string{"BTN_SOUTH": {"KEY_ENTER"}, "BTN_EAST": {"KEY_ESC"}},
+		Commands: map[string][]string{"BTN_TL": {"hyprctl dispatch movefocus l"}},
+	}
+	keys := extractMappingKeys(p)
+	if len(keys) != 3 {
+		t.Fatalf("expected 3 keys, got %d", len(keys))
+	}
+	if v, ok := keys["BTN_SOUTH"]; !ok || !strings.HasPrefix(v, "key:") {
+		t.Errorf("BTN_SOUTH = %q, want key:...", v)
+	}
+	if v, ok := keys["BTN_TL"]; !ok || !strings.HasPrefix(v, "cmd:") {
+		t.Errorf("BTN_TL = %q, want cmd:...", v)
+	}
+}
+
+func TestExtractMappingKeys_Unified(t *testing.T) {
+	p := &MappingProfile{
+		Profile: &ProfileMeta{SchemaVersion: 1},
+		Mappings: []MappingRule{
+			{Input: "BTN_SOUTH", Output: OutputAction{Type: OutputKey, Keys: []string{"KEY_ENTER"}}},
+			{Input: "midi:cc:1", Output: OutputAction{Type: OutputOSC, Address: "/volume", Host: "localhost", Port: 7000}},
+		},
+	}
+	keys := extractMappingKeys(p)
+	if len(keys) != 2 {
+		t.Fatalf("expected 2 keys, got %d", len(keys))
+	}
+	if v := keys["BTN_SOUTH"]; !strings.Contains(v, "KEY_ENTER") {
+		t.Errorf("BTN_SOUTH = %q, want to contain KEY_ENTER", v)
+	}
+	if v := keys["midi:cc:1"]; !strings.Contains(v, "osc") {
+		t.Errorf("midi:cc:1 = %q, want to contain osc", v)
+	}
+}
+
+func TestDescribeOutput(t *testing.T) {
+	tests := []struct {
+		output OutputAction
+		want   string
+	}{
+		{OutputAction{Type: OutputKey, Keys: []string{"KEY_A", "KEY_B"}}, "KEY_A+KEY_B"},
+		{OutputAction{Type: OutputCommand, Exec: []string{"echo", "hello"}}, "echo hello"},
+		{OutputAction{Type: OutputMovement, Target: "CURSOR_UP"}, "CURSOR_UP"},
+	}
+	for _, tt := range tests {
+		got := describeOutput(tt.output)
+		if got != tt.want {
+			t.Errorf("describeOutput(%v) = %q, want %q", tt.output.Type, got, tt.want)
+		}
 	}
 }

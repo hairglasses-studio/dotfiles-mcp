@@ -130,6 +130,62 @@ type MappingGenerateOutput struct {
 	MappingCount int    `json:"mapping_count"`
 }
 
+// ── Export ──
+
+type MappingExportInput struct {
+	Name     string `json:"name" jsonschema:"required,description=Profile name to export"`
+	Sanitize bool   `json:"sanitize,omitempty" jsonschema:"description=Strip local paths and user-specific data (default false)"`
+}
+
+type MappingExportOutput struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	Format  string `json:"format"`
+	Size    int    `json:"size_bytes"`
+}
+
+// ── Import ──
+
+type MappingImportInput struct {
+	Content string `json:"content" jsonschema:"required,description=TOML content to import"`
+	Name    string `json:"name,omitempty" jsonschema:"description=Override profile name (default: derived from content)"`
+	Force   bool   `json:"force,omitempty" jsonschema:"description=Overwrite existing profile (default false)"`
+	DryRun  bool   `json:"dry_run,omitempty" jsonschema:"description=Validate without writing (default false)"`
+}
+
+type MappingImportOutput struct {
+	Valid   bool              `json:"valid"`
+	Written string            `json:"written,omitempty"`
+	Name    string            `json:"name"`
+	Format  string            `json:"format"`
+	Issues  []ValidationIssue `json:"issues,omitempty"`
+	DryRun  bool              `json:"dry_run"`
+	Exists  bool              `json:"exists,omitempty"`
+}
+
+// ── Diff ──
+
+type MappingDiffInput struct {
+	Name1 string `json:"name1" jsonschema:"required,description=First profile name"`
+	Name2 string `json:"name2" jsonschema:"required,description=Second profile name"`
+}
+
+type MappingDiffEntry struct {
+	Input  string `json:"input"`
+	Status string `json:"status"` // "added", "removed", "changed", "unchanged"
+	Left   string `json:"left,omitempty"`
+	Right  string `json:"right,omitempty"`
+}
+
+type MappingDiffOutput struct {
+	Name1   string             `json:"name1"`
+	Name2   string             `json:"name2"`
+	Added   int                `json:"added"`
+	Removed int                `json:"removed"`
+	Changed int                `json:"changed"`
+	Entries []MappingDiffEntry `json:"entries"`
+}
+
 // ===========================================================================
 // Module
 // ===========================================================================
@@ -519,6 +575,186 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 				return MappingGenerateOutput{}, fmt.Errorf("[%s] unknown template: %q", handler.ErrInvalidParam, input.Template)
 			},
 		),
+
+		// ── mapping_export ──
+		handler.TypedHandler[MappingExportInput, MappingExportOutput](
+			"mapping_export",
+			"Export a mapping profile for sharing. Optionally sanitize to strip local paths.",
+			func(_ context.Context, input MappingExportInput) (MappingExportOutput, error) {
+				if input.Name == "" {
+					return MappingExportOutput{}, fmt.Errorf("[%s] name is required", handler.ErrInvalidParam)
+				}
+				path := resolveMappingPath(input.Name)
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return MappingExportOutput{}, fmt.Errorf("[%s] profile %q not found: %w", handler.ErrNotFound, input.Name, err)
+				}
+
+				content := string(data)
+				if input.Sanitize {
+					content = sanitizeProfile(content)
+				}
+
+				format := "legacy"
+				if strings.Contains(content, "[profile]") {
+					format = "unified"
+				}
+
+				return MappingExportOutput{
+					Name:    input.Name,
+					Content: content,
+					Format:  format,
+					Size:    len(content),
+				}, nil
+			},
+		),
+
+		// ── mapping_import ──
+		handler.TypedHandler[MappingImportInput, MappingImportOutput](
+			"mapping_import",
+			"Import a mapping profile from TOML content. Validates before writing. Dry-run mode available.",
+			func(_ context.Context, input MappingImportInput) (MappingImportOutput, error) {
+				if input.Content == "" {
+					return MappingImportOutput{}, fmt.Errorf("[%s] content is required", handler.ErrInvalidParam)
+				}
+
+				// Parse and validate.
+				p, err := ParseMappingProfile(input.Content, "import.toml")
+				if err != nil {
+					return MappingImportOutput{
+						Valid: false,
+						Issues: []ValidationIssue{{
+							Severity: "error",
+							Field:    "content",
+							Message:  err.Error(),
+						}},
+					}, nil
+				}
+
+				issues := ValidateProfile(p)
+				hasErrors := false
+				for _, issue := range issues {
+					if issue.Severity == "error" {
+						hasErrors = true
+						break
+					}
+				}
+
+				// Determine name.
+				name := input.Name
+				if name == "" {
+					name = p.DeviceName()
+				}
+				if name == "" {
+					name = "imported-profile"
+				}
+
+				format := "legacy"
+				if p.IsUnifiedFormat() {
+					format = "unified"
+				}
+
+				result := MappingImportOutput{
+					Valid:  !hasErrors,
+					Name:   name,
+					Format: format,
+					Issues: issues,
+					DryRun: input.DryRun,
+				}
+
+				if hasErrors {
+					return result, nil
+				}
+
+				// Check if profile already exists.
+				path := resolveMappingPath(name)
+				if _, err := os.Stat(path); err == nil {
+					result.Exists = true
+					if !input.Force && !input.DryRun {
+						result.Issues = append(result.Issues, ValidationIssue{
+							Severity: "warning",
+							Field:    "name",
+							Message:  fmt.Sprintf("Profile %q already exists. Use force=true to overwrite.", name),
+						})
+						return result, nil
+					}
+				}
+
+				if input.DryRun {
+					return result, nil
+				}
+
+				// Write the profile.
+				if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+					return result, fmt.Errorf("create directory: %w", err)
+				}
+				if err := os.WriteFile(path, []byte(input.Content), 0644); err != nil {
+					return result, fmt.Errorf("write profile: %w", err)
+				}
+				result.Written = path
+
+				return result, nil
+			},
+		),
+
+		// ── mapping_diff ──
+		handler.TypedHandler[MappingDiffInput, MappingDiffOutput](
+			"mapping_diff",
+			"Compare two mapping profiles and show differences in their bindings.",
+			func(_ context.Context, input MappingDiffInput) (MappingDiffOutput, error) {
+				if input.Name1 == "" || input.Name2 == "" {
+					return MappingDiffOutput{}, fmt.Errorf("[%s] name1 and name2 are required", handler.ErrInvalidParam)
+				}
+
+				p1, err := LoadMappingProfile(resolveMappingPath(input.Name1))
+				if err != nil {
+					return MappingDiffOutput{}, fmt.Errorf("[%s] profile %q: %w", handler.ErrNotFound, input.Name1, err)
+				}
+				p2, err := LoadMappingProfile(resolveMappingPath(input.Name2))
+				if err != nil {
+					return MappingDiffOutput{}, fmt.Errorf("[%s] profile %q: %w", handler.ErrNotFound, input.Name2, err)
+				}
+
+				// Extract mapping keys from both profiles.
+				left := extractMappingKeys(p1)
+				right := extractMappingKeys(p2)
+
+				var entries []MappingDiffEntry
+				added, removed, changed := 0, 0, 0
+
+				// Find items in left.
+				for key, lval := range left {
+					if rval, ok := right[key]; ok {
+						if lval == rval {
+							entries = append(entries, MappingDiffEntry{Input: key, Status: "unchanged"})
+						} else {
+							entries = append(entries, MappingDiffEntry{Input: key, Status: "changed", Left: lval, Right: rval})
+							changed++
+						}
+					} else {
+						entries = append(entries, MappingDiffEntry{Input: key, Status: "removed", Left: lval})
+						removed++
+					}
+				}
+
+				// Find items only in right.
+				for key, rval := range right {
+					if _, ok := left[key]; !ok {
+						entries = append(entries, MappingDiffEntry{Input: key, Status: "added", Right: rval})
+						added++
+					}
+				}
+
+				return MappingDiffOutput{
+					Name1:   input.Name1,
+					Name2:   input.Name2,
+					Added:   added,
+					Removed: removed,
+					Changed: changed,
+					Entries: entries,
+				}, nil
+			},
+		),
 	}
 }
 
@@ -565,4 +801,57 @@ func countTOMLMappings(content string) int {
 		}
 	}
 	return count
+}
+
+// sanitizeProfile removes local file paths and user-specific data from a profile.
+func sanitizeProfile(content string) string {
+	lines := strings.Split(content, "\n")
+	var sanitized []string
+	for _, line := range lines {
+		// Remove lines containing absolute paths.
+		if strings.Contains(line, "/home/") || strings.Contains(line, "/Users/") {
+			// Replace absolute paths with relative placeholders.
+			line = strings.ReplaceAll(line, homeDir(), "~")
+		}
+		sanitized = append(sanitized, line)
+	}
+	return strings.Join(sanitized, "\n")
+}
+
+// extractMappingKeys returns a map of input->output description for diffing.
+func extractMappingKeys(p *MappingProfile) map[string]string {
+	keys := make(map[string]string)
+
+	if p.IsUnifiedFormat() {
+		for _, m := range p.Mappings {
+			keys[m.Input] = fmt.Sprintf("%s:%v", m.Output.Type, describeOutput(m.Output))
+		}
+	} else {
+		for input, outputs := range p.Remap {
+			keys[input] = fmt.Sprintf("key:%s", strings.Join(outputs, "+"))
+		}
+		for input, cmds := range p.Commands {
+			keys[input] = fmt.Sprintf("cmd:%s", strings.Join(cmds, " && "))
+		}
+		for input, target := range p.Movements {
+			keys[input] = fmt.Sprintf("move:%s", target)
+		}
+	}
+
+	return keys
+}
+
+func describeOutput(o OutputAction) string {
+	switch o.Type {
+	case OutputKey:
+		return strings.Join(o.Keys, "+")
+	case OutputCommand:
+		return strings.Join(o.Exec, " ")
+	case OutputMovement:
+		return o.Target
+	case OutputOSC:
+		return fmt.Sprintf("%s:%d%s", o.Host, o.Port, o.Address)
+	default:
+		return string(o.Type)
+	}
 }
