@@ -29,6 +29,8 @@ github.com/hairglasses-studio/mapping v0.1.1-0.20260405143738-f2666d440fbd h1:X0
 github.com/hairglasses-studio/mapping v0.1.1-0.20260405143738-f2666d440fbd/go.mod h1:ssLCNQusnJGoI4oC45TkADS+FmR8FJexgX7o0Kz3VEQ=
 github.com/hairglasses-studio/mcpkit v0.3.0 h1:jeMehv75Fc/sjno8ny6V7ciDzEbXRrOWg0B2O/JF2aE=
 github.com/hairglasses-studio/mcpkit v0.3.0/go.mod h1:EAV+7RY169dtQzVGwK+WWVPiU7VyuEmEXOnye7V8qM8=
+github.com/hairglasses-studio/mcpkit v0.4.1 h1:gBH6mxKxmMf/pAfenUFRpz/tBNmLBGos+3Ugca882B8=
+github.com/hairglasses-studio/mcpkit v0.4.1/go.mod h1:HmLyg7xKc1/Hdfu6yF06+A/TvqSgg38aAWGKWXCtfjc=
 github.com/hairglasses-studio/prompt-improver v0.1.0 h1:4mqjWEdilWCtq/3EMK8y5k56GaB6rhHUOJHPoiWx0lM=
 github.com/hairglasses-studio/prompt-improver v0.1.0/go.mod h1:dsgax7UWshVyNMGGUbGYYxMQk/hYIV4RA3da3wAX21c=
 github.com/invopop/jsonschema v0.13.0 h1:KvpoAJWEjR3uD9Kbm2HWJmqsEaHt8lBUpd0qHcIi21E=
