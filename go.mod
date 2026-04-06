@@ -9,6 +9,8 @@ require (
 	github.com/mark3labs/mcp-go v0.46.0
 )
 
+// mapping is a local-only module (not published). Remove this replace
+// directive after publishing mapping to GitHub.
 replace github.com/hairglasses-studio/mapping => ../mapping
 
 require (
