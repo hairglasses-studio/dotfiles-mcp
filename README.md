@@ -1,3 +1,5 @@
+> **Consolidated** — This repo has been merged into [hairglasses-studio/dotfiles](https://github.com/hairglasses-studio/dotfiles) at `mcp/dotfiles-mcp/`. The dotfiles version has 99 tools (vs 82 here) and is actively maintained. For new development, use the consolidated version.
+
 # dotfiles-mcp
 
 [![CI](https://github.com/hairglasses-studio/dotfiles-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/hairglasses-studio/dotfiles-mcp/actions/workflows/ci.yml)
