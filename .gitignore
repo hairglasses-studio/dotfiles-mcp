@@ -10,3 +10,7 @@ dotfiles-mcp
 .env.*
 !.env.example
 !.env.*.example
+
+# AI tool configs (local-only)
+.codex/
+.gemini/
