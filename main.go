@@ -12,8 +12,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +24,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/hairglasses-studio/dotfiles-mcp/internal/tracing"
+	"github.com/hairglasses-studio/mcpkit/a2a"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 	"github.com/hairglasses-studio/mcpkit/resilience"
@@ -2940,10 +2943,8 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 // ---------------------------------------------------------------------------
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})).With("service", "dotfiles-mcp"))
-
+	a2aPort := flag.Int("a2a-port", 0, "Port to expose the A2A server")
+	
 	// Handle --session-index: output session index as JSONL for ccg.
 	if len(os.Args) > 1 && os.Args[1] == "--session-index" {
 		if err := outputSessionIndex(); err != nil {
@@ -2952,6 +2953,12 @@ func main() {
 		}
 		return
 	}
+	
+	flag.Parse()
+
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})).With("service", "dotfiles-mcp"))
 
 	// Initialize OpenTelemetry tracing (no-op unless OTEL_ENABLED=true).
 	ctx := context.Background()
@@ -2978,8 +2985,19 @@ func main() {
 	resReg.RegisterWithServer(s)
 	promptReg.RegisterWithServer(s)
 
-	if err := registry.ServeAuto(s); err != nil {
-		slog.Error("server stopped", "error", err)
-		os.Exit(1)
+	if *a2aPort > 0 {
+		card := a2a.AgentCardFromRegistry(reg)
+		a2aServer := a2a.NewServer(reg, card)
+		addr := fmt.Sprintf(":%d", *a2aPort)
+		slog.Info("starting a2a server", "addr", addr)
+		if err := http.ListenAndServe(addr, a2aServer.Handler()); err != nil {
+			slog.Error("a2a server failed", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		if err := registry.ServeAuto(s); err != nil {
+			slog.Error("server stopped", "error", err)
+			os.Exit(1)
+		}
 	}
 }
