@@ -37,7 +37,7 @@ type DaemonControlOutput struct {
 
 type MappingDaemonModule struct{}
 
-func (m *MappingDaemonModule) Name() string        { return "mapping_daemon" }
+func (m *MappingDaemonModule) Name() string { return "mapping_daemon" }
 func (m *MappingDaemonModule) Description() string {
 	return "Control the live mapitall daemon via IPC"
 }

@@ -124,8 +124,10 @@ type ScreenScreenshotAnnotatedInput struct {
 
 type ScreenModule struct{}
 
-func (m *ScreenModule) Name() string        { return "screen" }
-func (m *ScreenModule) Description() string { return "Screen capture, recording, OCR, and color-pick tools" }
+func (m *ScreenModule) Name() string { return "screen" }
+func (m *ScreenModule) Description() string {
+	return "Screen capture, recording, OCR, and color-pick tools"
+}
 
 func (m *ScreenModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{

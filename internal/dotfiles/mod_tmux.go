@@ -252,8 +252,10 @@ type tmuxWorkspaceOutput struct {
 // TmuxModule provides tmux session, window, and pane management tools.
 type TmuxModule struct{}
 
-func (m *TmuxModule) Name() string        { return "tmux" }
-func (m *TmuxModule) Description() string { return "tmux session management: sessions, windows, panes, capture, send-keys" }
+func (m *TmuxModule) Name() string { return "tmux" }
+func (m *TmuxModule) Description() string {
+	return "tmux session management: sessions, windows, panes, capture, send-keys"
+}
 
 func (m *TmuxModule) Tools() []registry.ToolDefinition {
 	// ---------------------------------------------------------------

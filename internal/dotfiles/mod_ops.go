@@ -49,14 +49,14 @@ type OpsSession struct {
 }
 
 type IterationRecord struct {
-	Number      int   `json:"number"`
-	StartedAt   int64 `json:"started_at"`
-	DurationMs  int64 `json:"duration_ms"`
+	Number      int    `json:"number"`
+	StartedAt   int64  `json:"started_at"`
+	DurationMs  int64  `json:"duration_ms"`
 	Status      string `json:"status"`
-	ErrorCount  int   `json:"error_count"`
-	BuildOK     bool  `json:"build_ok"`
-	TestsPassed int   `json:"tests_passed"`
-	TestsFailed int   `json:"tests_failed"`
+	ErrorCount  int    `json:"error_count"`
+	BuildOK     bool   `json:"build_ok"`
+	TestsPassed int    `json:"tests_passed"`
+	TestsFailed int    `json:"tests_failed"`
 }
 
 type IterationSummary struct {
@@ -225,6 +225,7 @@ func opsHasNPMScript(repoPath, script string) bool {
 	_, ok := pkg.Scripts[script]
 	return ok
 }
+
 var conventionalRe = regexp.MustCompile(`^(feat|fix|chore|docs|refactor|test|ci|perf|build)(\(.+\))?: .+`)
 
 func opsResolveRepo(repo string) (string, error) {
@@ -595,20 +596,20 @@ type OpsAnalyzeInput struct {
 	TestFailures []TestFailure  `json:"test_failures,omitempty" jsonschema:"description=Test failures from ops_test_smart"`
 }
 type OpsAnalyzeOutput struct {
-	Summary        string           `json:"summary"`
-	TotalIssues    int              `json:"total_issues"`
-	Categories     map[string]int   `json:"categories"`
-	Issues         []AnalyzedIssue  `json:"issues"`
-	AffectedFiles  []string         `json:"affected_files"`
-	SuggestedOrder []string         `json:"suggested_fix_order"`
+	Summary        string          `json:"summary"`
+	TotalIssues    int             `json:"total_issues"`
+	Categories     map[string]int  `json:"categories"`
+	Issues         []AnalyzedIssue `json:"issues"`
+	AffectedFiles  []string        `json:"affected_files"`
+	SuggestedOrder []string        `json:"suggested_fix_order"`
 }
 
 type OpsBranchInput struct {
-	Repo   string `json:"repo,omitempty" jsonschema:"description=Absolute repo path. Defaults to cwd."`
-	Name   string `json:"name" jsonschema:"required,description=Branch name (auto-prefixed with type/ if no slash)"`
-	Type   string `json:"type,omitempty" jsonschema:"description=Branch type prefix,enum=feat,enum=fix,enum=chore,enum=docs,enum=refactor"`
-	From   string `json:"from,omitempty" jsonschema:"description=Base ref. Default: main."`
-	Execute bool `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+	Repo    string `json:"repo,omitempty" jsonschema:"description=Absolute repo path. Defaults to cwd."`
+	Name    string `json:"name" jsonschema:"required,description=Branch name (auto-prefixed with type/ if no slash)"`
+	Type    string `json:"type,omitempty" jsonschema:"description=Branch type prefix,enum=feat,enum=fix,enum=chore,enum=docs,enum=refactor"`
+	From    string `json:"from,omitempty" jsonschema:"description=Base ref. Default: main."`
+	Execute bool   `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
 }
 type OpsBranchOutput struct {
 	Branch     string `json:"branch"`
@@ -621,7 +622,7 @@ type OpsCommitInput struct {
 	Repo    string   `json:"repo,omitempty" jsonschema:"description=Absolute repo path. Defaults to cwd."`
 	Message string   `json:"message" jsonschema:"required,description=Commit message (conventional: feat: fix: chore: etc.)"`
 	Files   []string `json:"files,omitempty" jsonschema:"description=Specific files to stage. Default: all modified tracked files."`
-	Execute bool `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+	Execute bool     `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
 }
 type OpsCommitOutput struct {
 	SHA         string   `json:"sha,omitempty"`
@@ -634,12 +635,12 @@ type OpsCommitOutput struct {
 }
 
 type OpsPRCreateInput struct {
-	Repo   string `json:"repo,omitempty" jsonschema:"description=Absolute repo path. Defaults to cwd."`
-	Title  string `json:"title" jsonschema:"required,description=PR title (under 70 chars)"`
-	Body   string `json:"body,omitempty" jsonschema:"description=PR body markdown"`
-	Base   string `json:"base,omitempty" jsonschema:"description=Base branch. Default: main."`
-	Draft  bool   `json:"draft,omitempty" jsonschema:"description=Create as draft PR"`
-	Execute bool `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+	Repo    string `json:"repo,omitempty" jsonschema:"description=Absolute repo path. Defaults to cwd."`
+	Title   string `json:"title" jsonschema:"required,description=PR title (under 70 chars)"`
+	Body    string `json:"body,omitempty" jsonschema:"description=PR body markdown"`
+	Base    string `json:"base,omitempty" jsonschema:"description=Base branch. Default: main."`
+	Draft   bool   `json:"draft,omitempty" jsonschema:"description=Create as draft PR"`
+	Execute bool   `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
 }
 type OpsPRCreateOutput struct {
 	URL     string `json:"url,omitempty"`
@@ -710,7 +711,7 @@ type OpsShipInput struct {
 	Title   string `json:"title,omitempty" jsonschema:"description=PR title. Defaults to commit message."`
 	Body    string `json:"body,omitempty" jsonschema:"description=PR body markdown."`
 	Draft   bool   `json:"draft,omitempty" jsonschema:"description=Create PR as draft."`
-	Execute bool `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
+	Execute bool   `json:"execute,omitempty" jsonschema:"description=Set true to execute (default: dry-run)"`
 }
 type OpsShipOutput struct {
 	DryRun    bool               `json:"dry_run"`
@@ -737,15 +738,15 @@ type OpsSessionStatusInput struct {
 	SessionID string `json:"session_id" jsonschema:"required,description=Ops session ID"`
 }
 type OpsSessionStatusOutput struct {
-	SessionID   string             `json:"session_id"`
-	Repo        string             `json:"repo"`
-	Branch      string             `json:"branch"`
-	Iterations  int                `json:"iterations"`
-	TotalTimeMs int64              `json:"total_time_ms"`
-	CurrentState string            `json:"current_state"`
-	ErrorTrend  []int              `json:"error_trend"`
-	Converging  bool               `json:"converging"`
-	History     []IterationSummary `json:"history"`
+	SessionID    string             `json:"session_id"`
+	Repo         string             `json:"repo"`
+	Branch       string             `json:"branch"`
+	Iterations   int                `json:"iterations"`
+	TotalTimeMs  int64              `json:"total_time_ms"`
+	CurrentState string             `json:"current_state"`
+	ErrorTrend   []int              `json:"error_trend"`
+	Converging   bool               `json:"converging"`
+	History      []IterationSummary `json:"history"`
 }
 
 type OpsRevertInput struct {
@@ -808,22 +809,22 @@ type OpsRepoAnalyzeInput struct {
 	Repo string `json:"repo,omitempty" jsonschema:"description=Absolute repo path. Defaults to cwd."`
 }
 type OpsRepoAnalyzeOutput struct {
-	Repo            string            `json:"repo"`
-	Name            string            `json:"name"`
-	Language        string            `json:"language"`
-	Languages       []string          `json:"languages"`
-	IsMCP           bool              `json:"is_mcp"`
-	Protocols       []string          `json:"protocols"`
-	Frameworks      []string          `json:"frameworks"`
-	KeyDeps         []string          `json:"key_dependencies"`
-	GoModules       int               `json:"go_modules,omitempty"`
-	TestCount       int               `json:"test_count"`
-	HasCI           bool              `json:"has_ci"`
-	HasCLAUDEMD     bool              `json:"has_claude_md"`
-	HasReadme       bool              `json:"has_readme"`
-	HasLicense      bool              `json:"has_license"`
-	Tags            []string          `json:"tags"`
-	AnalysisTimeMs  int64             `json:"analysis_time_ms"`
+	Repo           string   `json:"repo"`
+	Name           string   `json:"name"`
+	Language       string   `json:"language"`
+	Languages      []string `json:"languages"`
+	IsMCP          bool     `json:"is_mcp"`
+	Protocols      []string `json:"protocols"`
+	Frameworks     []string `json:"frameworks"`
+	KeyDeps        []string `json:"key_dependencies"`
+	GoModules      int      `json:"go_modules,omitempty"`
+	TestCount      int      `json:"test_count"`
+	HasCI          bool     `json:"has_ci"`
+	HasCLAUDEMD    bool     `json:"has_claude_md"`
+	HasReadme      bool     `json:"has_readme"`
+	HasLicense     bool     `json:"has_license"`
+	Tags           []string `json:"tags"`
+	AnalysisTimeMs int64    `json:"analysis_time_ms"`
 }
 
 type OpsDepGraphInput struct {
@@ -832,10 +833,10 @@ type OpsDepGraphInput struct {
 	Format string `json:"format,omitempty" jsonschema:"description=Output format: mermaid or dot,enum=mermaid,enum=dot"`
 }
 type OpsDepGraphOutput struct {
-	Graph       string `json:"graph"`
-	Format      string `json:"format"`
-	ModuleCount int    `json:"module_count"`
-	EdgeCount   int    `json:"edge_count"`
+	Graph       string   `json:"graph"`
+	Format      string   `json:"format"`
+	ModuleCount int      `json:"module_count"`
+	EdgeCount   int      `json:"edge_count"`
 	OrgModules  []string `json:"org_modules,omitempty"`
 }
 
@@ -3020,26 +3021,26 @@ func opsChangelogGenerate(_ context.Context, input OpsChangelogGenerateInput) (O
 
 // Protocol detection maps
 var protocolImports = map[string]string{
-	"google.golang.org/grpc":           "gRPC",
-	"github.com/gorilla/websocket":     "WebSocket",
-	"nhooyr.io/websocket":              "WebSocket",
-	"github.com/mark3labs/mcp-go":      "MCP",
-	"github.com/modelcontextprotocol":  "MCP",
-	"github.com/gin-gonic/gin":         "REST",
-	"github.com/labstack/echo":         "REST",
-	"github.com/gofiber/fiber":         "REST",
-	"net/http":                         "HTTP",
+	"google.golang.org/grpc":          "gRPC",
+	"github.com/gorilla/websocket":    "WebSocket",
+	"nhooyr.io/websocket":             "WebSocket",
+	"github.com/mark3labs/mcp-go":     "MCP",
+	"github.com/modelcontextprotocol": "MCP",
+	"github.com/gin-gonic/gin":        "REST",
+	"github.com/labstack/echo":        "REST",
+	"github.com/gofiber/fiber":        "REST",
+	"net/http":                        "HTTP",
 }
 
 var frameworkPatterns = map[string][]string{
-	"LLM":       {"anthropic", "openai", "claude", "gemini"},
-	"Database":  {"postgres", "sqlite", "mysql", "mongodb", "gorm", "sqlx", "pgx"},
-	"Cache":     {"redis", "memcached", "ristretto"},
-	"Messaging": {"kafka", "rabbitmq", "nats", "mqtt"},
-	"CLI":       {"cobra", "urfave/cli", "kingpin"},
-	"TUI":       {"bubbletea", "lipgloss", "charm"},
+	"LLM":           {"anthropic", "openai", "claude", "gemini"},
+	"Database":      {"postgres", "sqlite", "mysql", "mongodb", "gorm", "sqlx", "pgx"},
+	"Cache":         {"redis", "memcached", "ristretto"},
+	"Messaging":     {"kafka", "rabbitmq", "nats", "mqtt"},
+	"CLI":           {"cobra", "urfave/cli", "kingpin"},
+	"TUI":           {"bubbletea", "lipgloss", "charm"},
 	"Observability": {"opentelemetry", "prometheus", "jaeger", "zap", "slog"},
-	"Testing":   {"testify", "gomock", "ginkgo"},
+	"Testing":       {"testify", "gomock", "ginkgo"},
 }
 
 func opsRepoAnalyze(_ context.Context, input OpsRepoAnalyzeInput) (OpsRepoAnalyzeOutput, error) {
@@ -4248,6 +4249,6 @@ func opsIterationPatterns(_ context.Context, input OpsIterationPatternsInput) (O
 		TotalSessions: totalSessions, TotalIterations: totalIterations,
 		AvgIterations:   math.Round(avgIter*10) / 10,
 		ConvergenceRate: math.Round(convergenceRate*10) / 10,
-		CommonErrors: errorCounts, HotFiles: hotFiles, Recommendations: recs,
+		CommonErrors:    errorCounts, HotFiles: hotFiles, Recommendations: recs,
 	}, nil
 }

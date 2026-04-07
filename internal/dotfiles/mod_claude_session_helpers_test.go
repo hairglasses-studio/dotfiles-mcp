@@ -353,7 +353,7 @@ func TestLoadSessionMemory_WithFiles(t *testing.T) {
 	memDir := filepath.Join(dir, "memory")
 	os.MkdirAll(memDir, 0755)
 
-	os.WriteFile(filepath.Join(memDir, "MEMORY.md"), []byte("# Memory"), 0644)     // should be excluded
+	os.WriteFile(filepath.Join(memDir, "MEMORY.md"), []byte("# Memory"), 0644) // should be excluded
 	os.WriteFile(filepath.Join(memDir, "topic1.md"), []byte("Topic 1 content"), 0644)
 	os.WriteFile(filepath.Join(memDir, "topic2.md"), []byte("Topic 2 content"), 0644)
 	os.WriteFile(filepath.Join(memDir, "notes.txt"), []byte("not markdown"), 0644) // should be excluded
@@ -590,4 +590,3 @@ func TestFindRecentPlanFile_NoJSONL(t *testing.T) {
 		t.Errorf("findRecentPlanFile() = %q, want empty for missing JSONL", got)
 	}
 }
-

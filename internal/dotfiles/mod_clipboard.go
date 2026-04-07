@@ -46,8 +46,10 @@ func clipRunCmd(name string, args ...string) (string, error) {
 // ClipboardModule provides Wayland clipboard tools via wl-copy/wl-paste.
 type ClipboardModule struct{}
 
-func (m *ClipboardModule) Name() string        { return "clipboard" }
-func (m *ClipboardModule) Description() string { return "Wayland clipboard read/write via wl-copy/wl-paste" }
+func (m *ClipboardModule) Name() string { return "clipboard" }
+func (m *ClipboardModule) Description() string {
+	return "Wayland clipboard read/write via wl-copy/wl-paste"
+}
 
 func (m *ClipboardModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{

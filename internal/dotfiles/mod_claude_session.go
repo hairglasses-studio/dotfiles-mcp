@@ -507,21 +507,21 @@ type RepoStatusInput struct {
 }
 
 type RepoStatusOutput struct {
-	RepoPath         string   `json:"repo_path"`
-	RepoName         string   `json:"repo_name"`
-	Branch           string   `json:"branch"`
-	LastCommitHash   string   `json:"last_commit_hash"`
-	LastCommitMsg    string   `json:"last_commit_message"`
-	LastCommitTime   string   `json:"last_commit_time"`
-	RemoteTracking   string   `json:"remote_tracking,omitempty"`
-	Staged           []string `json:"staged,omitempty"`
-	Unstaged         []string `json:"unstaged,omitempty"`
-	Untracked        []string `json:"untracked,omitempty"`
-	StagedCount      int      `json:"staged_count"`
-	UnstagedCount    int      `json:"unstaged_count"`
-	UntrackedCount   int      `json:"untracked_count"`
-	HasUncommitted   bool     `json:"has_uncommitted"`
-	IsGitRepo        bool     `json:"is_git_repo"`
+	RepoPath       string   `json:"repo_path"`
+	RepoName       string   `json:"repo_name"`
+	Branch         string   `json:"branch"`
+	LastCommitHash string   `json:"last_commit_hash"`
+	LastCommitMsg  string   `json:"last_commit_message"`
+	LastCommitTime string   `json:"last_commit_time"`
+	RemoteTracking string   `json:"remote_tracking,omitempty"`
+	Staged         []string `json:"staged,omitempty"`
+	Unstaged       []string `json:"unstaged,omitempty"`
+	Untracked      []string `json:"untracked,omitempty"`
+	StagedCount    int      `json:"staged_count"`
+	UnstagedCount  int      `json:"unstaged_count"`
+	UntrackedCount int      `json:"untracked_count"`
+	HasUncommitted bool     `json:"has_uncommitted"`
+	IsGitRepo      bool     `json:"is_git_repo"`
 }
 
 // ── claude_repo_diff ──
@@ -531,13 +531,13 @@ type RepoDiffInput struct {
 }
 
 type RepoDiffOutput struct {
-	RepoPath          string           `json:"repo_path"`
-	RepoName          string           `json:"repo_name"`
-	UnpushedCommits   []CommitSummary  `json:"unpushed_commits,omitempty"`
-	UnpushedCount     int              `json:"unpushed_count"`
-	LocalOnlyBranches []string         `json:"local_only_branches,omitempty"`
-	StashEntries      []string         `json:"stash_entries,omitempty"`
-	IsGitRepo         bool             `json:"is_git_repo"`
+	RepoPath          string          `json:"repo_path"`
+	RepoName          string          `json:"repo_name"`
+	UnpushedCommits   []CommitSummary `json:"unpushed_commits,omitempty"`
+	UnpushedCount     int             `json:"unpushed_count"`
+	LocalOnlyBranches []string        `json:"local_only_branches,omitempty"`
+	StashEntries      []string        `json:"stash_entries,omitempty"`
+	IsGitRepo         bool            `json:"is_git_repo"`
 }
 
 type CommitSummary struct {
@@ -553,16 +553,16 @@ type RecoveryReportInput struct {
 }
 
 type RecoveryReport struct {
-	GeneratedAt     string                  `json:"generated_at"`
-	CrashDetected   bool                    `json:"crash_detected"`
-	Severity        string                  `json:"severity"`
-	Sessions        []RecoverySessionEntry  `json:"sessions"`
-	Repos           []RecoveryRepoEntry     `json:"repos,omitempty"`
-	OrphanedRepos   []RecoveryOrphanEntry   `json:"orphaned_repos,omitempty"`
-	PriorityQueue   []RecoveryPriorityEntry `json:"priority_queue,omitempty"`
-	AliveCount      int                     `json:"alive_count"`
-	DeadCount       int                     `json:"dead_count"`
-	TotalSessions   int                     `json:"total_sessions"`
+	GeneratedAt   string                  `json:"generated_at"`
+	CrashDetected bool                    `json:"crash_detected"`
+	Severity      string                  `json:"severity"`
+	Sessions      []RecoverySessionEntry  `json:"sessions"`
+	Repos         []RecoveryRepoEntry     `json:"repos,omitempty"`
+	OrphanedRepos []RecoveryOrphanEntry   `json:"orphaned_repos,omitempty"`
+	PriorityQueue []RecoveryPriorityEntry `json:"priority_queue,omitempty"`
+	AliveCount    int                     `json:"alive_count"`
+	DeadCount     int                     `json:"dead_count"`
+	TotalSessions int                     `json:"total_sessions"`
 }
 
 type RecoverySessionEntry struct {
@@ -589,12 +589,12 @@ type RecoveryRepoEntry struct {
 }
 
 type RecoveryOrphanEntry struct {
-	RepoPath      string `json:"repo_path"`
-	RepoName      string `json:"repo_name"`
-	Branch        string `json:"branch"`
-	StagedCount   int    `json:"staged_count"`
-	UnstagedCount int    `json:"unstaged_count"`
-	UntrackedCount int   `json:"untracked_count"`
+	RepoPath       string `json:"repo_path"`
+	RepoName       string `json:"repo_name"`
+	Branch         string `json:"branch"`
+	StagedCount    int    `json:"staged_count"`
+	UnstagedCount  int    `json:"unstaged_count"`
+	UntrackedCount int    `json:"untracked_count"`
 }
 
 type RecoveryPriorityEntry struct {
@@ -635,22 +635,22 @@ type SessionCompareInput struct {
 }
 
 type SessionCompareOutput struct {
-	SessionID1 string            `json:"session_id_1"`
-	SessionID2 string            `json:"session_id_2"`
-	Repo       string            `json:"repo"`
-	SameRepo   bool              `json:"same_repo"`
+	SessionID1 string             `json:"session_id_1"`
+	SessionID2 string             `json:"session_id_2"`
+	Repo       string             `json:"repo"`
+	SameRepo   bool               `json:"same_repo"`
 	Diff       SessionCompareDiff `json:"diff"`
 }
 
 type SessionCompareDiff struct {
-	Session1Tasks      int    `json:"session1_tasks"`
-	Session1Completed  int    `json:"session1_completed"`
-	Session1Status     string `json:"session1_status"`
-	Session2Tasks      int    `json:"session2_tasks"`
-	Session2Completed  int    `json:"session2_completed"`
-	Session2Status     string `json:"session2_status"`
-	TaskCompletionDelta int   `json:"task_completion_delta"`
-	TimeBetween        string `json:"time_between,omitempty"`
+	Session1Tasks       int    `json:"session1_tasks"`
+	Session1Completed   int    `json:"session1_completed"`
+	Session1Status      string `json:"session1_status"`
+	Session2Tasks       int    `json:"session2_tasks"`
+	Session2Completed   int    `json:"session2_completed"`
+	Session2Status      string `json:"session2_status"`
+	TaskCompletionDelta int    `json:"task_completion_delta"`
+	TimeBetween         string `json:"time_between,omitempty"`
 }
 
 // ── claude_session_replay ──
@@ -1432,8 +1432,10 @@ func searchSessions(query string, repoFilter string, windowDur time.Duration, st
 
 type ClaudeSessionModule struct{}
 
-func (m *ClaudeSessionModule) Name() string        { return "claude_session" }
-func (m *ClaudeSessionModule) Description() string { return "Claude Code session discovery, crash detection, and recovery analysis" }
+func (m *ClaudeSessionModule) Name() string { return "claude_session" }
+func (m *ClaudeSessionModule) Description() string {
+	return "Claude Code session discovery, crash detection, and recovery analysis"
+}
 
 func (m *ClaudeSessionModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{

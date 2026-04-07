@@ -222,4 +222,3 @@ func TestMapitallSocketPath_Default(t *testing.T) {
 		t.Errorf("expected path ending in mapitall.sock, got %q", got)
 	}
 }
-

@@ -96,9 +96,9 @@ func TestMacRegex(t *testing.T) {
 	invalid := []string{
 		"",
 		"not-a-mac",
-		"D2:8E:C5:DE:9F",    // too short
+		"D2:8E:C5:DE:9F",       // too short
 		"D2:8E:C5:DE:9F:CB:00", // too long
-		"G2:8E:C5:DE:9F:CB", // invalid hex char
+		"G2:8E:C5:DE:9F:CB",    // invalid hex char
 	}
 
 	for _, mac := range valid {
@@ -115,8 +115,8 @@ func TestMacRegex(t *testing.T) {
 
 func TestDeviceRegex(t *testing.T) {
 	tests := []struct {
-		line    string
-		wantMAC string
+		line     string
+		wantMAC  string
 		wantName string
 	}{
 		{"Device D2:8E:C5:DE:9F:CB MX Master 4", "D2:8E:C5:DE:9F:CB", "MX Master 4"},

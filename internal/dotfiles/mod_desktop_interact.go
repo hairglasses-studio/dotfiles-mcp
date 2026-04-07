@@ -434,8 +434,10 @@ type DesktopWaitForTextInput struct {
 // DesktopInteractModule provides composed see-think-act desktop automation tools.
 type DesktopInteractModule struct{}
 
-func (m *DesktopInteractModule) Name() string        { return "desktop_interact" }
-func (m *DesktopInteractModule) Description() string { return "Composed see-think-act desktop automation workflows" }
+func (m *DesktopInteractModule) Name() string { return "desktop_interact" }
+func (m *DesktopInteractModule) Description() string {
+	return "Composed see-think-act desktop automation workflows"
+}
 
 func (m *DesktopInteractModule) Tools() []registry.ToolDefinition {
 	// ── desktop_screenshot_ocr ────────────────────────

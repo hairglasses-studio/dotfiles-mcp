@@ -81,11 +81,11 @@ type FanReading struct {
 
 // SystemTempsOutput is the structured response from system_temps.
 type SystemTempsOutput struct {
-	CPUTemp      float64       `json:"cpu_temp"`
-	GPUTemp      float64       `json:"gpu_temp"`
-	NVMeTemp     float64       `json:"nvme_temp"`
-	Fans         []FanReading  `json:"fans"`
-	NotAvailable string        `json:"not_available,omitempty"`
+	CPUTemp      float64      `json:"cpu_temp"`
+	GPUTemp      float64      `json:"gpu_temp"`
+	NVMeTemp     float64      `json:"nvme_temp"`
+	Fans         []FanReading `json:"fans"`
+	NotAvailable string       `json:"not_available,omitempty"`
 }
 
 // SystemGPUOutput is the structured response from system_gpu.
@@ -116,9 +116,9 @@ type SystemDiskOutput struct {
 
 // SystemUpdatesOutput is the structured response from system_updates.
 type SystemUpdatesOutput struct {
-	PacmanCount int    `json:"pacman_count"`
-	AURCount    int    `json:"aur_count"`
-	Total       int    `json:"total"`
+	PacmanCount  int    `json:"pacman_count"`
+	AURCount     int    `json:"aur_count"`
+	Total        int    `json:"total"`
 	NotAvailable string `json:"not_available,omitempty"`
 }
 
@@ -459,8 +459,10 @@ func systemUptime(_ context.Context, _ SystemUptimeInput) (SystemUptimeOutput, e
 // SystemModule provides system monitoring tools.
 type SystemModule struct{}
 
-func (m *SystemModule) Name() string        { return "system" }
-func (m *SystemModule) Description() string { return "System monitoring: temps, GPU, disk, memory, updates, uptime" }
+func (m *SystemModule) Name() string { return "system" }
+func (m *SystemModule) Description() string {
+	return "System monitoring: temps, GPU, disk, memory, updates, uptime"
+}
 
 func (m *SystemModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{

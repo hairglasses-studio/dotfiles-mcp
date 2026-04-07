@@ -88,8 +88,10 @@ type SimScreenshotClickInput struct {
 // All tools are marked IsWrite because they produce real input events.
 type InputSimulateModule struct{}
 
-func (m *InputSimulateModule) Name() string        { return "input_simulate" }
-func (m *InputSimulateModule) Description() string { return "Input simulation tools (keyboard, mouse, screen interaction)" }
+func (m *InputSimulateModule) Name() string { return "input_simulate" }
+func (m *InputSimulateModule) Description() string {
+	return "Input simulation tools (keyboard, mouse, screen interaction)"
+}
 
 func (m *InputSimulateModule) Tools() []registry.ToolDefinition {
 	// ── input_type_text ──────────────────────────────────

@@ -103,38 +103,38 @@ func TestHyprScreenshotWindow_NoSelector(t *testing.T) {
 
 func TestWindowRegion(t *testing.T) {
 	tests := []struct {
-		name                   string
-		x, y, w, h            int
-		scale                  float64
+		name                       string
+		x, y, w, h                 int
+		scale                      float64
 		wantX, wantY, wantW, wantH int
 	}{
 		{
-			name:  "scale 1x (no scaling)",
-			x:     100, y: 200, w: 800, h: 600,
+			name: "scale 1x (no scaling)",
+			x:    100, y: 200, w: 800, h: 600,
 			scale: 1.0,
 			wantX: 100, wantY: 200, wantW: 800, wantH: 600,
 		},
 		{
-			name:  "scale 2x",
-			x:     100, y: 200, w: 800, h: 600,
+			name: "scale 2x",
+			x:    100, y: 200, w: 800, h: 600,
 			scale: 2.0,
 			wantX: 200, wantY: 400, wantW: 1600, wantH: 1200,
 		},
 		{
-			name:  "scale 1.5x",
-			x:     100, y: 200, w: 800, h: 600,
+			name: "scale 1.5x",
+			x:    100, y: 200, w: 800, h: 600,
 			scale: 1.5,
 			wantX: 150, wantY: 300, wantW: 1200, wantH: 900,
 		},
 		{
-			name:  "fractional rounding",
-			x:     101, y: 203, w: 799, h: 601,
+			name: "fractional rounding",
+			x:    101, y: 203, w: 799, h: 601,
 			scale: 1.333333,
 			wantX: 135, wantY: 271, wantW: 1065, wantH: 801,
 		},
 		{
-			name:  "zero position",
-			x:     0, y: 0, w: 1920, h: 1080,
+			name: "zero position",
+			x:    0, y: 0, w: 1920, h: 1080,
 			scale: 2.0,
 			wantX: 0, wantY: 0, wantW: 3840, wantH: 2160,
 		},

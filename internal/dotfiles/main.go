@@ -12,10 +12,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +22,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/hairglasses-studio/dotfiles-mcp/internal/tracing"
-	"github.com/hairglasses-studio/mcpkit/a2a"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 	"github.com/hairglasses-studio/mcpkit/resilience"
@@ -2944,7 +2941,7 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 
 func main() {
 	a2aPort := flag.Int("a2a-port", 0, "Port to expose the A2A server")
-	
+
 	// Handle --session-index: output session index as JSONL for ccg.
 	if len(os.Args) > 1 && os.Args[1] == "--session-index" {
 		if err := outputSessionIndex(); err != nil {
@@ -2953,7 +2950,7 @@ func main() {
 		}
 		return
 	}
-	
+
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
