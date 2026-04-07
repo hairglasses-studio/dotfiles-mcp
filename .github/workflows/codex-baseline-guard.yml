@@ -100,12 +100,15 @@ jobs:
           fi
 
           if [[ -f .mcp.json ]]; then
-            jq -e '(.mcpServers // {}) | type == "object"' .claude/settings.json >/dev/null || \
-              fail ".claude/settings.json must expose repo MCP servers"
-            jq -e '(.mcpServers // {}) | type == "object"' .gemini/settings.json >/dev/null || \
-              fail ".gemini/settings.json must expose repo MCP servers"
-            jq -e '(.mcpServers // {}) | keys | all(test("^[a-z0-9]+(-[a-z0-9]+)*$"))' .gemini/settings.json >/dev/null || \
-              fail ".gemini/settings.json MCP server names must use kebab-case"
+            active_mcp_servers="$(jq -r '(.mcpServers // {}) | if type != "object" then {} else . end | with_entries(select(.key | startswith("_") | not)) | length' .mcp.json)"
+            if [[ "$active_mcp_servers" -gt 0 ]]; then
+              jq -e '(.mcpServers // {}) | type == "object"' .claude/settings.json >/dev/null || \
+                fail ".claude/settings.json must expose repo MCP servers"
+              jq -e '(.mcpServers // {}) | type == "object"' .gemini/settings.json >/dev/null || \
+                fail ".gemini/settings.json must expose repo MCP servers"
+              jq -e '(.mcpServers // {}) | keys | all(test("^[a-z0-9]+(-[a-z0-9]+)*$"))' .gemini/settings.json >/dev/null || \
+                fail ".gemini/settings.json MCP server names must use kebab-case"
+            fi
           fi
 
           for profile in readonly_quiet review workspace_auto ci_json; do

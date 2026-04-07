@@ -18,3 +18,4 @@ go install .
 - `clean_stale` checks for uncommitted/unpushed work before deletion
 - `pull_all` detects dirty repos and detached HEAD, skips safely
 - Composed "tool-of-tools" (full_sync, fleet_audit, cascade_reload, rice_check, bulk_pipeline) eliminate multi-step token waste
+

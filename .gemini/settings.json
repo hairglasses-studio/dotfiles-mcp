@@ -1,9 +1,9 @@
 {
   "context": {
     "fileName": [
-      "GEMINI.md",
       "AGENTS.md",
-      "CLAUDE.md"
+      "CLAUDE.md",
+      "GEMINI.md"
     ]
   },
   "mcpServers": {}
