@@ -49,7 +49,7 @@ func TestClaudeSessionDeferredInDefaultProfile(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "default")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	// All claude_* tools should be deferred in default profile.
 	for _, name := range []string{

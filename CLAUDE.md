@@ -1,7 +1,5 @@
 # dotfiles-mcp
 
-This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file.
-
 MCP server for dotfiles configuration management, GitHub org lifecycle, fleet auditing, and desktop service orchestration. Built with [mcpkit](https://github.com/hairglasses-studio/mcpkit).
 
 ## Build & Test
@@ -12,7 +10,7 @@ go test ./... -count=1
 go install .
 ```
 
-## Tools (93)
+## Tools (99)
 
 ### Config Management (4)
 - `dotfiles_list_configs` — List dotfiles config directories with symlink health and format
@@ -137,8 +135,46 @@ go install .
 - `dotfiles_oss_score` — Score a repo's open-source readiness (0-100) across 8 categories: community files, README quality, Go module, testing, CI/CD, security, release, maintenance. Returns structured report with per-check pass/fail and top action items.
 - `dotfiles_oss_check` — Run checks for a single category with detailed suggestions
 
+### SDLC Operations (21)
+- `ops_build` — Build project (Go/Node/Python), parse compile errors into structured JSON
+- `ops_test_smart` — Run tests on changed packages only (Go: go test -json, Node: jest --json, Python: pytest -v)
+- `ops_changed_files` — List changed files with diff stats and Go package mapping
+- `ops_analyze_failures` — Categorize build/test failures (type_error, missing_dep, timeout, etc.) with fix suggestions
+- `ops_auto_fix` — Auto-fix mechanical failures: missing deps (go mod tidy), missing imports (goimports), unused vars. Dry-run by default
+- `ops_branch_create` — Create feature branch with conventional naming (dry-run by default)
+- `ops_commit` — Stage + commit with conventional message validation (dry-run by default)
+- `ops_pr_create` — Push branch + create PR via gh CLI (dry-run by default)
+- `ops_ci_status` — Poll GitHub Actions checks with optional wait (up to 5min)
+- `ops_pre_push` — Gate: vet → lint → build → test (language-aware, short-circuits on failure)
+- `ops_iterate` — **Core loop**: build → test → analyze → track iteration. Returns structured NextActions with file:line
+- `ops_ship` — **Composed**: pre-push gate → commit → push → create PR (dry-run by default)
+- `ops_revert` — Safely undo last commit (soft reset if unpushed, revert if pushed)
+- `ops_session_create` — Create SDLC iteration tracking session (persisted to ~/.local/state/ops/)
+- `ops_session_status` — Session stats: iterations, error trend, convergence detection
+- `ops_session_list` — List active sessions (auto-cleans >7 days old)
+- `ops_session_handoff` — Generate Agent Handoff Protocol document from session + git state
+- `ops_fleet_diff` — Fleet-wide changes since a date: per-repo commits, churn, commit types, authors
+- `ops_tech_debt` — Score tech debt 0-100 across 6 dimensions with fleet mode and trend tracking
+- `ops_research_check` — Search docs knowledge base for existing research with gap detection
+- `ops_iteration_patterns` — Mine historical sessions for common failures, convergence rates, hot files
+
+### Sandbox Testing (13)
+- `sandbox_create` — Create Docker container with GPU (nvidia-container-toolkit)
+- `sandbox_start` — Start container, wait for Hyprland ready, auto-resize to 2560x1440
+- `sandbox_stop` — Stop a running sandbox
+- `sandbox_destroy` — Remove container and config dir
+- `sandbox_list` — List sandboxes with status
+- `sandbox_status` — GPU utilization, memory, CPU stats
+- `sandbox_sync` — Deploy dotfile symlinks + reload Hyprland inside container
+- `sandbox_test` — Run test suite (bats/selftest/symlinks/shaders/config)
+- `sandbox_exec` — Execute command inside sandbox
+- `sandbox_diff` — Compare symlink health inside container
+- `sandbox_screenshot` — Capture Hyprland display via grim, return base64 PNG
+- `sandbox_visual_diff` — Compare screenshot against reference via ImageMagick
+- `sandbox_validate` — **Composed**: create → sync → test → screenshot → destroy
+
 ## Key Patterns
-- All batch tools use dry-run by default (`execute: true` for live mode)
+- All batch/write tools use dry-run by default (`execute: true` for live mode)
 - `bulk_settings` reports previous state before applying changes
 - `clean_stale` checks for uncommitted/unpushed work before deletion
 - `pull_all` detects dirty repos and detached HEAD, skips safely

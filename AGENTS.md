@@ -1,6 +1,4 @@
 # dotfiles-mcp — Agent Instructions
-> Canonical instructions: AGENTS.md
-
 
 ## Project Overview
 MCP server for dotfiles configuration management. Provides validated config editing, symlink health checks, and service reloading over the Model Context Protocol (stdio transport).

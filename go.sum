@@ -23,12 +23,8 @@ github.com/google/jsonschema-go v0.4.2 h1:tmrUohrwoLZZS/P3x7ex0WAVknEkBZM46iALbc
 github.com/google/jsonschema-go v0.4.2/go.mod h1:r5quNTdLOYEz95Ru18zA0ydNbBuYoo9tgaYcxEYhJVE=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/hairglasses-studio/mapping v0.1.0 h1:boE9eWjcwWqyOy+I3ZOhoaFloukFQatfGVPy1l40R3A=
-github.com/hairglasses-studio/mapping v0.1.0/go.mod h1:ssLCNQusnJGoI4oC45TkADS+FmR8FJexgX7o0Kz3VEQ=
 github.com/hairglasses-studio/mapping v0.1.1-0.20260405143738-f2666d440fbd h1:X0yPvbVzXKfDjp7kF6018OetZKQ8ed6BkecbXPrglYU=
 github.com/hairglasses-studio/mapping v0.1.1-0.20260405143738-f2666d440fbd/go.mod h1:ssLCNQusnJGoI4oC45TkADS+FmR8FJexgX7o0Kz3VEQ=
-github.com/hairglasses-studio/mcpkit v0.3.0 h1:jeMehv75Fc/sjno8ny6V7ciDzEbXRrOWg0B2O/JF2aE=
-github.com/hairglasses-studio/mcpkit v0.3.0/go.mod h1:EAV+7RY169dtQzVGwK+WWVPiU7VyuEmEXOnye7V8qM8=
 github.com/hairglasses-studio/mcpkit v0.5.1 h1:+b+fMcbhuzPfRGcpfWgu7C08IpLcDidrliKl18TCfcg=
 github.com/hairglasses-studio/mcpkit v0.5.1/go.mod h1:dJEkQAC6cISrp+OUemMrQi/3FplIJOUnj2gJr+c87GA=
 github.com/hairglasses-studio/prompt-improver v0.1.0 h1:4mqjWEdilWCtq/3EMK8y5k56GaB6rhHUOJHPoiWx0lM=

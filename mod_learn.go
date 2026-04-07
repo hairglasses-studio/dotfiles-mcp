@@ -195,8 +195,8 @@ func (m *LearnModule) Tools() []registry.ToolDefinition {
 					status = "no_events"
 				}
 
-				// Generate suggestions based on detected controls and device identity.
-				suggestions := suggestMappings(controls, input.Purpose, deviceName)
+				// Generate suggestions based on detected controls.
+				suggestions := suggestMappings(controls, input.Purpose)
 
 				return LearnStartOutput{
 					DeviceName:  deviceName,
@@ -536,16 +536,8 @@ func parseEvtestOutput(output string) ([]CapturedControl, int) {
 	return controls, totalEvents
 }
 
-// isIntechGrid returns true if the device name indicates an Intech Studio Grid controller.
-func isIntechGrid(deviceName string) bool {
-	lower := strings.ToLower(deviceName)
-	return strings.Contains(lower, "grid") || strings.Contains(lower, "intech")
-}
-
 // suggestMappings generates mapping suggestions based on detected controls.
-// When deviceName identifies an Intech Grid EN16, additional EN16-specific
-// suggestions are included (pre-populated CC 32-47 range, template recommendations).
-func suggestMappings(controls []CapturedControl, purpose string, deviceName string) []LearnSuggestion {
+func suggestMappings(controls []CapturedControl, purpose string) []LearnSuggestion {
 	var suggestions []LearnSuggestion
 
 	hasButtons := false
@@ -567,35 +559,6 @@ func suggestMappings(controls []CapturedControl, purpose string, deviceName stri
 		case "midi_note":
 			hasMIDINote = true
 		}
-	}
-
-	// EN16-specific suggestions: pre-populated encoder CC range and template recommendation.
-	en16 := isIntechGrid(deviceName)
-	if en16 {
-		suggestions = append(suggestions, LearnSuggestion{
-			OutputType:  "template",
-			Description: "Detected Intech Studio Grid EN16. Use the 'vj-control' template for VJ/DJ live performance (Resolume, TouchDesigner, OBS) or 'en16-default' for a general desktop layout. Run: mapping_generate with template='vj-control' or template='en16-default'.",
-			Example: `# EN16 encoder CC range: 32-47 (16 endless encoders)
-# Push buttons send Note On/Off on the same numbers (32-47)
-# Generate a mapping profile:
-#   mapping_generate(device_name="Grid", template="vj-control")
-#   mapping_generate(device_name="Grid", template="en16-default")`,
-		})
-		suggestions = append(suggestions, LearnSuggestion{
-			OutputType:  "osc",
-			Description: "EN16 encoders (CC 32-47) to OSC for Resolume Arena layer control",
-			Example: `[cc]
-# Row 1: Layer opacity (CC 32-35)
-32 = { type = "osc", action = "/composition/layers/1/video/opacity {value}" }
-33 = { type = "osc", action = "/composition/layers/2/video/opacity {value}" }
-34 = { type = "osc", action = "/composition/layers/3/video/opacity {value}" }
-35 = { type = "osc", action = "/composition/layers/4/video/opacity {value}" }
-# Row 2: Effect parameters (CC 36-39)
-36 = { type = "osc", action = "/composition/layers/1/video/effects/1/param1 {value}" }
-37 = { type = "osc", action = "/composition/layers/2/video/effects/1/param1 {value}" }
-38 = { type = "osc", action = "/composition/layers/3/video/effects/1/param1 {value}" }
-39 = { type = "osc", action = "/composition/layers/4/video/effects/1/param1 {value}" }`,
-		})
 	}
 
 	if hasButtons {

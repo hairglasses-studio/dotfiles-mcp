@@ -215,7 +215,7 @@ func findTextInWords(words []tsvWord, target string, caseSensitive bool) textMat
 }
 
 // screenshotToDesktop converts screenshot-pixel coordinates to desktop logical
-// coordinates. On Hyprland with a given scale factor, grim captures at physical
+// coordinates. On Hyprland with a given scale factor, wayshot captures at physical
 // pixels (logical * scale). To get back to logical coords (which ydotool needs),
 // divide by scale and add the window's logical position offset.
 func screenshotToDesktop(ssX, ssY int, scale float64, winX, winY int) (int, int) {
@@ -242,19 +242,16 @@ type diCaptureResult struct {
 	scale     float64
 }
 
-// diCapture performs the grim capture → magick resize → tesseract OCR pipeline.
+// diCapture performs the screenshot capture → magick resize → tesseract OCR pipeline.
 // address/class select a window; region captures a specific area; maxSize limits
 // the resized image dimension.
 func diCapture(address, class, region string, maxSize int, tsvMode bool) (*diCaptureResult, error) {
-	if err := screenCheckTool("grim"); err != nil {
-		return nil, err
-	}
 
 	ts := time.Now().UnixMilli()
 	rawPath := fmt.Sprintf("/tmp/di-capture-%d.png", ts)
 	resizedPath := fmt.Sprintf("/tmp/di-capture-%d-resized.png", ts)
 
-	var grimRegion string
+	var captureRegion string
 	var winX, winY int
 	scale := 1.0
 
@@ -313,20 +310,14 @@ func diCapture(address, class, region string, maxSize int, tsvMode bool) (*diCap
 		}
 
 		px, py, pw, ph := windowRegion(target.At[0], target.At[1], target.Size[0], target.Size[1], scale)
-		grimRegion = fmt.Sprintf("%d,%d %dx%d", px, py, pw, ph)
+		captureRegion = fmt.Sprintf("%d,%d %dx%d", px, py, pw, ph)
 	} else if region != "" {
-		grimRegion = region
+		captureRegion = region
 	}
 
-	// Capture with grim
-	var grimArgs []string
-	if grimRegion != "" {
-		grimArgs = append(grimArgs, "-g", grimRegion)
-	}
-	grimArgs = append(grimArgs, rawPath)
-
-	if _, err := screenRunCmd("grim", grimArgs...); err != nil {
-		return nil, fmt.Errorf("grim capture failed: %w", err)
+	// Capture screenshot
+	if err := screenshotCapture(rawPath, captureRegion, ""); err != nil {
+		return nil, fmt.Errorf("screenshot capture failed: %w", err)
 	}
 
 	// Resize with magick
@@ -408,7 +399,7 @@ func diCapture(address, class, region string, maxSize int, tsvMode bool) (*diCap
 type DesktopScreenshotOCRInput struct {
 	Address string `json:"address,omitempty" jsonschema:"description=Window address (hex) to capture. Get from hypr_list_windows."`
 	Class   string `json:"class,omitempty" jsonschema:"description=Window class name to capture (e.g. foot or firefox). First match is used."`
-	Region  string `json:"region,omitempty" jsonschema:"description=Region to capture in 'x,y WxH' grim format. Ignored if address or class is set."`
+	Region  string `json:"region,omitempty" jsonschema:"description=Region to capture in 'x,y WxH' slurp format. Ignored if address or class is set."`
 	MaxSize int    `json:"max_size,omitempty" jsonschema:"description=Max image dimension for resizing (default 1568). Smaller = fewer tokens."`
 }
 
@@ -466,7 +457,7 @@ func (m *DesktopInteractModule) Tools() []registry.ToolDefinition {
 					},
 					"region": map[string]any{
 						"type":        "string",
-						"description": "Region to capture in 'x,y WxH' grim format. Ignored if address or class is set.",
+						"description": "Region to capture in 'x,y WxH' slurp format. Ignored if address or class is set.",
 					},
 					"max_size": map[string]any{
 						"type":        "integer",

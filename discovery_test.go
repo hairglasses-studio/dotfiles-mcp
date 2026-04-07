@@ -119,7 +119,7 @@ func TestRegisterDotfilesModules_FullProfile(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "full")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	// In full profile, nothing should be deferred.
 	if reg.IsDeferred("shader_list") {
@@ -134,7 +134,7 @@ func TestRegisterDotfilesModules_OpsProfile(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "ops")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	// dotfiles_* should be eager in ops profile.
 	if reg.IsDeferred("dotfiles_validate_config") {
@@ -152,15 +152,15 @@ func TestRegisterDotfilesModules_OpsProfile(t *testing.T) {
 
 func TestDiscoveryModuleRegistration(t *testing.T) {
 	reg := registry.NewToolRegistry()
-	m := &DotfilesDiscoveryModule{reg: reg}
+	m := &DotfilesDiscoveryModule{reg: reg, version: dotfilesMCPVersion}
 
 	if m.Name() != "discovery" {
 		t.Fatalf("expected name discovery, got %s", m.Name())
 	}
 
 	tools := m.Tools()
-	if len(tools) != 4 {
-		t.Fatalf("expected 4 discovery tools, got %d", len(tools))
+	if len(tools) != 5 {
+		t.Fatalf("expected 5 discovery tools, got %d", len(tools))
 	}
 
 	names := make(map[string]bool)
@@ -172,6 +172,7 @@ func TestDiscoveryModuleRegistration(t *testing.T) {
 		"dotfiles_tool_schema",
 		"dotfiles_tool_catalog",
 		"dotfiles_tool_stats",
+		"dotfiles_server_health",
 	} {
 		if !names[want] {
 			t.Errorf("missing tool: %s", want)
@@ -187,7 +188,7 @@ func TestToolStats(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "full")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	disc := &DotfilesDiscoveryModule{reg: reg}
 	tools := disc.Tools()
@@ -217,6 +218,12 @@ func TestToolStats(t *testing.T) {
 	}
 	if out.ModuleCount == 0 {
 		t.Error("expected non-zero module count")
+	}
+	if out.ResourceCount != 0 {
+		t.Errorf("expected resource count 0 without registries, got %d", out.ResourceCount)
+	}
+	if out.PromptCount != 0 {
+		t.Errorf("expected prompt count 0 without registries, got %d", out.PromptCount)
 	}
 }
 
@@ -255,10 +262,60 @@ func TestToolSchema_NotFound(t *testing.T) {
 
 func TestDiscoveryModuleDescription(t *testing.T) {
 	reg := registry.NewToolRegistry()
-	m := &DotfilesDiscoveryModule{reg: reg}
+	m := &DotfilesDiscoveryModule{reg: reg, version: dotfilesMCPVersion}
 	desc := m.Description()
 	if desc == "" {
 		t.Error("expected non-empty description")
+	}
+}
+
+func TestServerHealth_WithSurfaceRegistries(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "full")
+
+	reg := registry.NewToolRegistry()
+	promptReg := buildDotfilesPromptRegistry()
+	resReg := buildDotfilesResourceRegistry(reg, promptReg)
+	registerDotfilesModules(reg, resReg, promptReg, dotfilesMCPVersion)
+
+	disc := &DotfilesDiscoveryModule{
+		reg:       reg,
+		resources: resReg,
+		prompts:   promptReg,
+		version:   dotfilesMCPVersion,
+	}
+	tools := disc.Tools()
+
+	var healthTool registry.ToolDefinition
+	for _, td := range tools {
+		if td.Tool.Name == "dotfiles_server_health" {
+			healthTool = td
+			break
+		}
+	}
+
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+	result, err := healthTool.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	text := extractText(t, result)
+	var out dotfilesServerHealthOutput
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.Status != "ok" {
+		t.Fatalf("expected ok status, got %q", out.Status)
+	}
+	if out.ResourceCount == 0 {
+		t.Fatal("expected non-zero resource count")
+	}
+	if out.PromptCount == 0 {
+		t.Fatal("expected non-zero prompt count")
+	}
+	if len(out.DiscoveryTools) != 5 {
+		t.Fatalf("expected 5 discovery tools, got %d", len(out.DiscoveryTools))
 	}
 }
 
@@ -303,7 +360,7 @@ func TestToolSearch_Integration(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "full")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	disc := &DotfilesDiscoveryModule{reg: reg}
 	tools := disc.Tools()
@@ -341,7 +398,7 @@ func TestToolCatalog_AllCategories(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "full")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	disc := &DotfilesDiscoveryModule{reg: reg}
 	tools := disc.Tools()
@@ -375,7 +432,7 @@ func TestToolCatalog_WithFilter(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "full")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	disc := &DotfilesDiscoveryModule{reg: reg}
 	tools := disc.Tools()
