@@ -1,5 +1,5 @@
 // mod_notify.go — Desktop notification tools via notify-send
-package main
+package dotfiles
 
 import (
 	"context"

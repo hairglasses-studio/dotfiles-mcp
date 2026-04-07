@@ -1,5 +1,5 @@
 // mod_shader.go — Ghostty shader pipeline tools (migrated from shader-mcp)
-package main
+package dotfiles
 
 import (
 	"bufio"

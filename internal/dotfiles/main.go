@@ -6,7 +6,7 @@
 // Usage:
 //
 //	DOTFILES_DIR=$HOME/hairglasses-studio/dotfiles dotfiles-mcp
-package main
+package dotfiles
 
 import (
 	"bytes"
@@ -2936,31 +2936,15 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 }
 
 // ---------------------------------------------------------------------------
-// main
+// Setup
 // ---------------------------------------------------------------------------
 
-func main() {
-	a2aPort := flag.Int("a2a-port", 0, "Port to expose the A2A server")
-
-	// Handle --session-index: output session index as JSONL for ccg.
-	if len(os.Args) > 1 && os.Args[1] == "--session-index" {
-		if err := outputSessionIndex(); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	flag.Parse()
-
+func Setup(ctx context.Context) (*registry.ToolRegistry, *registry.MCPServer, func(context.Context) error) {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})).With("service", "dotfiles-mcp"))
 
-	// Initialize OpenTelemetry tracing (no-op unless OTEL_ENABLED=true).
-	ctx := context.Background()
 	shutdownTracing := tracing.Init(ctx, dotfilesMCPVersion)
-	defer shutdownTracing(ctx)
 
 	cbRegistry := resilience.NewCircuitBreakerRegistry(nil)
 	mw := []registry.Middleware{
@@ -2982,19 +2966,5 @@ func main() {
 	resReg.RegisterWithServer(s)
 	promptReg.RegisterWithServer(s)
 
-	if *a2aPort > 0 {
-		card := a2a.AgentCardFromRegistry(reg)
-		a2aServer := a2a.NewServer(reg, card)
-		addr := fmt.Sprintf(":%d", *a2aPort)
-		slog.Info("starting a2a server", "addr", addr)
-		if err := http.ListenAndServe(addr, a2aServer.Handler()); err != nil {
-			slog.Error("a2a server failed", "error", err)
-			os.Exit(1)
-		}
-	} else {
-		if err := registry.ServeAuto(s); err != nil {
-			slog.Error("server stopped", "error", err)
-			os.Exit(1)
-		}
-	}
+	return reg, s, shutdownTracing
 }

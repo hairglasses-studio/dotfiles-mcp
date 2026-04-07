@@ -1,5 +1,5 @@
 // mod_mapping_status.go — High-level status and quick-map tools for the mapping system.
-package main
+package dotfiles
 
 import (
 	"context"

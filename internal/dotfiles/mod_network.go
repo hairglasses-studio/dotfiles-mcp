@@ -1,5 +1,5 @@
 // mod_network.go — NetworkManager WiFi/VPN/DNS tools via nmcli + resolvectl
-package main
+package dotfiles
 
 import (
 	"context"

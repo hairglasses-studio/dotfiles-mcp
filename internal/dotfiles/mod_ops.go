@@ -1,5 +1,5 @@
 // mod_ops.go — Standardized SDLC operations for autonomous Claude Code development loops
-package main
+package dotfiles
 
 import (
 	"bufio"

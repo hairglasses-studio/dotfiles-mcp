@@ -1,5 +1,5 @@
 // mod_input_simulate.go — Input simulation tools (keyboard, mouse, screen interaction)
-package main
+package dotfiles
 
 import (
 	"context"

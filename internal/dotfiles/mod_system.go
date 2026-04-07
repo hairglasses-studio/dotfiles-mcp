@@ -1,5 +1,5 @@
 // mod_system.go — System monitoring tools: temps, GPU, disk, memory, updates, uptime
-package main
+package dotfiles
 
 import (
 	"context"

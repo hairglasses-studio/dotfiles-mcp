@@ -1,5 +1,5 @@
 // mod_audio.go — PipeWire/WirePlumber audio control tools via wpctl/pactl
-package main
+package dotfiles
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package main
+package dotfiles
 
 import (
 	"testing"

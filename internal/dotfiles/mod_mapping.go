@@ -1,5 +1,5 @@
 // mod_mapping.go — Unified controller mapping MCP tools.
-package main
+package dotfiles
 
 import (
 	"bytes"

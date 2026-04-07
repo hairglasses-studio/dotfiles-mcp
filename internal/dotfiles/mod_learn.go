@@ -1,5 +1,5 @@
 // mod_learn.go — Controller learn mode, monitoring, and auto-setup tools.
-package main
+package dotfiles
 
 import (
 	"bytes"

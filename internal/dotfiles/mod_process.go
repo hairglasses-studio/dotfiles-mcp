@@ -1,5 +1,5 @@
 // mod_process.go — Process management, port inspection, GPU status, and system info
-package main
+package dotfiles
 
 import (
 	"bytes"

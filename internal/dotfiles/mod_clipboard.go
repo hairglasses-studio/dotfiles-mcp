@@ -1,5 +1,5 @@
 // mod_clipboard.go — Wayland clipboard read/write tools via wl-copy/wl-paste
-package main
+package dotfiles
 
 import (
 	"bytes"
