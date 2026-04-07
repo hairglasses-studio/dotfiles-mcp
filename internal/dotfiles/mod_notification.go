@@ -1,5 +1,5 @@
 // mod_notification.go — SwayNotificationCenter control via swaync-client
-package main
+package dotfiles
 
 import (
 	"context"

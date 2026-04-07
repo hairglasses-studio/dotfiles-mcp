@@ -1,5 +1,5 @@
 // mod_systemd.go — systemd service and timer management tools via systemctl/journalctl
-package main
+package dotfiles
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package main
+package dotfiles
 
 import (
 	"os"
@@ -145,9 +145,9 @@ func TestIsConventionalCommit(t *testing.T) {
 
 func TestOpsDetectLanguage(t *testing.T) {
 	// Test with current directory (should be Go)
-	lang := opsDetectLanguage(".")
+	lang := opsDetectLanguage("../..")
 	if lang != "go" {
-		t.Errorf("detectLanguage(\".\") = %q, want \"go\"", lang)
+		t.Errorf("detectLanguage(\"../..\") = %q, want \"go\"", lang)
 	}
 
 	// Test with non-existent directory

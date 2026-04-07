@@ -1,5 +1,5 @@
 // mod_tmux.go — tmux session, window, and pane management tools
-package main
+package dotfiles
 
 import (
 	"context"

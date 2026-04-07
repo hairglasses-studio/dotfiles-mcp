@@ -1,5 +1,5 @@
 // mod_claude_session.go — Claude Code session discovery, crash detection, and recovery analysis tools
-package main
+package dotfiles
 
 import (
 	"bufio"
@@ -2978,8 +2978,8 @@ func buildSessionIndex() ([]SessionIndexEntry, error) {
 	return index, nil
 }
 
-// outputSessionIndex writes the session index as JSONL to stdout.
-func outputSessionIndex() error {
+// OutputSessionIndex writes the session index as JSONL to stdout.
+func OutputSessionIndex() error {
 	index, err := buildSessionIndex()
 	if err != nil {
 		return err

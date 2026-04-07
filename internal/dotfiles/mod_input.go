@@ -1,5 +1,5 @@
 // mod_input.go — Input device, BT, controller, MIDI, Solaar tools (migrated from input-mcp)
-package main
+package dotfiles
 
 import (
 	"bytes"

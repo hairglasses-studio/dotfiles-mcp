@@ -1,5 +1,5 @@
 // mod_hyprland.go — Hyprland desktop control tools (migrated from hyprland-mcp)
-package main
+package dotfiles
 
 import (
 	"context"

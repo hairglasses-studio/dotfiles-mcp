@@ -1,5 +1,5 @@
 // mapping_helpers.go — Local wrappers around the shared mapping module.
-package main
+package dotfiles
 
 import "github.com/hairglasses-studio/mapping"
 

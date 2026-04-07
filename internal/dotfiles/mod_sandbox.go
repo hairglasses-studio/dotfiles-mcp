@@ -1,5 +1,5 @@
 // mod_sandbox.go — Docker + NVIDIA GPU sandbox for isolated dotfile testing
-package main
+package dotfiles
 
 import (
 	"context"

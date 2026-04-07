@@ -1,5 +1,5 @@
 // mod_mapping_daemon.go — MCP tool for controlling the live mapitall daemon via IPC.
-package main
+package dotfiles
 
 import (
 	"context"

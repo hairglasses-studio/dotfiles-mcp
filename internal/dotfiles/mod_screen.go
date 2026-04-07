@@ -1,5 +1,5 @@
 // mod_screen.go — Screen capture, recording, OCR, and color-pick tools
-package main
+package dotfiles
 
 import (
 	"context"

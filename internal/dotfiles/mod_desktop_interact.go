@@ -1,5 +1,5 @@
 // mod_desktop_interact.go — Composed see-think-act desktop automation workflows
-package main
+package dotfiles
 
 import (
 	"context"
