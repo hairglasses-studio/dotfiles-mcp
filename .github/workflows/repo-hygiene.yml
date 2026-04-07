@@ -1,0 +1,11 @@
+name: Repo Hygiene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  hygiene:
+    uses: hairglasses-studio/.github/.github/workflows/repo-hygiene.yml@main
