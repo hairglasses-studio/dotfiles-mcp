@@ -1,4 +1,4 @@
-# Inherit global Codex defaults from ~/.codex/config.toml.
+# Inherit model, reasoning, and personal preferences from ~/.codex/config.toml.
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
