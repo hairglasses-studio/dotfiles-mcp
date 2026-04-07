@@ -10,7 +10,8 @@ coverage.out
 !.env.*.example
 
 # Agent artifacts
-.claude/
+.claude/*
+!.claude/settings.json
 .codex/
 .gemini/*
 !.gemini/config.yaml
