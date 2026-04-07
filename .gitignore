@@ -12,7 +12,8 @@ coverage.out
 # Agent artifacts
 .claude/
 .codex/
-.gemini/
+.gemini/*
+!.gemini/config.yaml
 
 # IDE files
 .idea/
