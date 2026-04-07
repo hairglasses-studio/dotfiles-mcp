@@ -48,7 +48,7 @@ func TestPromptRegistryDeferredInDefaultProfile(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "default")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	for _, name := range []string{
 		"prompt_capture",
@@ -735,4 +735,3 @@ this is not valid json
 		t.Error("expected .corrupt file to be created")
 	}
 }
-

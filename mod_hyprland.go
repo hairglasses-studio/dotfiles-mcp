@@ -139,7 +139,7 @@ type hyprMonitor struct {
 	Scale float64 `json:"scale"`
 }
 
-// windowRegion calculates the physical pixel region for grim from logical
+// windowRegion calculates the physical pixel region for screenshot capture from logical
 // coordinates and a monitor scale factor.
 func windowRegion(x, y, w, h int, scale float64) (px, py, pw, ph int) {
 	px = int(math.Round(float64(x) * scale))
@@ -236,13 +236,9 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 				defer os.Remove(raw)
 				defer os.Remove(resized)
 
-				// Capture with grim
-				grimArgs := []string{raw}
-				if input.Output != "" {
-					grimArgs = []string{"-o", input.Output, raw}
-				}
-				if _, err := runHyprCmd("grim", grimArgs...); err != nil {
-					return handler.ErrorResult(fmt.Errorf("grim capture failed: %w", err)), nil
+				// Capture screenshot
+				if err := screenshotCapture(raw, "", input.Output); err != nil {
+					return handler.ErrorResult(fmt.Errorf("screenshot capture failed: %w", err)), nil
 				}
 
 				// Resize with ImageMagick (preserve aspect ratio, max 1568x1568)
@@ -305,7 +301,7 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 					resized := fmt.Sprintf("/tmp/hypr-mon-%s-resized.png", mon.Name)
 					bar := fmt.Sprintf("/tmp/hypr-mon-%s-bar.png", mon.Name)
 
-					if _, err := runHyprCmd("grim", "-o", mon.Name, full); err != nil {
+					if err := screenshotCapture(full, "", mon.Name); err != nil {
 						content = append(content, mcp.TextContent{
 							Type: "text",
 							Text: fmt.Sprintf("%s: capture failed: %v", mon.Name, err),
@@ -1192,9 +1188,9 @@ func handleHyprScreenshotWindow(_ context.Context, req registry.CallToolRequest)
 	defer os.Remove(raw)
 	defer os.Remove(resized)
 
-	// 5. Capture with grim
-	if _, err := runHyprCmd("grim", "-g", region, raw); err != nil {
-		return handler.ErrorResult(fmt.Errorf("grim capture failed (region %s): %w", region, err)), nil
+	// 5. Capture screenshot
+	if err := screenshotCapture(raw, region, ""); err != nil {
+		return handler.ErrorResult(fmt.Errorf("screenshot capture failed (region %s): %w", region, err)), nil
 	}
 
 	// 6. Resize with ImageMagick

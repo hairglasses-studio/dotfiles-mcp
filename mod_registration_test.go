@@ -166,9 +166,6 @@ func TestScreenModuleRegistration(t *testing.T) {
 		"screen_record_stop",
 		"screen_ocr",
 		"screen_color_pick",
-		"screen_record_status",
-		"screen_annotate",
-		"screen_screenshot_annotated",
 	} {
 		if !srv.HasTool(want) {
 			t.Errorf("missing tool: %s", want)

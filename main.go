@@ -24,6 +24,7 @@ import (
 	"github.com/hairglasses-studio/dotfiles-mcp/internal/tracing"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
+	"github.com/hairglasses-studio/mcpkit/resilience"
 )
 
 // ---------------------------------------------------------------------------
@@ -2954,22 +2955,28 @@ func main() {
 
 	// Initialize OpenTelemetry tracing (no-op unless OTEL_ENABLED=true).
 	ctx := context.Background()
-	shutdownTracing := tracing.Init(ctx, "2.1.0")
+	shutdownTracing := tracing.Init(ctx, dotfilesMCPVersion)
 	defer shutdownTracing(ctx)
 
+	cbRegistry := resilience.NewCircuitBreakerRegistry(nil)
 	mw := []registry.Middleware{
 		registry.AuditMiddleware(""),
 		registry.SafetyTierMiddleware(),
+		resilience.CircuitBreakerMiddleware(cbRegistry),
 		tracing.Middleware(),
 	}
 
 	reg := registry.NewToolRegistry(registry.Config{
 		Middleware: mw,
 	})
-	registerDotfilesModules(reg)
+	promptReg := buildDotfilesPromptRegistry()
+	resReg := buildDotfilesResourceRegistry(reg, promptReg)
+	registerDotfilesModules(reg, resReg, promptReg, dotfilesMCPVersion)
 
-	s := registry.NewMCPServer("dotfiles-mcp", "2.1.0")
+	s := registry.NewMCPServer("dotfiles-mcp", dotfilesMCPVersion)
 	reg.RegisterWithServer(s)
+	resReg.RegisterWithServer(s)
+	promptReg.RegisterWithServer(s)
 
 	if err := registry.ServeAuto(s); err != nil {
 		slog.Error("server stopped", "error", err)

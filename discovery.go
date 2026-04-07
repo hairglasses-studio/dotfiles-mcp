@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 
 	"github.com/hairglasses-studio/mcpkit/handler"
+	"github.com/hairglasses-studio/mcpkit/prompts"
 	"github.com/hairglasses-studio/mcpkit/registry"
+	"github.com/hairglasses-studio/mcpkit/resources"
 )
 
 type dotfilesToolSearchInput struct {
@@ -76,14 +79,35 @@ type dotfilesToolStatsOutput struct {
 	TotalTools      int            `json:"total_tools"`
 	ModuleCount     int            `json:"module_count"`
 	DeferredTools   int            `json:"deferred_tools"`
+	ResourceCount   int            `json:"resource_count"`
+	PromptCount     int            `json:"prompt_count"`
 	ByCategory      map[string]int `json:"by_category"`
 	ByRuntimeGroup  map[string]int `json:"by_runtime_group"`
 	WriteToolsCount int            `json:"write_tools_count"`
 	ReadOnlyCount   int            `json:"read_only_count"`
 }
 
+type dotfilesServerHealthInput struct{}
+
+type dotfilesServerHealthOutput struct {
+	Name           string   `json:"name"`
+	Version        string   `json:"version"`
+	Status         string   `json:"status"`
+	Profile        string   `json:"profile"`
+	RuntimeOS      string   `json:"runtime_os"`
+	TotalTools     int      `json:"total_tools"`
+	ModuleCount    int      `json:"module_count"`
+	DeferredTools  int      `json:"deferred_tools"`
+	ResourceCount  int      `json:"resource_count"`
+	PromptCount    int      `json:"prompt_count"`
+	DiscoveryTools []string `json:"discovery_tools"`
+}
+
 type DotfilesDiscoveryModule struct {
-	reg *registry.ToolRegistry
+	reg       *registry.ToolRegistry
+	resources *resources.ResourceRegistry
+	prompts   *prompts.PromptRegistry
+	version   string
 }
 
 func (m *DotfilesDiscoveryModule) Name() string { return "discovery" }
@@ -200,10 +224,20 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 		"Show high-level catalog statistics, including how many tools are marked deferred in the active profile.",
 		func(_ context.Context, _ dotfilesToolStatsInput) (dotfilesToolStatsOutput, error) {
 			toolStats := m.reg.GetToolStats()
+			resourceCount := 0
+			promptCount := 0
+			if m.resources != nil {
+				resourceCount = m.resources.ResourceCount() + m.resources.TemplateCount()
+			}
+			if m.prompts != nil {
+				promptCount = m.prompts.PromptCount()
+			}
 			return dotfilesToolStatsOutput{
 				TotalTools:      toolStats.TotalTools,
 				ModuleCount:     toolStats.ModuleCount,
 				DeferredTools:   len(m.reg.ListDeferredTools()),
+				ResourceCount:   resourceCount,
+				PromptCount:     promptCount,
 				ByCategory:      toolStats.ByCategory,
 				ByRuntimeGroup:  toolStats.ByRuntimeGroup,
 				WriteToolsCount: toolStats.WriteToolsCount,
@@ -214,21 +248,90 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 	stats.Category = "discovery"
 	stats.SearchTerms = []string{"tool stats", "catalog stats", "tool counts"}
 
-	return []registry.ToolDefinition{search, schema, catalog, stats}
+	serverHealth := handler.TypedHandler[dotfilesServerHealthInput, dotfilesServerHealthOutput](
+		"dotfiles_server_health",
+		"Show the active dotfiles-mcp contract shape: discovery coverage, tool counts, profile, and resource/prompt availability.",
+		func(_ context.Context, _ dotfilesServerHealthInput) (dotfilesServerHealthOutput, error) {
+			toolStats := m.reg.GetToolStats()
+			resourceCount := 0
+			promptCount := 0
+			if m.resources != nil {
+				resourceCount = m.resources.ResourceCount() + m.resources.TemplateCount()
+			}
+			if m.prompts != nil {
+				promptCount = m.prompts.PromptCount()
+			}
+
+			discoveryTools := make([]string, 0, 5)
+			for _, name := range []string{
+				"dotfiles_tool_search",
+				"dotfiles_tool_schema",
+				"dotfiles_tool_catalog",
+				"dotfiles_tool_stats",
+				"dotfiles_server_health",
+			} {
+				if _, ok := m.reg.GetTool(name); ok {
+					discoveryTools = append(discoveryTools, name)
+				}
+			}
+
+			status := "ok"
+			if len(discoveryTools) < 5 || resourceCount == 0 || promptCount == 0 {
+				status = "degraded"
+			}
+
+			return dotfilesServerHealthOutput{
+				Name:           "dotfiles-mcp",
+				Version:        m.version,
+				Status:         status,
+				Profile:        dotfilesProfile(),
+				RuntimeOS:      runtime.GOOS,
+				TotalTools:     toolStats.TotalTools,
+				ModuleCount:    toolStats.ModuleCount,
+				DeferredTools:  len(m.reg.ListDeferredTools()),
+				ResourceCount:  resourceCount,
+				PromptCount:    promptCount,
+				DiscoveryTools: discoveryTools,
+			}, nil
+		},
+	)
+	serverHealth.Category = "discovery"
+	serverHealth.SearchTerms = []string{"server health", "mcp health", "contract status", "server overview"}
+
+	return []registry.ToolDefinition{search, schema, catalog, stats, serverHealth}
 }
 
-func registerDotfilesModules(reg *registry.ToolRegistry) {
-	reg.RegisterModule(&DotfilesDiscoveryModule{reg: reg})
+// annotatedModule wraps a ToolModule to apply MCP annotations and circuit breaker groups.
+type annotatedModule struct {
+	inner registry.ToolModule
+}
+
+func (m *annotatedModule) Name() string        { return m.inner.Name() }
+func (m *annotatedModule) Description() string { return m.inner.Description() }
+func (m *annotatedModule) Tools() []registry.ToolDefinition {
+	tools := m.inner.Tools()
+	for i := range tools {
+		tools[i] = registry.ApplyMCPAnnotations(tools[i], "dotfiles_")
+		if strings.HasPrefix(tools[i].Tool.Name, "dotfiles_gh_") {
+			tools[i].CircuitBreakerGroup = "github"
+		}
+	}
+	return tools
+}
+
+func registerDotfilesModules(reg *registry.ToolRegistry, resReg *resources.ResourceRegistry, promptReg *prompts.PromptRegistry, version string) {
+	reg.RegisterModule(&DotfilesDiscoveryModule{reg: reg, resources: resReg, prompts: promptReg, version: version})
 
 	profile := dotfilesProfile()
 	for _, module := range dotfilesModules() {
+		wrapped := &annotatedModule{inner: module}
 		deferred := make(map[string]bool)
-		for _, td := range module.Tools() {
+		for _, td := range wrapped.Tools() {
 			if shouldDeferDotfilesTool(profile, td) {
 				deferred[td.Tool.Name] = true
 			}
 		}
-		reg.RegisterDeferredModule(module, deferred)
+		reg.RegisterDeferredModule(wrapped, deferred)
 	}
 }
 
@@ -251,10 +354,19 @@ func dotfilesModules() []registry.ToolModule {
 		&ScreenModule{},
 		&ClipboardModule{},
 		&NotifyModule{},
+		&NotificationModule{},
 		&InputSimulateModule{},
 		&DesktopInteractModule{},
 		&ClaudeSessionModule{},
 		&PromptRegistryModule{},
+		&SandboxModule{},
+		&OpsModule{},
+		&AudioModule{},
+		&NetworkModule{},
+		&SystemModule{},
+		&SystemdModule{},
+		&TmuxModule{},
+		&ProcessModule{},
 	}
 }
 

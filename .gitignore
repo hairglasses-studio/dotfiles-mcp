@@ -1,16 +1,35 @@
-.env
-.env.*
-.envrc
+# Build artifacts
 dotfiles-mcp
+coverage.out
 
-# Local env files
+# Environment
 .env
-.env.local
-.envrc
 .env.*
+.envrc
 !.env.example
 !.env.*.example
 
-# AI tool configs (local-only)
+# Agent artifacts
+.claude/
 .codex/
 .gemini/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ralph runtime
+.ralph/
+.ralph-state/
+
+# Dev artifacts
+tmp/
+*.log
+*.prof
+*.pprof
+debug.test
+__debug_bin*

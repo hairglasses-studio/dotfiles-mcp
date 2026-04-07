@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/hairglasses-studio/mapping v0.0.0
+	github.com/hairglasses-studio/mapping v0.1.1-0.20260405143738-f2666d440fbd
 	github.com/hairglasses-studio/mcpkit v0.5.1
 	github.com/hairglasses-studio/prompt-improver v0.1.0
 	github.com/mark3labs/mcp-go v0.47.0
@@ -13,10 +13,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
 )
-
-// mapping is a local-only module (not published). Remove this replace
-// directive after publishing mapping to GitHub.
-replace github.com/hairglasses-studio/mapping => ../mapping
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect

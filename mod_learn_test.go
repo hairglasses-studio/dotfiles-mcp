@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/hairglasses-studio/mcpkit/mcptest"
@@ -145,7 +144,7 @@ func TestSuggestMappings_ButtonsOnly(t *testing.T) {
 	controls := []CapturedControl{
 		{Type: "button", Source: "BTN_SOUTH"},
 	}
-	suggestions := suggestMappings(controls, "", "Generic Controller")
+	suggestions := suggestMappings(controls, "")
 	if len(suggestions) < 2 {
 		t.Errorf("expected at least 2 suggestions for buttons, got %d", len(suggestions))
 	}
@@ -173,7 +172,7 @@ func TestSuggestMappings_Axes(t *testing.T) {
 	controls := []CapturedControl{
 		{Type: "axis", Source: "ABS_Z"},
 	}
-	suggestions := suggestMappings(controls, "", "")
+	suggestions := suggestMappings(controls, "")
 	hasOSC := false
 	for _, s := range suggestions {
 		if s.OutputType == "osc" {
@@ -189,7 +188,7 @@ func TestSuggestMappings_WithPurpose(t *testing.T) {
 	controls := []CapturedControl{
 		{Type: "button"},
 	}
-	suggestions := suggestMappings(controls, "master volume", "")
+	suggestions := suggestMappings(controls, "master volume")
 	hasPurpose := false
 	for _, s := range suggestions {
 		if s.OutputType == "suggestion" {
@@ -205,7 +204,7 @@ func TestSuggestMappings_Encoders(t *testing.T) {
 	controls := []CapturedControl{
 		{Type: "encoder"},
 	}
-	suggestions := suggestMappings(controls, "", "")
+	suggestions := suggestMappings(controls, "")
 	found := false
 	for _, s := range suggestions {
 		if s.OutputType == "command" {
@@ -214,81 +213,6 @@ func TestSuggestMappings_Encoders(t *testing.T) {
 	}
 	if !found {
 		t.Error("missing encoder suggestion")
-	}
-}
-
-func TestSuggestMappings_EN16_ByGridName(t *testing.T) {
-	controls := []CapturedControl{
-		{Type: "midi_cc", Source: "midi:cc:32"},
-	}
-	suggestions := suggestMappings(controls, "", "Grid")
-	hasTemplate := false
-	hasEN16OSC := false
-	for _, s := range suggestions {
-		if s.OutputType == "template" {
-			hasTemplate = true
-			if !strings.Contains(s.Description, "vj-control") {
-				t.Error("EN16 template suggestion should mention vj-control")
-			}
-			if !strings.Contains(s.Description, "en16-default") {
-				t.Error("EN16 template suggestion should mention en16-default")
-			}
-		}
-		if s.OutputType == "osc" && strings.Contains(s.Description, "EN16") {
-			hasEN16OSC = true
-		}
-	}
-	if !hasTemplate {
-		t.Error("missing EN16 template suggestion for Grid device")
-	}
-	if !hasEN16OSC {
-		t.Error("missing EN16 OSC suggestion for Grid device")
-	}
-}
-
-func TestSuggestMappings_EN16_ByIntechName(t *testing.T) {
-	controls := []CapturedControl{}
-	suggestions := suggestMappings(controls, "", "Intech Studio: Grid")
-	hasTemplate := false
-	for _, s := range suggestions {
-		if s.OutputType == "template" {
-			hasTemplate = true
-		}
-	}
-	if !hasTemplate {
-		t.Error("missing EN16 template suggestion for Intech Studio device")
-	}
-}
-
-func TestSuggestMappings_NonEN16_NoTemplate(t *testing.T) {
-	controls := []CapturedControl{
-		{Type: "midi_cc", Source: "midi:cc:1"},
-	}
-	suggestions := suggestMappings(controls, "", "APC Mini mk2")
-	for _, s := range suggestions {
-		if s.OutputType == "template" {
-			t.Error("non-EN16 device should not get EN16 template suggestion")
-		}
-	}
-}
-
-func TestIsIntechGrid(t *testing.T) {
-	tests := []struct {
-		name string
-		want bool
-	}{
-		{"Grid", true},
-		{"Intech Studio: Grid", true},
-		{"GRID EN16", true},
-		{"intech", true},
-		{"APC Mini mk2", false},
-		{"nanoKONTROL2", false},
-		{"", false},
-	}
-	for _, tt := range tests {
-		if got := isIntechGrid(tt.name); got != tt.want {
-			t.Errorf("isIntechGrid(%q) = %v, want %v", tt.name, got, tt.want)
-		}
 	}
 }
 
@@ -325,8 +249,6 @@ func TestListTemplates(t *testing.T) {
 		{Name: "desktop-control", Type: "midi"},
 		{Name: "shader-control", Type: "midi"},
 		{Name: "volume-mixer", Type: "midi"},
-		{Name: "vj-control", Type: "midi"},
-		{Name: "en16-default", Type: "midi"},
 	}
 	for _, tmpl := range templates {
 		if tmpl.Type == "gamepad" {
@@ -338,7 +260,7 @@ func TestListTemplates(t *testing.T) {
 	if gamepadCount != 5 {
 		t.Errorf("gamepad templates = %d, want 5", gamepadCount)
 	}
-	if midiCount != 5 {
-		t.Errorf("midi templates = %d, want 5", midiCount)
+	if midiCount != 3 {
+		t.Errorf("midi templates = %d, want 3", midiCount)
 	}
 }

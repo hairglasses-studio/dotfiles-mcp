@@ -44,7 +44,7 @@ func TestRegisterDotfilesModules_DefaultProfile(t *testing.T) {
 	t.Setenv("DOTFILES_MCP_PROFILE", "default")
 
 	reg := registry.NewToolRegistry()
-	registerDotfilesModules(reg)
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
 
 	if !reg.IsDeferred("dotfiles_validate_config") {
 		t.Fatal("expected dotfiles_validate_config to be deferred in default profile")
