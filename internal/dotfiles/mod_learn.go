@@ -25,37 +25,37 @@ import (
 // ── Learn Start ──
 
 type LearnStartInput struct {
-	DeviceName string `json:"device_name,omitempty" jsonschema:"description=Controller or MIDI device name. If empty, uses first detected device."`
-	EventPath  string `json:"event_path,omitempty" jsonschema:"description=Event device path (e.g. /dev/input/event5). Alternative to device_name."`
-	DurationSec int   `json:"duration_sec,omitempty" jsonschema:"description=How long to listen for events (default 5, max 15),minimum=1,maximum=15"`
-	Purpose    string `json:"purpose,omitempty" jsonschema:"description=What this control will be mapped to (e.g. 'master volume'). Helps with suggestions."`
+	DeviceName  string `json:"device_name,omitempty" jsonschema:"description=Controller or MIDI device name. If empty, uses first detected device."`
+	EventPath   string `json:"event_path,omitempty" jsonschema:"description=Event device path (e.g. /dev/input/event5). Alternative to device_name."`
+	DurationSec int    `json:"duration_sec,omitempty" jsonschema:"description=How long to listen for events (default 5, max 15),minimum=1,maximum=15"`
+	Purpose     string `json:"purpose,omitempty" jsonschema:"description=What this control will be mapped to (e.g. 'master volume'). Helps with suggestions."`
 }
 
 type CapturedControl struct {
-	Type        string   `json:"type"`         // "button", "axis", "encoder", "midi_cc", "midi_note"
-	Source      string   `json:"source"`       // Canonical ID: "BTN_SOUTH", "ABS_X", "midi:cc:1"
-	Code        string   `json:"code"`         // Raw code name from evtest
-	Values      []string `json:"values"`       // Observed values
-	MinValue    string   `json:"min_value"`
-	MaxValue    string   `json:"max_value"`
-	Continuous  bool     `json:"continuous"`    // true if multiple distinct values seen
-	EventCount  int      `json:"event_count"`
+	Type       string   `json:"type"`   // "button", "axis", "encoder", "midi_cc", "midi_note"
+	Source     string   `json:"source"` // Canonical ID: "BTN_SOUTH", "ABS_X", "midi:cc:1"
+	Code       string   `json:"code"`   // Raw code name from evtest
+	Values     []string `json:"values"` // Observed values
+	MinValue   string   `json:"min_value"`
+	MaxValue   string   `json:"max_value"`
+	Continuous bool     `json:"continuous"` // true if multiple distinct values seen
+	EventCount int      `json:"event_count"`
 }
 
 type LearnSuggestion struct {
-	OutputType  string `json:"output_type"`  // "key", "command", "osc", "movement"
+	OutputType  string `json:"output_type"` // "key", "command", "osc", "movement"
 	Description string `json:"description"`
-	Example     string `json:"example"`      // Example TOML mapping
+	Example     string `json:"example"` // Example TOML mapping
 }
 
 type LearnStartOutput struct {
-	DeviceName   string            `json:"device_name"`
-	EventPath    string            `json:"event_path,omitempty"`
-	Duration     int               `json:"duration_sec"`
-	TotalEvents  int               `json:"total_events"`
-	Controls     []CapturedControl `json:"controls"`
-	Suggestions  []LearnSuggestion `json:"suggestions,omitempty"`
-	Status       string            `json:"status"` // "captured", "no_events", "timeout"
+	DeviceName  string            `json:"device_name"`
+	EventPath   string            `json:"event_path,omitempty"`
+	Duration    int               `json:"duration_sec"`
+	TotalEvents int               `json:"total_events"`
+	Controls    []CapturedControl `json:"controls"`
+	Suggestions []LearnSuggestion `json:"suggestions,omitempty"`
+	Status      string            `json:"status"` // "captured", "no_events", "timeout"
 }
 
 // ── Monitor ──
@@ -91,9 +91,9 @@ type AutoSetupInput struct {
 
 type DeviceSetupResult struct {
 	Name    string `json:"name"`
-	Type    string `json:"type"`    // "gamepad", "midi"
+	Type    string `json:"type"` // "gamepad", "midi"
 	Brand   string `json:"brand,omitempty"`
-	Action  string `json:"action"`  // "generated", "exists", "skipped"
+	Action  string `json:"action"` // "generated", "exists", "skipped"
 	Profile string `json:"profile,omitempty"`
 }
 
@@ -125,7 +125,7 @@ type ListTemplatesOutput struct {
 // LearnModule provides controller learn mode, monitoring, and auto-setup tools.
 type LearnModule struct{}
 
-func (m *LearnModule) Name() string        { return "learn" }
+func (m *LearnModule) Name() string { return "learn" }
 func (m *LearnModule) Description() string {
 	return "Controller learn mode, live monitoring, templates, and auto-setup workflows"
 }

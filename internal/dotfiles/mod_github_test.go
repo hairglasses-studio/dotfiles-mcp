@@ -297,7 +297,7 @@ func TestGHBulkSettings_MissingOrg(t *testing.T) {
 	boolTrue := true
 	req := registry.CallToolRequest{}
 	req.Params.Arguments = map[string]any{
-		"org":                     "",
+		"org":                    "",
 		"delete_branch_on_merge": boolTrue,
 	}
 

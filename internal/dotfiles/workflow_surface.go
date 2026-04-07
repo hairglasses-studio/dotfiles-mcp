@@ -22,14 +22,14 @@ type repoBootstrapWorkflowInput struct {
 }
 
 type repoBootstrapWorkflowOutput struct {
-	Action            string   `json:"action"`
-	Status            string   `json:"status"`
-	RepoPath          string   `json:"repo_path,omitempty"`
-	Summary           string   `json:"summary"`
-	Command           []string `json:"command"`
-	OutputPreview     string   `json:"output_preview,omitempty"`
-	ErrorPreview      string   `json:"error_preview,omitempty"`
-	RecommendedTools  []string `json:"recommended_tools"`
+	Action           string   `json:"action"`
+	Status           string   `json:"status"`
+	RepoPath         string   `json:"repo_path,omitempty"`
+	Summary          string   `json:"summary"`
+	Command          []string `json:"command"`
+	OutputPreview    string   `json:"output_preview,omitempty"`
+	ErrorPreview     string   `json:"error_preview,omitempty"`
+	RecommendedTools []string `json:"recommended_tools"`
 }
 
 type repoSyncWorkflowInput struct {
@@ -68,8 +68,10 @@ type fleetHealthWorkflowOutput struct {
 
 type FleetWorkflowSurfaceModule struct{}
 
-func (m *FleetWorkflowSurfaceModule) Name() string        { return "fleet_workflows" }
-func (m *FleetWorkflowSurfaceModule) Description() string { return "Composed repo bootstrap, sync, audit, and fleet-health workflows" }
+func (m *FleetWorkflowSurfaceModule) Name() string { return "fleet_workflows" }
+func (m *FleetWorkflowSurfaceModule) Description() string {
+	return "Composed repo bootstrap, sync, audit, and fleet-health workflows"
+}
 
 func (m *FleetWorkflowSurfaceModule) Tools() []registry.ToolDefinition {
 	repoBootstrap := handler.TypedHandler[repoBootstrapWorkflowInput, repoBootstrapWorkflowOutput](

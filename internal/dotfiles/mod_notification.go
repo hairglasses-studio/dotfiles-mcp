@@ -80,8 +80,10 @@ type NotifyResult struct {
 // swaync-client. Separate from NotifyModule (which wraps notify-send).
 type NotificationModule struct{}
 
-func (m *NotificationModule) Name() string        { return "notification" }
-func (m *NotificationModule) Description() string { return "SwayNotificationCenter control via swaync-client" }
+func (m *NotificationModule) Name() string { return "notification" }
+func (m *NotificationModule) Description() string {
+	return "SwayNotificationCenter control via swaync-client"
+}
 
 func (m *NotificationModule) Tools() []registry.ToolDefinition {
 	// ── notify_history ─────────────────────────────────────
@@ -106,9 +108,9 @@ func (m *NotificationModule) Tools() []registry.ToolDefinition {
 			}
 
 			return map[string]any{
-				"count":   count,
-				"dnd":     strings.TrimSpace(dndRaw) == "true",
-				"note":    "swaync does not expose individual notification history via CLI; use notify_count for count and notify_dnd for DND state",
+				"count": count,
+				"dnd":   strings.TrimSpace(dndRaw) == "true",
+				"note":  "swaync does not expose individual notification history via CLI; use notify_count for count and notify_dnd for DND state",
 			}, nil
 		},
 	)

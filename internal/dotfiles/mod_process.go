@@ -182,8 +182,10 @@ type ProcInvestigateServiceOutput struct {
 // ProcessModule provides process management, port inspection, GPU, and system info tools.
 type ProcessModule struct{}
 
-func (m *ProcessModule) Name() string        { return "process" }
-func (m *ProcessModule) Description() string { return "Process management: list, tree, kill, ports, GPU status, system info" }
+func (m *ProcessModule) Name() string { return "process" }
+func (m *ProcessModule) Description() string {
+	return "Process management: list, tree, kill, ports, GPU status, system info"
+}
 
 func (m *ProcessModule) Tools() []registry.ToolDefinition {
 	// ── ps_list ──────────────────────────────────────────

@@ -123,12 +123,12 @@ type monitorsResult struct {
 // ---------- hyprctl JSON types ----------
 
 type hyprClient struct {
-	Address string `json:"address"`
-	At      [2]int `json:"at"`
-	Size    [2]int `json:"size"`
-	Class   string `json:"class"`
-	Title   string `json:"title"`
-	Monitor int    `json:"monitor"`
+	Address   string `json:"address"`
+	At        [2]int `json:"at"`
+	Size      [2]int `json:"size"`
+	Class     string `json:"class"`
+	Title     string `json:"title"`
+	Monitor   int    `json:"monitor"`
 	Workspace struct {
 		ID int `json:"id"`
 	} `json:"workspace"`
@@ -1223,7 +1223,6 @@ func handleHyprScreenshotWindow(_ context.Context, req registry.CallToolRequest)
 }
 
 // ---------- main ----------
-
 
 func init() {
 	sig := hyprInstanceSig()

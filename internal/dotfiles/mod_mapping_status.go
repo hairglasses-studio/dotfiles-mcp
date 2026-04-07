@@ -45,22 +45,22 @@ type ConnectedDevice struct {
 }
 
 type DaemonStatus struct {
-	Running       bool   `json:"running"`
+	Running       bool    `json:"running"`
 	UptimeSeconds float64 `json:"uptime_seconds,omitempty"`
-	Profiles      int    `json:"profiles,omitempty"`
-	Devices       int    `json:"devices,omitempty"`
-	Error         string `json:"error,omitempty"`
+	Profiles      int     `json:"profiles,omitempty"`
+	Devices       int     `json:"devices,omitempty"`
+	Error         string  `json:"error,omitempty"`
 }
 
 type MappingStatusOutput struct {
-	Gamepads       []ConnectedDevice         `json:"gamepads"`
-	MIDIDevices    []ConnectedDevice         `json:"midi_devices"`
-	Profiles       []mapping.MappingProfileSummary `json:"profiles"`
-	ProfileCount   int                       `json:"profile_count"`
-	TemplateCount  int                       `json:"template_count"`
-	MakimaDir      string                    `json:"makima_dir"`
-	MidiDir        string                    `json:"midi_dir"`
-	Daemon         *DaemonStatus             `json:"daemon,omitempty"`
+	Gamepads      []ConnectedDevice               `json:"gamepads"`
+	MIDIDevices   []ConnectedDevice               `json:"midi_devices"`
+	Profiles      []mapping.MappingProfileSummary `json:"profiles"`
+	ProfileCount  int                             `json:"profile_count"`
+	TemplateCount int                             `json:"template_count"`
+	MakimaDir     string                          `json:"makima_dir"`
+	MidiDir       string                          `json:"midi_dir"`
+	Daemon        *DaemonStatus                   `json:"daemon,omitempty"`
 }
 
 // ── Quick Map ──
@@ -94,7 +94,7 @@ type QuickMapOutput struct {
 // MappingStatusModule provides high-level status and quick-map tools.
 type MappingStatusModule struct{}
 
-func (m *MappingStatusModule) Name() string        { return "mapping_status" }
+func (m *MappingStatusModule) Name() string { return "mapping_status" }
 func (m *MappingStatusModule) Description() string {
 	return "Controller mapping status overview and quick mapping creation"
 }

@@ -232,7 +232,9 @@ func checkReadme(repo string) []CheckResult {
 
 	return []CheckResult{
 		contentCheck("badges", text, 2,
-			func(s string) bool { return strings.Contains(s, "![") || strings.Contains(s, "shields.io") || strings.Contains(s, "badge") },
+			func(s string) bool {
+				return strings.Contains(s, "![") || strings.Contains(s, "shields.io") || strings.Contains(s, "badge")
+			},
 			"Present", "Add shields.io badges (build status, coverage, Go version, license)"),
 		contentCheck("install_instructions", lower, 3,
 			func(s string) bool {
@@ -291,7 +293,7 @@ func checkGoMod(repo string) []CheckResult {
 	hasReplace := strings.Contains(gomod, "\nreplace ")
 	results = append(results, CheckResult{
 		Name: "no_replace", Passed: !hasReplace, Points: boolInt(!hasReplace, 3), MaxPoints: 3,
-		Detail: ternary(hasReplace, "replace directive found", "No replace directives"),
+		Detail:     ternary(hasReplace, "replace directive found", "No replace directives"),
 		Suggestion: ternary(hasReplace, "Remove replace directives and point to published module versions", ""),
 	})
 
@@ -300,7 +302,7 @@ func checkGoMod(repo string) []CheckResult {
 	hasSUM := sumErr == nil
 	results = append(results, CheckResult{
 		Name: "gosum_present", Passed: hasSUM, Points: boolInt(hasSUM, 2), MaxPoints: 2,
-		Detail: ternary(hasSUM, "go.sum present", "go.sum missing"),
+		Detail:     ternary(hasSUM, "go.sum present", "go.sum missing"),
 		Suggestion: ternary(hasSUM, "", "Run go mod tidy to generate go.sum"),
 	})
 
@@ -309,7 +311,7 @@ func checkGoMod(repo string) []CheckResult {
 	goodVer := goVer >= "1.21"
 	results = append(results, CheckResult{
 		Name: "go_version", Passed: goodVer, Points: boolInt(goodVer, 2), MaxPoints: 2,
-		Detail: fmt.Sprintf("Go version: %s", goVer),
+		Detail:     fmt.Sprintf("Go version: %s", goVer),
 		Suggestion: ternary(goodVer, "", "Update to Go 1.21+ for improved module support"),
 	})
 
@@ -331,7 +333,7 @@ func checkGoMod(repo string) []CheckResult {
 	}
 	results = append(results, CheckResult{
 		Name: "no_private_imports", Passed: !hasPrivate, Points: boolInt(!hasPrivate, 3), MaxPoints: 3,
-		Detail: ternary(hasPrivate, "Possible private module imports detected", "All imports appear public"),
+		Detail:     ternary(hasPrivate, "Possible private module imports detected", "All imports appear public"),
 		Suggestion: ternary(hasPrivate, "Ensure all dependencies are publicly accessible", ""),
 	})
 
@@ -353,7 +355,7 @@ func checkTesting(repo string, skipTests bool) []CheckResult {
 	hasTests := testFiles > 0
 	results = append(results, CheckResult{
 		Name: "has_tests", Passed: hasTests, Points: boolInt(hasTests, 5), MaxPoints: 5,
-		Detail: fmt.Sprintf("%d test files found", testFiles),
+		Detail:     fmt.Sprintf("%d test files found", testFiles),
 		Suggestion: ternary(hasTests, "", "Add _test.go files with unit tests"),
 	})
 
@@ -370,7 +372,7 @@ func checkTesting(repo string, skipTests bool) []CheckResult {
 	goodCov := covPct >= 80.0
 	results = append(results, CheckResult{
 		Name: "coverage", Passed: goodCov, Points: boolInt(goodCov, 5), MaxPoints: 5,
-		Detail: fmt.Sprintf("%.1f%% coverage", covPct),
+		Detail:     fmt.Sprintf("%.1f%% coverage", covPct),
 		Suggestion: ternary(goodCov, "", fmt.Sprintf("Increase test coverage to 80%%+ (currently %.1f%%)", covPct)),
 	})
 
@@ -378,7 +380,7 @@ func checkTesting(repo string, skipTests bool) []CheckResult {
 	raceOK := goTestRace(repo)
 	results = append(results, CheckResult{
 		Name: "race_detection", Passed: raceOK, Points: boolInt(raceOK, 3), MaxPoints: 3,
-		Detail: ternary(raceOK, "Tests pass with -race", "Race detection failed or timed out"),
+		Detail:     ternary(raceOK, "Tests pass with -race", "Race detection failed or timed out"),
 		Suggestion: ternary(raceOK, "", "Fix data races detected by go test -race"),
 	})
 
@@ -386,7 +388,7 @@ func checkTesting(repo string, skipTests bool) []CheckResult {
 	hasBench := grepFiles(repo, "func Benchmark")
 	results = append(results, CheckResult{
 		Name: "benchmarks", Passed: hasBench, Points: boolInt(hasBench, 2), MaxPoints: 2,
-		Detail: ternary(hasBench, "Benchmark functions found", "No benchmarks"),
+		Detail:     ternary(hasBench, "Benchmark functions found", "No benchmarks"),
 		Suggestion: ternary(hasBench, "", "Add Benchmark functions for performance-critical paths"),
 	})
 
@@ -405,7 +407,7 @@ func checkCICD(repo string) []CheckResult {
 	var results []CheckResult
 	results = append(results, CheckResult{
 		Name: "has_workflows", Passed: hasWorkflows, Points: boolInt(hasWorkflows, 3), MaxPoints: 3,
-		Detail: fmt.Sprintf("%d workflow files in .github/workflows/", len(entries)),
+		Detail:     fmt.Sprintf("%d workflow files in .github/workflows/", len(entries)),
 		Suggestion: ternary(hasWorkflows, "", "Add GitHub Actions CI workflow (.github/workflows/ci.yml)"),
 	})
 
@@ -429,21 +431,21 @@ func checkCICD(repo string) []CheckResult {
 	runsTests := strings.Contains(lower, "go test") || strings.Contains(lower, "make test")
 	results = append(results, CheckResult{
 		Name: "runs_tests", Passed: runsTests, Points: boolInt(runsTests, 3), MaxPoints: 3,
-		Detail: ternary(runsTests, "CI runs tests", "No test step found in workflows"),
+		Detail:     ternary(runsTests, "CI runs tests", "No test step found in workflows"),
 		Suggestion: ternary(runsTests, "", "Add 'go test ./...' step to CI workflow"),
 	})
 
 	runsLint := strings.Contains(lower, "golangci") || strings.Contains(lower, "go vet") || strings.Contains(lower, "staticcheck") || strings.Contains(lower, "make lint")
 	results = append(results, CheckResult{
 		Name: "runs_lint", Passed: runsLint, Points: boolInt(runsLint, 2), MaxPoints: 2,
-		Detail: ternary(runsLint, "CI runs linting", "No lint step found"),
+		Detail:     ternary(runsLint, "CI runs linting", "No lint step found"),
 		Suggestion: ternary(runsLint, "", "Add golangci-lint or go vet step to CI"),
 	})
 
 	hasCoverage := strings.Contains(lower, "coverprofile") || strings.Contains(lower, "codecov") || strings.Contains(lower, "coveralls") || strings.Contains(lower, "coverage")
 	results = append(results, CheckResult{
 		Name: "coverage_reporting", Passed: hasCoverage, Points: boolInt(hasCoverage, 2), MaxPoints: 2,
-		Detail: ternary(hasCoverage, "Coverage reporting configured", "No coverage reporting"),
+		Detail:     ternary(hasCoverage, "Coverage reporting configured", "No coverage reporting"),
 		Suggestion: ternary(hasCoverage, "", "Add coverage reporting (codecov-action or coveralls)"),
 	})
 
@@ -462,7 +464,7 @@ func checkSecurity(repo string) []CheckResult {
 	coversEnv := strings.Contains(string(gitignoreContent), ".env")
 	results = append(results, CheckResult{
 		Name: "gitignore_env", Passed: coversEnv, Points: boolInt(coversEnv, 2), MaxPoints: 2,
-		Detail: ternary(coversEnv, ".gitignore covers .env", ".env not in .gitignore"),
+		Detail:     ternary(coversEnv, ".gitignore covers .env", ".env not in .gitignore"),
 		Suggestion: ternary(coversEnv, "", "Add .env to .gitignore to prevent accidental secret commits"),
 	})
 
@@ -484,7 +486,7 @@ func checkSecurity(repo string) []CheckResult {
 	}
 	results = append(results, CheckResult{
 		Name: "no_hardcoded_secrets", Passed: !hasSecrets, Points: boolInt(!hasSecrets, 3), MaxPoints: 3,
-		Detail: secretDetail,
+		Detail:     secretDetail,
 		Suggestion: ternary(hasSecrets, "Remove hardcoded secrets and use environment variables", ""),
 	})
 
@@ -492,7 +494,7 @@ func checkSecurity(repo string) []CheckResult {
 	hasSecurity := fileExistsMulti(repo, []string{"SECURITY.md", ".github/SECURITY.md"})
 	results = append(results, CheckResult{
 		Name: "security_policy", Passed: hasSecurity, Points: boolInt(hasSecurity, 2), MaxPoints: 2,
-		Detail: ternary(hasSecurity, "SECURITY.md present", "No security policy"),
+		Detail:     ternary(hasSecurity, "SECURITY.md present", "No security policy"),
 		Suggestion: ternary(hasSecurity, "", "Add SECURITY.md with vulnerability reporting instructions"),
 	})
 
@@ -500,7 +502,7 @@ func checkSecurity(repo string) []CheckResult {
 	hasDependabot := fileExists(filepath.Join(repo, ".github", "dependabot.yml")) || fileExists(filepath.Join(repo, ".github", "dependabot.yaml"))
 	results = append(results, CheckResult{
 		Name: "dependabot", Passed: hasDependabot, Points: boolInt(hasDependabot, 3), MaxPoints: 3,
-		Detail: ternary(hasDependabot, "Dependabot configured", "No Dependabot config"),
+		Detail:     ternary(hasDependabot, "Dependabot configured", "No Dependabot config"),
 		Suggestion: ternary(hasDependabot, "", "Add .github/dependabot.yml for automated dependency updates"),
 	})
 
@@ -525,7 +527,7 @@ func checkRelease(repo string) []CheckResult {
 	}
 	results = append(results, CheckResult{
 		Name: "semver_tags", Passed: hasTags, Points: boolInt(hasTags, 3), MaxPoints: 3,
-		Detail: ternary(hasTags, "Semver tags found", "No version tags (v*.*.*)"),
+		Detail:     ternary(hasTags, "Semver tags found", "No version tags (v*.*.*)"),
 		Suggestion: ternary(hasTags, "", "Tag releases with semantic versions (git tag v0.1.0)"),
 	})
 
@@ -533,7 +535,7 @@ func checkRelease(repo string) []CheckResult {
 	hasChangelog := fileExistsMulti(repo, []string{"CHANGELOG.md", "CHANGES.md", "HISTORY.md"})
 	results = append(results, CheckResult{
 		Name: "changelog", Passed: hasChangelog, Points: boolInt(hasChangelog, 2), MaxPoints: 2,
-		Detail: ternary(hasChangelog, "CHANGELOG present", "No changelog"),
+		Detail:     ternary(hasChangelog, "CHANGELOG present", "No changelog"),
 		Suggestion: ternary(hasChangelog, "", "Add CHANGELOG.md following Keep a Changelog format"),
 	})
 
@@ -543,7 +545,7 @@ func checkRelease(repo string) []CheckResult {
 	isPublicPath := strings.Contains(modPath, "github.com/") || strings.Contains(modPath, "golang.org/") || strings.Contains(modPath, "go.dev/")
 	results = append(results, CheckResult{
 		Name: "public_module_path", Passed: isPublicPath, Points: boolInt(isPublicPath, 3), MaxPoints: 3,
-		Detail: fmt.Sprintf("Module: %s", modPath),
+		Detail:     fmt.Sprintf("Module: %s", modPath),
 		Suggestion: ternary(isPublicPath, "", "Use a public module path (github.com/org/repo) for pkg.go.dev indexing"),
 	})
 
@@ -551,7 +553,7 @@ func checkRelease(repo string) []CheckResult {
 	hasMain := fileExists(filepath.Join(repo, "main.go")) || fileExists(filepath.Join(repo, "cmd"))
 	results = append(results, CheckResult{
 		Name: "installable", Passed: hasMain, Points: boolInt(hasMain, 2), MaxPoints: 2,
-		Detail: ternary(hasMain, "main package or cmd/ found", "No main package — library only"),
+		Detail:     ternary(hasMain, "main package or cmd/ found", "No main package — library only"),
 		Suggestion: ternary(hasMain, "", "Add a main package or cmd/ for go install support (libraries score this anyway)"),
 	})
 
@@ -581,7 +583,7 @@ func checkMaintenance(repo string) []CheckResult {
 	}
 	results = append(results, CheckResult{
 		Name: "recent_commit", Passed: recentCommit, Points: boolInt(recentCommit, 2), MaxPoints: 2,
-		Detail: fmt.Sprintf("Last commit: %s", commitAge),
+		Detail:     fmt.Sprintf("Last commit: %s", commitAge),
 		Suggestion: ternary(recentCommit, "", "Repository appears unmaintained (>90 days since last commit)"),
 	})
 
@@ -589,7 +591,7 @@ func checkMaintenance(repo string) []CheckResult {
 	hasIssueTemplates := fileExists(filepath.Join(repo, ".github", "ISSUE_TEMPLATE")) || fileExists(filepath.Join(repo, ".github", "ISSUE_TEMPLATE.md"))
 	results = append(results, CheckResult{
 		Name: "issue_templates", Passed: hasIssueTemplates, Points: boolInt(hasIssueTemplates, 1), MaxPoints: 1,
-		Detail: ternary(hasIssueTemplates, "Issue templates present", "No issue templates"),
+		Detail:     ternary(hasIssueTemplates, "Issue templates present", "No issue templates"),
 		Suggestion: ternary(hasIssueTemplates, "", "Add .github/ISSUE_TEMPLATE/ with bug report and feature request templates"),
 	})
 
@@ -597,7 +599,7 @@ func checkMaintenance(repo string) []CheckResult {
 	hasPRTemplate := fileExists(filepath.Join(repo, ".github", "pull_request_template.md")) || fileExists(filepath.Join(repo, ".github", "PULL_REQUEST_TEMPLATE.md"))
 	results = append(results, CheckResult{
 		Name: "pr_template", Passed: hasPRTemplate, Points: boolInt(hasPRTemplate, 1), MaxPoints: 1,
-		Detail: ternary(hasPRTemplate, "PR template present", "No PR template"),
+		Detail:     ternary(hasPRTemplate, "PR template present", "No PR template"),
 		Suggestion: ternary(hasPRTemplate, "", "Add .github/pull_request_template.md"),
 	})
 
@@ -605,7 +607,7 @@ func checkMaintenance(repo string) []CheckResult {
 	hasEditorconfig := fileExists(filepath.Join(repo, ".editorconfig"))
 	results = append(results, CheckResult{
 		Name: "editorconfig", Passed: hasEditorconfig, Points: boolInt(hasEditorconfig, 1), MaxPoints: 1,
-		Detail: ternary(hasEditorconfig, ".editorconfig present", "No .editorconfig"),
+		Detail:     ternary(hasEditorconfig, ".editorconfig present", "No .editorconfig"),
 		Suggestion: ternary(hasEditorconfig, "", "Add .editorconfig for consistent formatting across editors"),
 	})
 
@@ -633,7 +635,7 @@ func fileExistsMulti(repo string, names []string) bool {
 func fileCheck(repo, name string, points int, suggestion string) CheckResult {
 	exists := fileExists(filepath.Join(repo, name))
 	return CheckResult{
-		Name: strings.ToLower(strings.ReplaceAll(name, ".", "_")),
+		Name:   strings.ToLower(strings.ReplaceAll(name, ".", "_")),
 		Passed: exists, Points: boolInt(exists, points), MaxPoints: points,
 		Detail:     ternary(exists, name+" present", name+" missing"),
 		Suggestion: ternary(exists, "", suggestion),
@@ -643,7 +645,7 @@ func fileCheck(repo, name string, points int, suggestion string) CheckResult {
 func fileCheckMulti(repo string, paths []string, displayName string, points int, suggestion string) CheckResult {
 	exists := fileExistsMulti(repo, paths)
 	return CheckResult{
-		Name: strings.ToLower(strings.ReplaceAll(displayName, ".", "_")),
+		Name:   strings.ToLower(strings.ReplaceAll(displayName, ".", "_")),
 		Passed: exists, Points: boolInt(exists, points), MaxPoints: points,
 		Detail:     ternary(exists, displayName+" present", displayName+" missing"),
 		Suggestion: ternary(exists, "", suggestion),

@@ -55,7 +55,7 @@ func TestLetterGrade(t *testing.T) {
 		{50, 100, "F"},
 		{0, 100, "F"},
 		{0, 0, "F"},   // edge case: zero max
-		{10, 10, "A"},  // 100%
+		{10, 10, "A"}, // 100%
 	}
 	for _, tc := range tests {
 		got := letterGrade(tc.score, tc.max)

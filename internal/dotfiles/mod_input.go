@@ -185,7 +185,6 @@ func btEnrichDevice(d *btDevice) {
 	}
 }
 
-
 // ---------------------------------------------------------------------------
 // Controller Detection
 // ---------------------------------------------------------------------------
@@ -947,9 +946,9 @@ type controllerSetupResult struct {
 }
 
 type AutoSetupControllerOutput struct {
-	DryRun        bool                     `json:"dry_run"`
-	Controllers   []controllerSetupResult  `json:"controllers"`
-	MakimaRestart string                   `json:"makima_restart,omitempty"`
+	DryRun        bool                    `json:"dry_run"`
+	Controllers   []controllerSetupResult `json:"controllers"`
+	MakimaRestart string                  `json:"makima_restart,omitempty"`
 }
 
 type BTDiscoverConnectInput struct {
@@ -1040,8 +1039,10 @@ type SolaarSetOutput struct {
 
 type InputModule struct{}
 
-func (m *InputModule) Name() string        { return "input" }
-func (m *InputModule) Description() string { return "Input device management (logiops, mapitall, services)" }
+func (m *InputModule) Name() string { return "input" }
+func (m *InputModule) Description() string {
+	return "Input device management (logiops, mapitall, services)"
+}
 
 func (m *InputModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{
@@ -1522,8 +1523,10 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 
 type ControllerModule struct{}
 
-func (m *ControllerModule) Name() string        { return "controller" }
-func (m *ControllerModule) Description() string { return "Gamepad/controller detection and profile generation" }
+func (m *ControllerModule) Name() string { return "controller" }
+func (m *ControllerModule) Description() string {
+	return "Gamepad/controller detection and profile generation"
+}
 
 func (m *ControllerModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{
@@ -1885,8 +1888,10 @@ func (m *SolaarModule) Tools() []registry.ToolDefinition {
 
 type WorkflowModule struct{}
 
-func (m *WorkflowModule) Name() string        { return "workflow" }
-func (m *WorkflowModule) Description() string { return "Composed workflow tools for multi-step operations" }
+func (m *WorkflowModule) Name() string { return "workflow" }
+func (m *WorkflowModule) Description() string {
+	return "Composed workflow tools for multi-step operations"
+}
 
 func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{
@@ -2161,4 +2166,3 @@ func (m *WorkflowModule) Tools() []registry.ToolDefinition {
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
-
