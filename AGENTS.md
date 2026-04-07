@@ -1,35 +1,20 @@
-# dotfiles-mcp — Agent Instructions
+# This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file. Treat this file as compatibility guidance for Claude-specific workflows. — Agent Instructions
 
-## Project Overview
-MCP server for dotfiles configuration management. Provides validated config editing, symlink health checks, and service reloading over the Model Context Protocol (stdio transport).
 
-## Tech Stack
-- Go (single-binary MCP server)
-- mcp-go SDK (github.com/mark3labs/mcp-go)
-- BurntSushi/toml for config parsing
 
-## Build & Run
+> Canonical source: CLAUDE.md
+
+## Build & Test
 ```bash
-go build -o dotfiles-mcp .
-DOTFILES_DIR=$HOME/hairglasses-studio/dotfiles ./dotfiles-mcp
+go build ./...
+go vet ./...
+go test ./... -count=1
+go install .
 ```
 
-## Test
-```bash
-go test ./...
-```
-
-## Architecture
-- `main.go` — Single-file MCP server with all tool handlers
-- Stdio transport, designed to run as a Claude Code MCP subprocess
-- Reads/writes dotfiles from `DOTFILES_DIR` (default: `~/hairglasses-studio/dotfiles`)
-- Tools: config editing, symlink management, service reload
-
-## Code Standards
-- Go standard formatting (gofmt)
-- Error wrapping with context
-- All MCP tool handlers follow mcp-go patterns
-
-## Shared Research Repository
-
-Cross-project research lives at `~/hairglasses-studio/docs/` (git: hairglasses-studio/docs). When launching research agents, check existing docs first and write reusable research outputs back to the shared repo rather than local docs/.
+## Key Conventions
+- All batch/write tools use dry-run by default (`execute: true` for live mode)
+- `bulk_settings` reports previous state before applying changes
+- `clean_stale` checks for uncommitted/unpushed work before deletion
+- `pull_all` detects dirty repos and detached HEAD, skips safely
+- Composed "tool-of-tools" (full_sync, fleet_audit, cascade_reload, rice_check, bulk_pipeline) eliminate multi-step token waste
