@@ -1,5 +1,12 @@
 > **Consolidated** — This repo has been merged into [hairglasses-studio/dotfiles](https://github.com/hairglasses-studio/dotfiles) at `mcp/dotfiles-mcp/`. The dotfiles version has 99 tools (vs 82 here) and is actively maintained. For new development, use the consolidated version.
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/hairglasses-studio/dotfiles-mcp.svg)](https://pkg.go.dev/github.com/hairglasses-studio/dotfiles-mcp)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hairglasses-studio/dotfiles-mcp)](https://goreportcard.com/report/github.com/hairglasses-studio/dotfiles-mcp)
+[![CI](https://github.com/hairglasses-studio/dotfiles-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/hairglasses-studio/dotfiles-mcp/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Glama](https://glama.ai/mcp/servers/hairglasses-studio/dotfiles-mcp/badges/score.svg)](https://glama.ai/mcp/servers/hairglasses-studio/dotfiles-mcp)
+
 # dotfiles-mcp
 
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
