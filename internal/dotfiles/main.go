@@ -23,6 +23,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/hairglasses-studio/dotfiles-mcp/internal/tracing"
 	"github.com/hairglasses-studio/mcpkit/handler"
+	"github.com/hairglasses-studio/mcpkit/middleware/gate"
 	"github.com/hairglasses-studio/mcpkit/registry"
 	"github.com/hairglasses-studio/mcpkit/resilience"
 )
@@ -2948,6 +2949,7 @@ func Setup(ctx context.Context) (*registry.ToolRegistry, *registry.MCPServer, fu
 
 	cbRegistry := resilience.NewCircuitBreakerRegistry(nil)
 	mw := []registry.Middleware{
+		gate.Middleware(gate.Config{Gate: gate.PauseWrites}),
 		registry.AuditMiddleware(""),
 		registry.SafetyTierMiddleware(),
 		resilience.CircuitBreakerMiddleware(cbRegistry),
