@@ -1,21 +1,13 @@
-# This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file. Treat this file as compatibility guidance for Claude-specific workflows. — Gemini CLI Instructions
+# dotfiles-mcp — Gemini CLI Instructions
 
+This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file. Read it before making changes.
 
+## Gemini Notes
 
-## Build & Test
+- Use [AGENTS.md](AGENTS.md) for build, test, architecture, and repo-specific conventions.
+- Keep [GEMINI.md](GEMINI.md), [CLAUDE.md](CLAUDE.md), and `.github/copilot-instructions.md` as thin compatibility mirrors.
+- Add Gemini-specific notes here only when they cannot live in [AGENTS.md](AGENTS.md).
 
-```bash
-go build ./...
-go vet ./...
-go test ./... -count=1
-go install .
-```
+## Summary
 
-## Key Conventions
-
-- All batch/write tools use dry-run by default (`execute: true` for live mode)
-- `bulk_settings` reports previous state before applying changes
-- `clean_stale` checks for uncommitted/unpushed work before deletion
-- `pull_all` detects dirty repos and detached HEAD, skips safely
-- Composed "tool-of-tools" (full_sync, fleet_audit, cascade_reload, rice_check, bulk_pipeline) eliminate multi-step token waste
-
+> Canonical instructions: AGENTS.md
