@@ -10,9 +10,12 @@ permissions:
   security-events: write
   id-token: write
 
+concurrency:
+  group: claude-security-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   security-review:
-    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -23,6 +26,7 @@ jobs:
         with:
           trigger_phrase: "@claude-security"
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 5"
           prompt: |
             Focus exclusively on security concerns:
             - Injection vulnerabilities (SQL, command, XSS)
