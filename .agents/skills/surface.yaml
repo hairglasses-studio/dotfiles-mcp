@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "plugin_managed": false,
+  "skills": [
+    {
+      "name": "dotfiles_mcp",
+      "claude_include_canonical": true,
+      "export_plugin": false
+    }
+  ]
+}
