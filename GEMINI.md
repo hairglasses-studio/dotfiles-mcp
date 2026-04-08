@@ -1,19 +1,21 @@
-# dotfiles-mcp — Gemini CLI Instructions
+# This repo uses [AGENTS.md](AGENTS.md) as the canonical instruction file. Treat this file as compatibility guidance for Claude-specific workflows. — Gemini CLI Instructions
 
-## Overview
-Go MCP server for dotfiles management — config editing, symlink checks, service reloading via stdio transport.
+
 
 ## Build & Test
+
 ```bash
-go build -o dotfiles-mcp .
-go test ./...
+go build ./...
+go vet ./...
+go test ./... -count=1
+go install .
 ```
 
-## Key Details
-- Single-file server: `main.go`
-- SDK: mcp-go (github.com/mark3labs/mcp-go)
-- Env: `DOTFILES_DIR` sets dotfiles path
+## Key Conventions
 
-## Shared Research Repository
+- All batch/write tools use dry-run by default (`execute: true` for live mode)
+- `bulk_settings` reports previous state before applying changes
+- `clean_stale` checks for uncommitted/unpushed work before deletion
+- `pull_all` detects dirty repos and detached HEAD, skips safely
+- Composed "tool-of-tools" (full_sync, fleet_audit, cascade_reload, rice_check, bulk_pipeline) eliminate multi-step token waste
 
-Cross-project research lives at `~/hairglasses-studio/docs/` (git: hairglasses-studio/docs). When launching research agents, check existing docs first and write reusable research outputs back to the shared repo rather than local docs/.
