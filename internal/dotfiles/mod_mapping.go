@@ -805,11 +805,17 @@ func countTOMLMappings(content string) int {
 func sanitizeProfile(content string) string {
 	lines := strings.Split(content, "\n")
 	var sanitized []string
+	home := homeDir()
 	for _, line := range lines {
-		// Remove lines containing absolute paths.
+		// Replace the active user's home path first so root and other non-/home
+		// environments still sanitize correctly under test and in exports.
+		if len(home) > 1 && strings.Contains(line, home) {
+			line = strings.ReplaceAll(line, home, "~")
+		}
+		// Fall back to common home-directory prefixes for imported profiles.
 		if strings.Contains(line, "/home/") || strings.Contains(line, "/Users/") {
-			// Replace absolute paths with relative placeholders.
-			line = strings.ReplaceAll(line, homeDir(), "~")
+			line = strings.ReplaceAll(line, "/home/", "~/")
+			line = strings.ReplaceAll(line, "/Users/", "~/")
 		}
 		sanitized = append(sanitized, line)
 	}
