@@ -810,7 +810,7 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 			func(_ context.Context, _ ShaderGetStateInput) (ShaderGetStateOutput, error) {
 				active, err := readActiveShader()
 				if err != nil {
-					return ShaderGetStateOutput{}, err
+					return ShaderGetStateOutput{}, nil
 				}
 				name := strings.TrimSuffix(filepath.Base(active), ".glsl")
 				return ShaderGetStateOutput{
