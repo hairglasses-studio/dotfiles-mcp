@@ -344,7 +344,7 @@ func dotfilesModules() []registry.ToolModule {
 		&BluetoothModule{},
 		&ControllerModule{},
 		&MidiModule{},
-		&SolaarModule{},
+		&JuhradialModule{},
 		&WorkflowModule{},
 		&OSSModule{},
 		&MappingEngineModule{},

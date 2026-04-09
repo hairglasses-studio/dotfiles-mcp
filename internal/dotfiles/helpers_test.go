@@ -259,7 +259,7 @@ func TestDotfilesModules_Count(t *testing.T) {
 
 	expected := []string{
 		"dotfiles", "hyprland", "shader", "input", "bluetooth",
-		"controller", "midi", "solaar", "workflow", "oss",
+		"controller", "midi", "juhradial", "workflow", "oss",
 		"mapping", "learn", "mapping_status", "mapping_daemon",
 		"screen", "input_simulate", "claude_session", "prompt_registry",
 	}
@@ -313,8 +313,11 @@ func TestAllModuleToolsValid(t *testing.T) {
 
 func TestInputPathHelpers(t *testing.T) {
 	t.Setenv("DOTFILES_DIR", "/tmp/test-dotfiles")
-	if got := logiopsCfg(); got != "/tmp/test-dotfiles/logiops/logid.cfg" {
-		t.Errorf("logiopsCfg() = %q", got)
+	if got := juhradialConfigPath(); got != "/tmp/test-dotfiles/juhradial/config.json" {
+		t.Errorf("juhradialConfigPath() = %q", got)
+	}
+	if got := juhradialProfilesPath(); got != "/tmp/test-dotfiles/juhradial/profiles.json" {
+		t.Errorf("juhradialProfilesPath() = %q", got)
 	}
 	if got := makimaDir(); got != "/tmp/test-dotfiles/makima" {
 		t.Errorf("makimaDir() = %q", got)

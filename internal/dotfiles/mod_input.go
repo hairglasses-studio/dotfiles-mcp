@@ -1,9 +1,10 @@
-// mod_input.go — Input device, BT, controller, MIDI, Solaar tools (migrated from input-mcp)
+// mod_input.go — Input device, BT, controller, MIDI, juhradial tools (migrated from input-mcp)
 package dotfiles
 
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,17 +25,174 @@ import (
 
 func inputDotfilesDir() string { return dotfilesDir() }
 
-func logiopsCfg() string { return filepath.Join(inputDotfilesDir(), "logiops", "logid.cfg") }
-func makimaDir() string  { return filepath.Join(inputDotfilesDir(), "makima") }
-func midiDir() string    { return filepath.Join(inputDotfilesDir(), "midi") }
+func juhradialDir() string          { return filepath.Join(inputDotfilesDir(), "juhradial") }
+func juhradialConfigPath() string   { return filepath.Join(juhradialDir(), "config.json") }
+func juhradialProfilesPath() string { return filepath.Join(juhradialDir(), "profiles.json") }
+func makimaDir() string             { return filepath.Join(inputDotfilesDir(), "makima") }
+func midiDir() string               { return filepath.Join(inputDotfilesDir(), "midi") }
 
 func inputRunCmd(name string, args ...string) (string, string, error) {
+	return inputRunCmdEnv(nil, name, args...)
+}
+
+func inputRunCmdEnv(extraEnv []string, name string, args ...string) (string, string, error) {
 	cmd := exec.Command(name, args...)
+	if len(extraEnv) > 0 {
+		cmd.Env = append(os.Environ(), extraEnv...)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
+}
+
+func inputRuntimeDir() string {
+	if runtimeDir := os.Getenv("XDG_RUNTIME_DIR"); runtimeDir != "" {
+		return runtimeDir
+	}
+	return filepath.Join("/run/user", strconv.Itoa(os.Getuid()))
+}
+
+func juhradialSessionEnv() []string {
+	runtimeDir := inputRuntimeDir()
+	return []string{
+		"XDG_RUNTIME_DIR=" + runtimeDir,
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=" + filepath.Join(runtimeDir, "bus"),
+	}
+}
+
+func juhradialRunCmd(name string, args ...string) (string, string, error) {
+	return inputRunCmdEnv(juhradialSessionEnv(), name, args...)
+}
+
+func juhradialSystemctl(args ...string) (string, string, error) {
+	return juhradialRunCmd("systemctl", append([]string{"--user"}, args...)...)
+}
+
+func writeFileAtomic(path string, content []byte, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("create parent dir: %w", err)
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(content); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write temp file: %w", err)
+	}
+	if err := tmp.Chmod(mode); err != nil {
+		tmp.Close()
+		return fmt.Errorf("chmod temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("rename temp file: %w", err)
+	}
+	return nil
+}
+
+func validateJSONDocument(content string) error {
+	var parsed any
+	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		return err
+	}
+	return nil
+}
+
+func parseJuhradialBatteryOutput(raw string) (InputGetJuhradialBatteryOutput, error) {
+	out := strings.TrimSpace(raw)
+	out = strings.TrimPrefix(out, "(")
+	out = strings.TrimSuffix(out, ")")
+	parts := strings.Split(out, ",")
+	if len(parts) < 2 {
+		return InputGetJuhradialBatteryOutput{}, fmt.Errorf("unexpected battery output: %q", raw)
+	}
+
+	left := strings.Fields(strings.TrimSpace(parts[0]))
+	if len(left) == 0 {
+		return InputGetJuhradialBatteryOutput{}, fmt.Errorf("unexpected battery value: %q", raw)
+	}
+	percent, err := strconv.Atoi(strings.Trim(left[len(left)-1], "'\""))
+	if err != nil {
+		return InputGetJuhradialBatteryOutput{}, fmt.Errorf("parse battery percent: %w", err)
+	}
+
+	chargingToken := strings.ToLower(strings.Trim(strings.TrimSpace(parts[1]), "'\""))
+	return InputGetJuhradialBatteryOutput{
+		Percent:  percent,
+		Charging: strings.HasPrefix(chargingToken, "true"),
+		Source:   "dbus",
+	}, nil
+}
+
+func fallbackJuhradialBattery() (InputGetJuhradialBatteryOutput, error) {
+	devices, err := btListPaired()
+	if err != nil {
+		return InputGetJuhradialBatteryOutput{}, err
+	}
+
+	bestIndex := -1
+	bestScore := -1
+	for i := range devices {
+		btEnrichDevice(&devices[i])
+		if devices[i].Battery < 0 {
+			continue
+		}
+
+		score := 0
+		lowerName := strings.ToLower(devices[i].Name)
+		if strings.Contains(lowerName, "mx master") {
+			score += 4
+		}
+		if strings.Contains(lowerName, "logitech") {
+			score += 2
+		}
+		if devices[i].Connected {
+			score += 2
+		}
+		if score > bestScore {
+			bestScore = score
+			bestIndex = i
+		}
+	}
+
+	if bestIndex == -1 {
+		return InputGetJuhradialBatteryOutput{}, fmt.Errorf("no Logitech battery information available")
+	}
+
+	return InputGetJuhradialBatteryOutput{
+		Device:   devices[bestIndex].Name,
+		Percent:  devices[bestIndex].Battery,
+		Charging: false,
+		Source:   "bluetoothctl",
+	}, nil
+}
+
+func juhradialBatteryStatus() (InputGetJuhradialBatteryOutput, error) {
+	out, _, err := juhradialRunCmd(
+		"gdbus", "call",
+		"--session",
+		"--dest", "org.kde.juhradialmx",
+		"--object-path", "/org/kde/juhradialmx/Daemon",
+		"--method", "org.kde.juhradialmx.Daemon.GetBatteryStatus",
+	)
+	if err == nil && strings.TrimSpace(out) != "" {
+		status, parseErr := parseJuhradialBatteryOutput(out)
+		if parseErr == nil && status.Percent > 0 && status.Percent <= 100 {
+			return status, nil
+		}
+	}
+
+	return fallbackJuhradialBattery()
 }
 
 // btInteractivePair runs bluetoothctl interactively with an agent registered,
@@ -229,7 +387,7 @@ func parseInputDevices() []controllerInfo {
 				lower := strings.ToLower(name)
 				if strings.Contains(lower, "virtual") || strings.Contains(lower, "ydotool") ||
 					strings.Contains(lower, "antimicrox") || strings.Contains(lower, "makima") ||
-					strings.Contains(lower, "logiops") {
+					strings.Contains(lower, "juhradial") {
 					isVirtual = true
 				}
 			} else if strings.HasPrefix(line, "I: ") {
@@ -328,8 +486,8 @@ var controllerTemplates = map[string]string{
 [commands]
 BTN_SOUTH = ["hyprctl dispatch focusurgentorlast"]
 BTN_EAST = ["hyprctl dispatch killactive"]
-BTN_WEST = ["ghostty --gtk-single-instance=false"]
-BTN_NORTH = ["wofi --show drun"]
+BTN_WEST = ["$HOME/.local/bin/kitty-visual-launch"]
+BTN_NORTH = ["$HOME/.local/bin/app-launcher"]
 BTN_TL = ["hyprctl dispatch movefocus l"]
 BTN_TR = ["hyprctl dispatch movefocus r"]
 BTN_SELECT = ["wayshot --stdout | wl-copy"]
@@ -452,8 +610,8 @@ KEY_F14 = ["hyprctl dispatch workspace 2"]
 KEY_F15 = ["hyprctl dispatch workspace 3"]
 KEY_F16 = ["hyprctl dispatch workspace 4"]
 KEY_F17 = ["hyprctl dispatch workspace 5"]
-KEY_F18 = ["ghostty --gtk-single-instance=false"]
-KEY_F19 = ["wofi --show drun"]
+KEY_F18 = ["$HOME/.local/bin/kitty-visual-launch"]
+KEY_F19 = ["$HOME/.local/bin/app-launcher"]
 KEY_F20 = ["hyprctl dispatch killactive"]
 KEY_F21 = ["hyprctl dispatch fullscreen 0"]
 
@@ -718,16 +876,6 @@ hw = "%s"
 `,
 }
 
-// Solaar setting names we expose for management.
-var solaarSettingNames = []string{
-	"scroll-ratchet-torque",
-	"scroll-ratchet",
-	"smart-shift",
-	"haptic-level",
-	"hi-res-scroll",
-	"scroll-direction",
-}
-
 // ===========================================================================
 // I/O types
 // ===========================================================================
@@ -742,23 +890,44 @@ type serviceStatus struct {
 }
 
 type InputStatusOutput struct {
-	Services []serviceStatus `json:"services"`
-	Battery  map[string]int  `json:"battery,omitempty"`
+	Services []serviceStatus                 `json:"services"`
+	Battery  *InputGetJuhradialBatteryOutput `json:"battery,omitempty"`
 }
 
-type InputGetLogiopsInput struct{}
-type InputGetLogiopsOutput struct {
+type InputGetJuhradialConfigInput struct{}
+type InputGetJuhradialConfigOutput struct {
 	Content string `json:"content"`
+	Path    string `json:"path"`
 }
 
-type InputSetLogiopsInput struct {
-	Content string `json:"content" jsonschema:"required,description=Full logiops config content in libconfig format"`
-	Deploy  bool   `json:"deploy,omitempty" jsonschema:"description=Deploy to /etc/logid.cfg and restart logid (requires sudo). Default false."`
+type InputSetJuhradialConfigInput struct {
+	Content string `json:"content" jsonschema:"required,description=Full juhradial config.json content in JSON format"`
 }
-type InputSetLogiopsOutput struct {
-	Written  string `json:"written"`
-	Deployed bool   `json:"deployed"`
-	Restart  string `json:"restart,omitempty"`
+type InputSetJuhradialConfigOutput struct {
+	Written string `json:"written"`
+	Valid   bool   `json:"valid"`
+}
+
+type InputGetJuhradialProfilesInput struct{}
+type InputGetJuhradialProfilesOutput struct {
+	Content string `json:"content"`
+	Path    string `json:"path"`
+}
+
+type InputSetJuhradialProfilesInput struct {
+	Content string `json:"content" jsonschema:"required,description=Full juhradial profiles.json content in JSON format"`
+}
+type InputSetJuhradialProfilesOutput struct {
+	Written string `json:"written"`
+	Valid   bool   `json:"valid"`
+}
+
+type InputGetJuhradialBatteryInput struct{}
+type InputGetJuhradialBatteryOutput struct {
+	Device   string `json:"device,omitempty"`
+	Percent  int    `json:"percent"`
+	Charging bool   `json:"charging"`
+	Source   string `json:"source"`
 }
 
 type InputListMakimaInput struct{}
@@ -798,7 +967,7 @@ type InputDeleteMakimaOutput struct {
 }
 
 type InputRestartInput struct {
-	Service string `json:"service" jsonschema:"required,description=Which service to restart,enum=logid,enum=mapitall,enum=both"`
+	Service string `json:"service" jsonschema:"required,description=Which service group to restart,enum=mouse,enum=controller,enum=all"`
 }
 type InputRestartOutput struct {
 	Services []serviceStatus `json:"services"`
@@ -1003,33 +1172,7 @@ type MidiSetOutput struct {
 	Valid   bool   `json:"valid"`
 }
 
-// ── SolaarModule ───────────────────────────────────────────────────────────
-
-type SolaarGetInput struct {
-	Device string `json:"device,omitempty" jsonschema:"description=Device name (default: MX Master 4)"`
-}
-
-type solaarSetting struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-type SolaarGetOutput struct {
-	Device   string          `json:"device"`
-	Settings []solaarSetting `json:"settings"`
-}
-
-type SolaarSetInput struct {
-	Device  string `json:"device,omitempty" jsonschema:"description=Device name (default: MX Master 4)"`
-	Setting string `json:"setting" jsonschema:"required,description=Setting name,enum=scroll-ratchet-torque,enum=scroll-ratchet,enum=smart-shift,enum=haptic-level,enum=hi-res-scroll,enum=scroll-direction"`
-	Value   string `json:"value" jsonschema:"required,description=Value to set"`
-}
-type SolaarSetOutput struct {
-	Device  string `json:"device"`
-	Setting string `json:"setting"`
-	Value   string `json:"value"`
-	Output  string `json:"output"`
-}
+// ── JuhradialModule ────────────────────────────────────────────────────────
 
 // ===========================================================================
 // Modules
@@ -1041,73 +1184,41 @@ type InputModule struct{}
 
 func (m *InputModule) Name() string { return "input" }
 func (m *InputModule) Description() string {
-	return "Input device management (logiops, mapitall, services)"
+	return "Input device management (juhradial-mx, makima, services)"
 }
 
 func (m *InputModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{
 		handler.TypedHandler[InputStatusInput, InputStatusOutput](
 			"input_status",
-			"Show running state of input services (logid, mapitall) and battery levels for connected Bluetooth devices.",
+			"Show running state of juhradial mouse services, the makima controller service, and MX battery status when available.",
 			func(_ context.Context, _ InputStatusInput) (InputStatusOutput, error) {
 				var result InputStatusOutput
 
-				for _, svc := range []string{"logid", "mapitall"} {
-					_, _, err := inputRunCmd("systemctl", "is-active", svc+".service")
+				type serviceCheck struct {
+					name string
+					user bool
+				}
+				for _, svc := range []serviceCheck{
+					{name: "juhradialmx-daemon", user: true},
+					{name: "ydotool", user: true},
+					{name: "makima", user: false},
+				} {
+					var err error
+					if svc.user {
+						_, _, err = juhradialSystemctl("is-active", svc.name+".service")
+					} else {
+						_, _, err = inputRunCmd("systemctl", "is-active", svc.name+".service")
+					}
 					result.Services = append(result.Services, serviceStatus{
-						Name:   svc,
+						Name:   svc.name,
 						Active: err == nil,
 					})
 				}
 
-				devices, _ := btListPaired()
-				result.Battery = make(map[string]int)
-				for i := range devices {
-					btEnrichDevice(&devices[i])
-					if devices[i].Battery > 0 {
-						result.Battery[devices[i].Name] = devices[i].Battery
-					}
-				}
-
-				return result, nil
-			},
-		),
-
-		handler.TypedHandler[InputGetLogiopsInput, InputGetLogiopsOutput](
-			"input_get_logiops_config",
-			"Read the logiops (logid) configuration from dotfiles. Returns raw libconfig format text.",
-			func(_ context.Context, _ InputGetLogiopsInput) (InputGetLogiopsOutput, error) {
-				data, err := os.ReadFile(logiopsCfg())
-				if err != nil {
-					return InputGetLogiopsOutput{}, fmt.Errorf("[%s] read logiops config: %w", handler.ErrNotFound, err)
-				}
-				return InputGetLogiopsOutput{Content: string(data)}, nil
-			},
-		),
-
-		handler.TypedHandler[InputSetLogiopsInput, InputSetLogiopsOutput](
-			"input_set_logiops_config",
-			"Write logiops config to dotfiles and optionally deploy to /etc/logid.cfg + restart logid.",
-			func(_ context.Context, input InputSetLogiopsInput) (InputSetLogiopsOutput, error) {
-				if input.Content == "" {
-					return InputSetLogiopsOutput{}, fmt.Errorf("[%s] content is required", handler.ErrInvalidParam)
-				}
-
-				if err := os.WriteFile(logiopsCfg(), []byte(input.Content), 0644); err != nil {
-					return InputSetLogiopsOutput{}, fmt.Errorf("write config: %w", err)
-				}
-
-				result := InputSetLogiopsOutput{Written: logiopsCfg()}
-
-				if input.Deploy {
-					if _, stderr, err := inputRunCmd("sudo", "cp", logiopsCfg(), "/etc/logid.cfg"); err != nil {
-						return InputSetLogiopsOutput{}, fmt.Errorf("deploy to /etc/: %v: %s", err, stderr)
-					}
-					if _, stderr, err := inputRunCmd("sudo", "systemctl", "restart", "logid.service"); err != nil {
-						return InputSetLogiopsOutput{}, fmt.Errorf("restart logid: %v: %s", err, stderr)
-					}
-					result.Deployed = true
-					result.Restart = "logid restarted"
+				battery, err := juhradialBatteryStatus()
+				if err == nil {
+					result.Battery = &battery
 				}
 
 				return result, nil
@@ -1221,23 +1332,33 @@ func (m *InputModule) Tools() []registry.ToolDefinition {
 
 		handler.TypedHandler[InputRestartInput, InputRestartOutput](
 			"input_restart_services",
-			"Restart input device services (requires sudo).",
+			"Restart juhradial mouse services or the makima controller service. Restarting the controller service may require elevated systemd permissions.",
 			func(_ context.Context, input InputRestartInput) (InputRestartOutput, error) {
-				var targets []string
+				var userTargets []string
+				var systemTargets []string
 				switch input.Service {
-				case "logid":
-					targets = []string{"logid"}
-				case "mapitall":
-					targets = []string{"mapitall"}
-				case "both":
-					targets = []string{"logid", "mapitall"}
+				case "mouse":
+					userTargets = []string{"ydotool", "juhradialmx-daemon"}
+				case "controller":
+					systemTargets = []string{"makima"}
+				case "all":
+					userTargets = []string{"ydotool", "juhradialmx-daemon"}
+					systemTargets = []string{"makima"}
 				default:
-					return InputRestartOutput{}, fmt.Errorf("[%s] service must be logid, mapitall, or both", handler.ErrInvalidParam)
+					return InputRestartOutput{}, fmt.Errorf("[%s] service must be mouse, controller, or all", handler.ErrInvalidParam)
 				}
 
 				var result InputRestartOutput
-				for _, t := range targets {
-					_, stderr, err := inputRunCmd("sudo", "systemctl", "restart", t+".service")
+				for _, t := range userTargets {
+					_, stderr, err := juhradialSystemctl("restart", t+".service")
+					status := serviceStatus{Name: t, Active: err == nil}
+					if err != nil {
+						status.Name += " (error: " + stderr + ")"
+					}
+					result.Services = append(result.Services, status)
+				}
+				for _, t := range systemTargets {
+					_, stderr, err := inputRunCmd("systemctl", "restart", t+".service")
 					status := serviceStatus{Name: t, Active: err == nil}
 					if err != nil {
 						status.Name += " (error: " + stderr + ")"
@@ -1803,82 +1924,84 @@ func (m *MidiModule) Tools() []registry.ToolDefinition {
 	}
 }
 
-// ── SolaarModule ───────────────────────────────────────────────────────────
+// ── JuhradialModule ────────────────────────────────────────────────────────
 
-type SolaarModule struct{}
+type JuhradialModule struct{}
 
-func (m *SolaarModule) Name() string        { return "solaar" }
-func (m *SolaarModule) Description() string { return "Logitech Solaar device settings management" }
+func (m *JuhradialModule) Name() string { return "juhradial" }
+func (m *JuhradialModule) Description() string {
+	return "MX Master 4 juhradial-mx config and battery management"
+}
 
-func (m *SolaarModule) Tools() []registry.ToolDefinition {
+func (m *JuhradialModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{
-		handler.TypedHandler[SolaarGetInput, SolaarGetOutput](
-			"input_get_solaar_settings",
-			"Read current Solaar settings for a Logitech device (torque, haptic level, scroll mode, smart shift).",
-			func(_ context.Context, input SolaarGetInput) (SolaarGetOutput, error) {
-				device := input.Device
-				if device == "" {
-					device = "MX Master 4"
-				}
-
-				out, _, err := inputRunCmd("solaar", "config", device)
+		handler.TypedHandler[InputGetJuhradialConfigInput, InputGetJuhradialConfigOutput](
+			"input_get_juhradial_config",
+			"Read the tracked juhradial config.json from dotfiles.",
+			func(_ context.Context, _ InputGetJuhradialConfigInput) (InputGetJuhradialConfigOutput, error) {
+				data, err := os.ReadFile(juhradialConfigPath())
 				if err != nil {
-					return SolaarGetOutput{}, fmt.Errorf("solaar config: %w", err)
+					return InputGetJuhradialConfigOutput{}, fmt.Errorf("[%s] read juhradial config: %w", handler.ErrNotFound, err)
 				}
-
-				var settings []solaarSetting
-				for _, line := range strings.Split(out, "\n") {
-					line = strings.TrimSpace(line)
-					for _, name := range solaarSettingNames {
-						if strings.HasPrefix(line, name+" = ") {
-							val := strings.TrimPrefix(line, name+" = ")
-							settings = append(settings, solaarSetting{Name: name, Value: val})
-						}
-					}
-				}
-
-				return SolaarGetOutput{Device: device, Settings: settings}, nil
+				return InputGetJuhradialConfigOutput{Content: string(data), Path: juhradialConfigPath()}, nil
 			},
 		),
 
-		handler.TypedHandler[SolaarSetInput, SolaarSetOutput](
-			"input_set_solaar_setting",
-			"Set a Solaar device setting (e.g. scroll-ratchet-torque, haptic-level, smart-shift).",
-			func(_ context.Context, input SolaarSetInput) (SolaarSetOutput, error) {
-				device := input.Device
-				if device == "" {
-					device = "MX Master 4"
+		handler.TypedHandler[InputSetJuhradialConfigInput, InputSetJuhradialConfigOutput](
+			"input_set_juhradial_config",
+			"Write dotfiles juhradial config.json after validating that the content is valid JSON.",
+			func(_ context.Context, input InputSetJuhradialConfigInput) (InputSetJuhradialConfigOutput, error) {
+				if strings.TrimSpace(input.Content) == "" {
+					return InputSetJuhradialConfigOutput{}, fmt.Errorf("[%s] content is required", handler.ErrInvalidParam)
 				}
-				if input.Setting == "" {
-					return SolaarSetOutput{}, fmt.Errorf("[%s] setting is required", handler.ErrInvalidParam)
+				if err := validateJSONDocument(input.Content); err != nil {
+					return InputSetJuhradialConfigOutput{}, fmt.Errorf("[%s] invalid JSON: %w", handler.ErrInvalidParam, err)
 				}
-				if input.Value == "" {
-					return SolaarSetOutput{}, fmt.Errorf("[%s] value is required", handler.ErrInvalidParam)
+				if err := writeFileAtomic(juhradialConfigPath(), []byte(input.Content), 0644); err != nil {
+					return InputSetJuhradialConfigOutput{}, fmt.Errorf("write juhradial config: %w", err)
 				}
+				return InputSetJuhradialConfigOutput{Written: juhradialConfigPath(), Valid: true}, nil
+			},
+		),
 
-				valid := false
-				for _, name := range solaarSettingNames {
-					if name == input.Setting {
-						valid = true
-						break
-					}
-				}
-				if !valid {
-					return SolaarSetOutput{}, fmt.Errorf("[%s] unknown setting %q, valid: %v", handler.ErrInvalidParam, input.Setting, solaarSettingNames)
-				}
-
-				out, stderr, err := inputRunCmd("solaar", "config", device, input.Setting, input.Value)
+		handler.TypedHandler[InputGetJuhradialProfilesInput, InputGetJuhradialProfilesOutput](
+			"input_get_juhradial_profiles",
+			"Read the tracked juhradial profiles.json from dotfiles.",
+			func(_ context.Context, _ InputGetJuhradialProfilesInput) (InputGetJuhradialProfilesOutput, error) {
+				data, err := os.ReadFile(juhradialProfilesPath())
 				if err != nil {
-					msg := strings.TrimSpace(out + "\n" + stderr)
-					return SolaarSetOutput{}, fmt.Errorf("solaar config set: %s", msg)
+					return InputGetJuhradialProfilesOutput{}, fmt.Errorf("[%s] read juhradial profiles: %w", handler.ErrNotFound, err)
 				}
+				return InputGetJuhradialProfilesOutput{Content: string(data), Path: juhradialProfilesPath()}, nil
+			},
+		),
 
-				return SolaarSetOutput{
-					Device:  device,
-					Setting: input.Setting,
-					Value:   input.Value,
-					Output:  strings.TrimSpace(out),
-				}, nil
+		handler.TypedHandler[InputSetJuhradialProfilesInput, InputSetJuhradialProfilesOutput](
+			"input_set_juhradial_profiles",
+			"Write dotfiles juhradial profiles.json after validating that the content is valid JSON.",
+			func(_ context.Context, input InputSetJuhradialProfilesInput) (InputSetJuhradialProfilesOutput, error) {
+				if strings.TrimSpace(input.Content) == "" {
+					return InputSetJuhradialProfilesOutput{}, fmt.Errorf("[%s] content is required", handler.ErrInvalidParam)
+				}
+				if err := validateJSONDocument(input.Content); err != nil {
+					return InputSetJuhradialProfilesOutput{}, fmt.Errorf("[%s] invalid JSON: %w", handler.ErrInvalidParam, err)
+				}
+				if err := writeFileAtomic(juhradialProfilesPath(), []byte(input.Content), 0644); err != nil {
+					return InputSetJuhradialProfilesOutput{}, fmt.Errorf("write juhradial profiles: %w", err)
+				}
+				return InputSetJuhradialProfilesOutput{Written: juhradialProfilesPath(), Valid: true}, nil
+			},
+		),
+
+		handler.TypedHandler[InputGetJuhradialBatteryInput, InputGetJuhradialBatteryOutput](
+			"input_get_juhradial_battery",
+			"Read MX battery status from the juhradial D-Bus daemon, falling back to bluetoothctl when D-Bus is unavailable.",
+			func(_ context.Context, _ InputGetJuhradialBatteryInput) (InputGetJuhradialBatteryOutput, error) {
+				status, err := juhradialBatteryStatus()
+				if err != nil {
+					return InputGetJuhradialBatteryOutput{}, fmt.Errorf("juhradial battery: %w", err)
+				}
+				return status, nil
 			},
 		),
 	}
