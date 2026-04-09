@@ -1,7 +1,7 @@
 .PHONY: build test vet lint check coverage
 
 build:
-	go build -o dotfiles-mcp ./...
+	go build ./...
 
 test:
 	go test ./... -count=1
