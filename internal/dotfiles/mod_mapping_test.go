@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hairglasses-studio/mapping"
+	"github.com/hairglasses-studio/dotfiles-mcp/internal/mapping"
 	"github.com/hairglasses-studio/mcpkit/mcptest"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
