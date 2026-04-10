@@ -477,6 +477,10 @@
       "description": "Sync CI workflow files across all repos from canonical sources. Detects stale workflows and optionally updates, commits, and pushes."
     },
     {
+      "name": "dotfiles_workspace_scene",
+      "description": "Capture a live workspace scene snapshot by combining Hyprland monitors, workspaces, windows, and the saved layout or monitor-preset inventory used for restoration."
+    },
+    {
       "name": "dotfiles_workstation_diagnostics",
       "description": "Build a publishable workstation diagnostics snapshot by composing machine health, desktop readiness, rice state, and actionable follow-up recommendations."
     },
@@ -1624,7 +1628,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 397,
+  "tool_count": 398,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [

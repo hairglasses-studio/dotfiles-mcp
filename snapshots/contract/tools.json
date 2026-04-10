@@ -992,6 +992,20 @@
     "deferred": true
   },
   {
+    "name": "dotfiles_workspace_scene",
+    "description": "Capture a live workspace scene snapshot by combining Hyprland monitors, workspaces, windows, and the saved layout or monitor-preset inventory used for restoration.",
+    "category": "discovery",
+    "search_terms": [
+      "workspace scene",
+      "layout snapshot",
+      "restore scene",
+      "monitor presets",
+      "window scene report"
+    ],
+    "is_write": false,
+    "deferred": false
+  },
+  {
     "name": "dotfiles_workstation_diagnostics",
     "description": "Build a publishable workstation diagnostics snapshot by composing machine health, desktop readiness, rice state, and actionable follow-up recommendations.",
     "category": "discovery",

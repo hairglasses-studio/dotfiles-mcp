@@ -726,8 +726,9 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 	}
 
 	workstationDiagnostics := m.workstationDiagnosticsTool()
+	workspaceScene := m.workspaceSceneTool()
 
-	return []registry.ToolDefinition{search, schema, catalog, stats, serverHealth, desktopStatus, workstationDiagnostics}
+	return []registry.ToolDefinition{search, schema, catalog, stats, serverHealth, desktopStatus, workstationDiagnostics, workspaceScene}
 }
 
 // annotatedModule wraps a ToolModule to apply MCP annotations and circuit breaker groups.
@@ -846,6 +847,7 @@ func dotfilesDiscoveryToolNames() []string {
 		"dotfiles_server_health",
 		"dotfiles_desktop_status",
 		"dotfiles_workstation_diagnostics",
+		"dotfiles_workspace_scene",
 	}
 }
 
