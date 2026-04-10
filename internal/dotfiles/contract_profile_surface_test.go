@@ -21,6 +21,7 @@ func TestContractSnapshotDesktopProfileSurfaceBoundaries(t *testing.T) {
 	for _, tool := range []string{
 		"dotfiles_desktop_status",
 		"dotfiles_workstation_diagnostics",
+		"dotfiles_workspace_scene",
 		"desktop_snapshot",
 		"desktop_wait_for_element",
 		"session_screenshot",
@@ -54,6 +55,7 @@ func TestContractSnapshotOpsProfileSurfaceBoundaries(t *testing.T) {
 		"dotfiles_server_health",
 		"dotfiles_desktop_status",
 		"dotfiles_workstation_diagnostics",
+		"dotfiles_workspace_scene",
 		"workflow_sync",
 		"archwiki_search",
 		"arch_news_latest",

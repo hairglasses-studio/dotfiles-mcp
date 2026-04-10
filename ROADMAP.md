@@ -2,7 +2,7 @@
 
 ## Current State
 
-dotfiles-mcp is now a discovery-first workstation MCP surface with committed contract artifacts. The canonical snapshot currently exposes `397` tools across `37` registered modules, plus `24` resources and `12` prompts. Public release metadata is regenerated into `.well-known/mcp.json`, and the JSON bundle in `snapshots/contract/` is treated as the checked-in contract for publish parity.
+dotfiles-mcp is now a discovery-first workstation MCP surface with committed contract artifacts. The canonical snapshot currently exposes `398` tools across `37` registered modules, plus `24` resources and `12` prompts. Public release metadata is regenerated into `.well-known/mcp.json`, and the JSON bundle in `snapshots/contract/` is treated as the checked-in contract for publish parity.
 
 The server remains stdio-first, built on mcpkit, and defaults to deferred loading outside the discovery surface. Batch workflows still default to dry-run where live mutation would be risky.
 
@@ -16,11 +16,12 @@ Canonical-to-standalone carry-forward for the embedded `dotfiles/mcp/dotfiles-mc
 
 The workstation diagnosis workflow now has a concrete front door in `dotfiles_workstation_diagnostics`, which composes machine health, desktop readiness, rice status, recommendations, and a publishable markdown report into a single read-first snapshot.
 
+Workspace scene inspection now has a matching front door in `dotfiles_workspace_scene`, which combines live Hyprland monitors, workspaces, windows, and the saved layout or monitor-preset inventory used for restoration.
+
 ## Planned
 
 ### Phase 2 — Product Expansion
 - Broader semantic desktop compatibility for Electron/Chromium-heavy apps, richer semantic form editing, and more resilient KWin virtual-session introspection
-- Deeper workspace scene tooling around layout capture and window restoration
 
 ## Future Considerations
 - Remove the remaining Solaar recovery-only bridge once juhradial can replay full MX wheel state durably
