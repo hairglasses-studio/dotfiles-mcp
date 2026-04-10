@@ -10,19 +10,14 @@ Publish guard and release automation now emit contract-diff summaries into CI ar
 
 Host smoke now covers Hyprland, semantic AT-SPI import readiness, session clipboard and screenshot prerequisites, and strict skip handling so prepared runners can turn missing runtime context into hard failures when needed.
 
+Fixture-driven verification now covers `dotfiles_desktop_status`, Bluetooth and juhradial battery/service flows, semantic/session host preflights, and higher-signal `desktop`/`ops` defer-boundary checks without depending on a live workstation session.
+
 ## Planned
 
 ### Phase 1 — Publish And Mirror Hygiene
 - Automate canonical-to-standalone carry-forward for the embedded `dotfiles/mcp/dotfiles-mcp` module so publish-mirror updates stop depending on manual drift cleanup
 
-### Phase 2 — Surface Quality And Verification
-- Add targeted integration tests for Bluetooth, juhradial-mx, and desktop-control readiness paths that currently depend on workstation state
-- Expand resource and prompt coverage tests so the contract bundle fails loudly when workflow catalogs drift
-- Add higher-signal validation for profile-specific eager/deferred loading behavior, especially `desktop` and `ops`
-- Add richer semantic desktop fixtures so `desktop_snapshot`, `desktop_find`, `desktop_focus`, `desktop_read_value`, and `desktop_set_text` can be exercised outside the main workstation
-- Add stronger session-fixture coverage for live handles and KWin virtual-session startup, semantic inspection/action/value flows, screenshots, and clipboard flows
-
-### Phase 3 — Product Expansion
+### Phase 2 — Product Expansion
 - `dotfiles_pipeline_status` — aggregate CI status across all repos in one view
 - `dotfiles_changelog_gen` — generate changelogs from conventional commits
 - `dotfiles_release` — orchestrate go-releaser across repos
