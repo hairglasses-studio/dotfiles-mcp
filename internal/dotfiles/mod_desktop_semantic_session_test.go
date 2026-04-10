@@ -523,7 +523,8 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 
 	findResult := callDesktopSemanticTool(t, "desktop_find", map[string]any{
 		"app":  "Fixture App",
-		"name": "Save",
+		"name": "Full Name",
+		"role": "entry",
 	})
 	if findResult == nil || findResult.IsError {
 		t.Fatalf("expected successful desktop_find result, got %q", extractTextFromResult(t, findResult))
@@ -532,7 +533,7 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, findResult)), &found); err != nil {
 		t.Fatalf("unmarshal desktop find output: %v", err)
 	}
-	if !found.Matched || stringValue(found.Element["name"]) != "Save" {
+	if !found.Matched || stringValue(found.Element["role"]) != "entry" || found.Query.Path != "0/1" {
 		t.Fatalf("unexpected desktop_find output: %#v", found)
 	}
 
@@ -552,7 +553,7 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 
 	readValueResult := callDesktopSemanticTool(t, "desktop_read_value", map[string]any{
 		"app":  "Fixture App",
-		"name": "Name",
+		"name": "Full Name",
 	})
 	if readValueResult == nil || readValueResult.IsError {
 		t.Fatalf("expected successful desktop_read_value result, got %q", extractTextFromResult(t, readValueResult))
@@ -561,13 +562,13 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, readValueResult)), &read); err != nil {
 		t.Fatalf("unmarshal desktop read value output: %v", err)
 	}
-	if read.ValueKind != "text" || read.Value != "fixture-text" {
+	if read.ValueKind != "text" || read.Value != "fixture-text" || read.Query.Path != "0/1" {
 		t.Fatalf("unexpected read value output: %#v", read)
 	}
 
 	setTextResult := callDesktopSemanticTool(t, "desktop_set_text", map[string]any{
 		"app":  "Fixture App",
-		"name": "Name",
+		"name": "Full Name",
 		"text": "patched",
 	})
 	if setTextResult == nil || setTextResult.IsError {
@@ -577,8 +578,25 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, setTextResult)), &updated); err != nil {
 		t.Fatalf("unmarshal desktop set text output: %v", err)
 	}
-	if !updated.Updated || updated.Value != "patched" {
+	if !updated.Updated || updated.Value != "patched" || updated.Query.Path != "0/1" {
 		t.Fatalf("unexpected set text output: %#v", updated)
+	}
+
+	waitResult := callDesktopSemanticTool(t, "desktop_wait_for_element", map[string]any{
+		"app":     "Fixture App",
+		"name":    "Type full name",
+		"role":    "entry",
+		"timeout": 1,
+	})
+	if waitResult == nil || waitResult.IsError {
+		t.Fatalf("expected successful desktop_wait_for_element result, got %q", extractTextFromResult(t, waitResult))
+	}
+	var waited desktopSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, waitResult)), &waited); err != nil {
+		t.Fatalf("unmarshal desktop wait output: %v", err)
+	}
+	if !waited.Matched || stringValue(waited.Element["role"]) != "entry" || waited.Query.Path != "0/1" {
+		t.Fatalf("unexpected desktop wait output: %#v", waited)
 	}
 }
 
@@ -705,7 +723,8 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 	findResult := callDesktopSessionTool(t, "session_find_ui_element", map[string]any{
 		"session_id": record.ID,
 		"app":        "Fixture App",
-		"name":       "Save",
+		"name":       "Full Name",
+		"role":       "entry",
 	})
 	if findResult == nil || findResult.IsError {
 		t.Fatalf("expected successful session_find_ui_element result, got %q", extractTextFromResult(t, findResult))
@@ -714,14 +733,14 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, findResult)), &found); err != nil {
 		t.Fatalf("unmarshal session find output: %v", err)
 	}
-	if !found.Matched || stringValue(found.Element["name"]) != "Save" {
+	if !found.Matched || stringValue(found.Element["role"]) != "entry" || found.Query.Path != "0/1" {
 		t.Fatalf("unexpected session semantic find output: %#v", found)
 	}
 
 	setTextResult := callDesktopSessionTool(t, "session_set_text", map[string]any{
 		"session_id": record.ID,
 		"app":        "Fixture App",
-		"name":       "Name",
+		"name":       "Full Name",
 		"text":       "patched",
 	})
 	if setTextResult == nil || setTextResult.IsError {
@@ -731,8 +750,26 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, setTextResult)), &updated); err != nil {
 		t.Fatalf("unmarshal session set text output: %v", err)
 	}
-	if !updated.Updated || updated.Value != "patched" {
+	if !updated.Updated || updated.Value != "patched" || updated.Query.Path != "0/1" {
 		t.Fatalf("unexpected session set text output: %#v", updated)
+	}
+
+	waitResult := callDesktopSessionTool(t, "session_wait_for_element", map[string]any{
+		"session_id": record.ID,
+		"app":        "Fixture App",
+		"name":       "Type full name",
+		"role":       "entry",
+		"timeout":    1,
+	})
+	if waitResult == nil || waitResult.IsError {
+		t.Fatalf("expected successful session_wait_for_element result, got %q", extractTextFromResult(t, waitResult))
+	}
+	var waited SessionSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, waitResult)), &waited); err != nil {
+		t.Fatalf("unmarshal session wait output: %v", err)
+	}
+	if !waited.Matched || stringValue(waited.Element["role"]) != "entry" || waited.Query.Path != "0/1" {
+		t.Fatalf("unexpected session wait output: %#v", waited)
 	}
 
 	clickResult := callDesktopSessionTool(t, "session_click_element", map[string]any{
