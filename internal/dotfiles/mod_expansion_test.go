@@ -47,8 +47,8 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 func TestDesktopSessionModuleRegistration(t *testing.T) {
 	m := &DesktopSessionModule{}
 	tools := m.Tools()
-	if len(tools) != 28 {
-		t.Fatalf("expected 28 session tools, got %d", len(tools))
+	if len(tools) != 30 {
+		t.Fatalf("expected 30 session tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -59,9 +59,11 @@ func TestDesktopSessionModuleRegistration(t *testing.T) {
 		"session_list",
 		"session_start",
 		"session_connect",
+		"session_wait_ready",
 		"session_status",
 		"session_stop",
 		"session_screenshot",
+		"session_list_apps",
 		"session_list_windows",
 		"session_focus_window",
 		"session_launch_app",

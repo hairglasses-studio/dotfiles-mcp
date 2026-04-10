@@ -104,6 +104,24 @@ func unmarshalSessionLogResult(t *testing.T, result *registry.CallToolResult) Se
 	return out
 }
 
+func unmarshalSessionAppsResult(t *testing.T, result *registry.CallToolResult) SessionAppsOutput {
+	t.Helper()
+	var out SessionAppsOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
+		t.Fatalf("unmarshal session apps output: %v", err)
+	}
+	return out
+}
+
+func unmarshalSessionWaitReadyResult(t *testing.T, result *registry.CallToolResult) SessionWaitReadyOutput {
+	t.Helper()
+	var out SessionWaitReadyOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
+		t.Fatalf("unmarshal session wait-ready output: %v", err)
+	}
+	return out
+}
+
 func callDesktopSemanticTool(t *testing.T, name string, args map[string]any) *registry.CallToolResult {
 	t.Helper()
 	td := findModuleTool(t, &DesktopSemanticModule{}, name)
@@ -673,6 +691,17 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 		t.Fatalf("unexpected session window output: %#v", listed)
 	}
 
+	listAppsResult := callDesktopSessionTool(t, "session_list_apps", map[string]any{
+		"session_id": record.ID,
+	})
+	if listAppsResult == nil || listAppsResult.IsError {
+		t.Fatalf("expected successful session_list_apps result, got %q", extractTextFromResult(t, listAppsResult))
+	}
+	appsOut := unmarshalSessionAppsResult(t, listAppsResult)
+	if appsOut.Count != 1 || stringValue(appsOut.Apps[0]["name"]) != "Fixture App" {
+		t.Fatalf("unexpected session apps output: %#v", appsOut)
+	}
+
 	findResult := callDesktopSessionTool(t, "session_find_ui_element", map[string]any{
 		"session_id": record.ID,
 		"app":        "Fixture App",
@@ -974,6 +1003,18 @@ func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
 	}
 	if !containsString(status.Recommendations, "Use session_read_app_log to inspect the newest launched application output.") {
 		t.Fatalf("expected app log recommendation, got %#v", status.Recommendations)
+	}
+
+	waitReadyResult := callDesktopSessionTool(t, "session_wait_ready", map[string]any{
+		"session_id": newest.ID,
+		"timeout":    1,
+	})
+	if waitReadyResult == nil || waitReadyResult.IsError {
+		t.Fatalf("expected successful session_wait_ready result, got %q", extractTextFromResult(t, waitReadyResult))
+	}
+	waitOut := unmarshalSessionWaitReadyResult(t, waitReadyResult)
+	if !waitOut.Ready || waitOut.Status.ResolvedStatus != "connected" || waitOut.Timeout != 1 {
+		t.Fatalf("unexpected session wait-ready output: %#v", waitOut)
 	}
 
 	logResult := callDesktopSessionTool(t, "session_read_log", map[string]any{

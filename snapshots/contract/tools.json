@@ -2907,6 +2907,19 @@
     "deferred": true
   },
   {
+    "name": "session_list_apps",
+    "description": "List AT-SPI applications visible inside a tracked session before choosing one for semantic targeting.",
+    "category": "desktop",
+    "search_terms": [
+      "session apps",
+      "at-spi apps in session",
+      "semantic session snapshot",
+      "session app inventory"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "session_list_windows",
     "description": "List windows for a tracked session. Hyprland-backed sessions use hyprctl; other sessions fall back to AT-SPI window discovery.",
     "category": "desktop",
@@ -3049,6 +3062,19 @@
       "session wait element",
       "session wait for state",
       "session semantic wait"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_wait_ready",
+    "description": "Wait for a tracked session to expose its Wayland socket and D-Bus bus before driving semantic or input tools.",
+    "category": "desktop",
+    "search_terms": [
+      "wait for session",
+      "session ready",
+      "kwin ready",
+      "wayland session ready"
     ],
     "is_write": false,
     "deferred": true
