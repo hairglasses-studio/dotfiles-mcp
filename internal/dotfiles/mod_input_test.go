@@ -173,6 +173,22 @@ func TestBatteryRegex(t *testing.T) {
 	}
 }
 
+func TestParseJuhradialBatteryOutput(t *testing.T) {
+	out, err := parseJuhradialBatteryOutput("(uint32 73, true)")
+	if err != nil {
+		t.Fatalf("parseJuhradialBatteryOutput returned error: %v", err)
+	}
+	if out.Percent != 73 {
+		t.Fatalf("expected percent 73, got %d", out.Percent)
+	}
+	if !out.Charging {
+		t.Fatal("expected charging=true")
+	}
+	if out.Source != "dbus" {
+		t.Fatalf("expected source dbus, got %q", out.Source)
+	}
+}
+
 func TestResolveAnyDevice_MAC(t *testing.T) {
 	// MAC addresses should be returned directly without lookup
 	mac := "D2:8E:C5:DE:9F:CB"

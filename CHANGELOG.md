@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Desktop services: cascade reload, rice check, eww bar management
 - Shader pipeline: GLSL shader lifecycle for Ghostty and wallpapers
 - Bluetooth: BLE-safe pairing, connect/disconnect, battery, trust
-- Input devices: Logitech mouse config (logiops), gamepad profiles (makima), Solaar settings
+- Input devices: juhradial-mx config and battery, gamepad profiles (makima)
 - MIDI: USB controller detection and mapping config
 - Composed workflows: bt_discover_and_connect, input_auto_setup_controller
 - Open-source readiness scoring (0-100) across 8 categories
