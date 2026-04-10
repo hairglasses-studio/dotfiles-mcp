@@ -28,13 +28,15 @@ Or use the pipeline script directly:
 
 ## Architecture
 
-dotfiles-mcp is a single-binary MCP server with 87 tools registered across module files:
+dotfiles-mcp is a single-binary MCP server with a discovery-first contract. The canonical module now exposes 276 tools across 32 modules plus workflow resources and prompt entrypoints, while this standalone repo remains a publish mirror for installation and discovery.
 
-- `main.go` -- Server setup, tool registration
-- `mod_hyprland.go` -- Hyprland compositor tools
-- `mod_shader.go` -- Ghostty shader pipeline
-- `mod_input.go` -- Input device management (juhradial-mx, makima, MIDI)
-- `oss.go` -- Open-source readiness scoring
+Focus paths:
+
+- `cmd/`
+- `internal/dotfiles/`
+- `internal/githubstars/`
+- `internal/ops/`
+- `internal/common/`
 
 All tools are built on [mcpkit](https://github.com/hairglasses-studio/mcpkit) using `handler.TypedHandler` generics and `registry.ToolDefinition`.
 

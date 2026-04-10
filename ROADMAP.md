@@ -2,7 +2,7 @@
 
 ## Current State
 
-dotfiles-mcp is a consolidated desktop environment MCP server with 86 tools across 10 modules: config management, GitHub org lifecycle, fleet auditing, build pipelines, Hyprland desktop, shader pipeline, Bluetooth, input devices (Logitech/gamepad/MIDI), composed workflows, and open-source readiness scoring. Discovery-first design with deferred tool loading. Built on mcpkit with stdio transport.
+dotfiles-mcp is now best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The current `main` target surface exposes 276 tools across 32 modules when published from the canonical source, with discovery-first loading, workflow resources, prompt entrypoints, and a juhradial-first MX input contract. This standalone repo should stay explicit about that relationship instead of pretending to be the system of record.
 
 All modules functional and tested. MIT licensed, README and CLAUDE.md in place. Batch tools default to dry-run mode.
 
@@ -44,6 +44,7 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 
 ### Recommended Work
 - [ ] [Mirror contract] Keep the canonical-source mapping to `dotfiles/mcp/dotfiles-mcp` explicit in roadmap, README, and release notes.
+- [ ] [Count reconciliation] Make the standalone mirror state explicit whenever its public docs lag the canonical tool count or module inventory.
 - [ ] [Contract snapshots] Snapshot the exported tool/resource/prompt contracts for the major module groups so mirror drift is visible.
 - [ ] [Host smoke tests] Add smoke tests for the host-dependent Hyprland, Bluetooth, input, and org-lifecycle surfaces before publish.
 - [ ] [Release parity] Verify that release tags and manifests still reflect the canonical source-of-truth module.
