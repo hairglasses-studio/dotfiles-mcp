@@ -1,128 +1,1156 @@
 {
   "name": "io.github.hairglasses-studio.dotfiles-mcp",
-  "description": "Desktop environment management: Hyprland, shaders, Bluetooth, MIDI, OSS scoring",
-  "version": "2.0.0",
+  "description": "Publish mirror of the canonical dotfiles-mcp workstation MCP server with discovery-first tools, resources, and prompts.",
+  "version": "2.2.0",
   "homepage": "https://github.com/hairglasses-studio/dotfiles-mcp",
   "license": "MIT",
   "organization": "hairglasses-studio",
   "repository": "https://github.com/hairglasses-studio/dotfiles-mcp",
-  "transport": ["stdio"],
+  "canonical_source": "https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp",
+  "publish_mirror": true,
+  "transport": [
+    "stdio"
+  ],
+  "profiles": [
+    "default",
+    "desktop",
+    "ops",
+    "full"
+  ],
+  "default_profile": "default",
   "capabilities": {
     "tools": true,
-    "resources": false,
-    "prompts": false
+    "resources": true,
+    "prompts": true
   },
   "tools": [
-    { "name": "dotfiles_list_configs", "description": "List dotfiles config directories with symlink health and format" },
-    { "name": "dotfiles_validate_config", "description": "Validate TOML or JSON config syntax" },
-    { "name": "dotfiles_reload_service", "description": "Reload desktop service (hyprland, mako, eww, waybar, sway, tmux)" },
-    { "name": "dotfiles_check_symlinks", "description": "Check health of all expected dotfiles symlinks" },
-    { "name": "dotfiles_gh_list_personal_repos", "description": "List personal repos with fork/visibility metadata" },
-    { "name": "dotfiles_gh_list_org_repos", "description": "List org repos with local clone sync status" },
-    { "name": "dotfiles_gh_transfer_repos", "description": "Bulk transfer non-fork repos to org" },
-    { "name": "dotfiles_gh_recreate_forks", "description": "Squash forks into fresh org repos" },
-    { "name": "dotfiles_gh_onboard_repos", "description": "Fork public repos, squash history, clone locally (batch)" },
-    { "name": "dotfiles_gh_local_sync_audit", "description": "Audit local dirs vs org repos (orphaned/missing/mismatched)" },
-    { "name": "dotfiles_gh_bulk_clone", "description": "Clone all missing org repos locally" },
-    { "name": "dotfiles_gh_pull_all", "description": "Fetch/pull all local repos (detects dirty/detached)" },
-    { "name": "dotfiles_gh_clean_stale", "description": "Remove orphaned local clones (safety: checks uncommitted/unpushed)" },
-    { "name": "dotfiles_gh_full_sync", "description": "One-command fleet sync (pull + audit + clone missing)" },
-    { "name": "dotfiles_gh_bulk_archive", "description": "Batch archive repos" },
-    { "name": "dotfiles_gh_bulk_settings", "description": "Batch apply repo settings with before/after reporting" },
-    { "name": "dotfiles_fleet_audit", "description": "Per-repo language, Go version, CI status, test count, commit age, CLAUDE.md presence" },
-    { "name": "dotfiles_health_check", "description": "Org-wide health dashboard" },
-    { "name": "dotfiles_dep_audit", "description": "Go dependency version skew across fleet" },
-    { "name": "dotfiles_workflow_sync", "description": "Sync CI workflows from canonical sources" },
-    { "name": "dotfiles_pipeline_run", "description": "Run build+test pipeline on a repo (Go/Node/Python)" },
-    { "name": "dotfiles_bulk_pipeline", "description": "Run pipeline across N repos with language filtering" },
-    { "name": "dotfiles_go_sync", "description": "Sync Go version across all repos" },
-    { "name": "dotfiles_mcpkit_version_sync", "description": "Sync mcpkit dependency across all thin MCP servers" },
-    { "name": "dotfiles_create_repo", "description": "Scaffold new repo with standard files" },
-    { "name": "dotfiles_cascade_reload", "description": "Ordered multi-service reload with health verification" },
-    { "name": "dotfiles_rice_check", "description": "Compositor/shader/wallpaper/service status + Snazzy palette compliance" },
-    { "name": "dotfiles_eww_restart", "description": "Kill and restart eww daemon with both bars" },
-    { "name": "dotfiles_eww_status", "description": "Show eww daemon health, windows, key variables" },
-    { "name": "dotfiles_eww_get", "description": "Query current eww variable value" },
-    { "name": "dotfiles_onboard_repo", "description": "Add standard files to any repo (.editorconfig, CI, LICENSE)" },
-    { "name": "hypr_list_windows", "description": "List all windows with address, title, class, workspace" },
-    { "name": "hypr_list_workspaces", "description": "List workspaces with window count, monitor, focused status" },
-    { "name": "hypr_get_monitors", "description": "List monitors with resolution, refresh rate, position, scale" },
-    { "name": "hypr_screenshot", "description": "Capture screenshot (single monitor or all)" },
-    { "name": "hypr_screenshot_monitors", "description": "Capture separate screenshots per monitor" },
-    { "name": "hypr_focus_window", "description": "Focus window by address or class name" },
-    { "name": "hypr_switch_workspace", "description": "Switch to workspace by ID" },
-    { "name": "hypr_reload_config", "description": "Reload Hyprland config and check for errors" },
-    { "name": "hypr_click", "description": "Click at coordinates using ydotool" },
-    { "name": "hypr_type_text", "description": "Type text at cursor using wtype" },
-    { "name": "hypr_key", "description": "Send key events using ydotool" },
-    { "name": "hypr_set_monitor", "description": "Configure monitor resolution, position, or scale" },
-    { "name": "shader_list", "description": "List GLSL shaders, optionally filter by category" },
-    { "name": "shader_set", "description": "Apply shader to Ghostty via atomic config write" },
-    { "name": "shader_cycle", "description": "Advance shader playlist (next/prev)" },
-    { "name": "shader_random", "description": "Pick and apply a random shader" },
-    { "name": "shader_status", "description": "Current shader, animation state, playlist position, auto-rotate" },
-    { "name": "shader_meta", "description": "Full manifest metadata (category, cost, source, playlists)" },
-    { "name": "shader_test", "description": "Compile-test shaders via glslangValidator" },
-    { "name": "shader_build", "description": "Preprocess and validate shaders" },
-    { "name": "shader_playlist", "description": "List playlists or pick random shader from one" },
-    { "name": "shader_get_state", "description": "Read active shader from Ghostty config" },
-    { "name": "wallpaper_set", "description": "Set a live wallpaper shader via shaderbg" },
-    { "name": "wallpaper_random", "description": "Set random wallpaper shader" },
-    { "name": "wallpaper_list", "description": "List available wallpaper shaders" },
-    { "name": "bt_list_devices", "description": "List BT devices with connection status and battery levels" },
-    { "name": "bt_device_info", "description": "Detailed device info (battery, profiles, trust, UUIDs)" },
-    { "name": "bt_scan", "description": "Scan for nearby devices with configurable timeout (default 8s)" },
-    { "name": "bt_pair", "description": "Pair with interactive agent (BLE-safe, handles auth handshake)" },
-    { "name": "bt_connect", "description": "Connect with BLE retry logic, resolves names against all known devices" },
-    { "name": "bt_disconnect", "description": "Disconnect a device" },
-    { "name": "bt_remove", "description": "Forget a paired device" },
-    { "name": "bt_trust", "description": "Trust or untrust a device" },
-    { "name": "bt_power", "description": "Toggle BT adapter power" },
-    { "name": "input_detect_controllers", "description": "Scan for gamepads with brand detection and makima profile status" },
-    { "name": "input_generate_controller_profile", "description": "Generate makima profile from template (desktop/gaming/media/macropad)" },
-    { "name": "input_controller_test", "description": "Detect controllers, generate missing profiles, optionally restart makima" },
-    { "name": "input_status", "description": "Show running state of input services (logid, makima) and battery levels" },
-    { "name": "input_get_logiops_config", "description": "Read current logiops config for Logitech mice" },
-    { "name": "input_set_logiops_config", "description": "Write logiops config, optionally deploy to /etc/logid.cfg + restart logid" },
-    { "name": "input_restart_services", "description": "Restart input device services (logid, makima, or both; requires sudo)" },
-    { "name": "input_list_makima_profiles", "description": "List all per-app button remapping profiles" },
-    { "name": "input_get_makima_profile", "description": "Read a specific makima profile by name" },
-    { "name": "input_set_makima_profile", "description": "Create or update a makima profile (validates TOML)" },
-    { "name": "input_delete_makima_profile", "description": "Delete a makima profile" },
-    { "name": "input_get_solaar_settings", "description": "Read Solaar settings for Logitech devices" },
-    { "name": "input_set_solaar_setting", "description": "Set a Solaar device setting" },
-    { "name": "midi_list_devices", "description": "Detect connected USB MIDI controllers via ALSA" },
-    { "name": "midi_generate_mapping", "description": "Generate MIDI controller mapping config from template" },
-    { "name": "midi_get_mapping", "description": "Read existing MIDI controller mapping config" },
-    { "name": "midi_set_mapping", "description": "Create or update MIDI mapping (validates TOML)" },
-    { "name": "bt_discover_and_connect", "description": "Scan, find, remove stale, pair (with agent), trust, connect (with retry)" },
-    { "name": "input_auto_setup_controller", "description": "Detect controllers, generate missing profiles, restart makima" },
-    { "name": "dotfiles_oss_score", "description": "Score a repo's open-source readiness (0-100) across 8 categories" },
-    { "name": "dotfiles_oss_check", "description": "Run checks for a single category with detailed suggestions" },
-    { "name": "prompt_capture", "description": "Capture a prompt with auto-scoring (SHA-256 dedup, 10-dimension quality scoring)" },
-    { "name": "prompt_search", "description": "Full-text + tag/repo/score/status filter search" },
-    { "name": "prompt_get", "description": "Retrieve single prompt by hash" },
-    { "name": "prompt_tag", "description": "Add/remove tags (validated against taxonomy)" },
-    { "name": "prompt_score", "description": "Re-score prompt via 10-dimension scoring" },
-    { "name": "prompt_improve", "description": "Run 13-stage enhancement pipeline, save to sorted/" },
-    { "name": "prompt_stats", "description": "Aggregate statistics by repo/status/task_type/grade" },
-    { "name": "prompt_export", "description": "Export matching prompts as JSONL or markdown" }
+    {
+      "name": "audio_device_switch",
+      "description": "Switch the default audio output device. Provide a PipeWire node ID (numeric) or a device name substring to match. Uses wpctl set-default."
+    },
+    {
+      "name": "audio_devices",
+      "description": "List all audio devices (sinks and sources) with type, name, ID, and state. Uses pactl for structured output."
+    },
+    {
+      "name": "audio_mute",
+      "description": "Toggle or set mute state for an audio sink. Actions: toggle, on (mute), off (unmute). Uses wpctl."
+    },
+    {
+      "name": "audio_status",
+      "description": "Show current audio status: default sink/source, volume level, mute state. Uses wpctl to query PipeWire."
+    },
+    {
+      "name": "audio_volume",
+      "description": "Set audio volume. Accepts absolute percentage (e.g. '50'), float 0-1 (e.g. '0.5'), or relative adjustment (e.g. '+5', '-10'). Uses wpctl to control PipeWire."
+    },
+    {
+      "name": "bt_connect",
+      "description": "Connect to a Bluetooth device with BLE retry logic. Resolves names against all known devices (paired + scanned)."
+    },
+    {
+      "name": "bt_device_info",
+      "description": "Get detailed info for a Bluetooth device including battery, profiles, and trust status."
+    },
+    {
+      "name": "bt_disconnect",
+      "description": "Disconnect a Bluetooth device."
+    },
+    {
+      "name": "bt_discover_and_connect",
+      "description": "Full BLE-safe workflow: scan, find device by name, remove stale bond, pair with agent, trust, connect with retry. Handles BLE re-pairing (MAC changes, auth failures)."
+    },
+    {
+      "name": "bt_list_devices",
+      "description": "List Bluetooth devices with connection status and battery levels."
+    },
+    {
+      "name": "bt_pair",
+      "description": "Pair with a Bluetooth device using interactive agent (handles BLE auth). Set remove_first=true to clear stale bonds before re-pairing."
+    },
+    {
+      "name": "bt_power",
+      "description": "Toggle Bluetooth adapter power on or off."
+    },
+    {
+      "name": "bt_remove",
+      "description": "Remove (forget) a paired Bluetooth device."
+    },
+    {
+      "name": "bt_scan",
+      "description": "Scan for nearby Bluetooth devices. 'start' scans for 8 seconds (configurable) and returns discovered devices."
+    },
+    {
+      "name": "bt_trust",
+      "description": "Trust or untrust a Bluetooth device."
+    },
+    {
+      "name": "claude_crash_detect",
+      "description": "Detect Claude Code session crashes by checking PID liveness, dead session count within a time window, and crash indicators in history. Returns severity assessment (minor/major/catastrophic)."
+    },
+    {
+      "name": "claude_fleet_recovery",
+      "description": "Composed recovery workflow: detect dead sessions across all repos, analyze git state, generate recovery steps with resume commands. Dry-run by default — set execute=true to trigger resumes."
+    },
+    {
+      "name": "claude_recovery_history",
+      "description": "Audit trail of crash and recovery events extracted from history.jsonl. Shows crash timestamps, resume attempts, and session outcomes."
+    },
+    {
+      "name": "claude_recovery_report",
+      "description": "Comprehensive cross-session, cross-repo recovery report. Scans all sessions, correlates with git state, identifies orphaned repos, and builds a priority queue for session resumption ranked by incomplete tasks."
+    },
+    {
+      "name": "claude_repo_diff",
+      "description": "Compare a repository against origin/main: unpushed commits, local-only branches, and stash entries."
+    },
+    {
+      "name": "claude_repo_roadmap_status",
+      "description": "Parse ROADMAP.md checkbox items and compare completion against a session's task list. Returns progress percentage and unchecked items."
+    },
+    {
+      "name": "claude_repo_status",
+      "description": "Get git status for a repository: current branch, last commit, staged/unstaged/untracked files, and remote tracking status."
+    },
+    {
+      "name": "claude_session_compare",
+      "description": "Compare progress between two Claude Code sessions: task completion delta, commit delta, file change count, and time gap."
+    },
+    {
+      "name": "claude_session_detail",
+      "description": "Deep inspection of a single Claude Code session: metadata, recent interaction logs, associated plan file, task list with statuses, and memory files."
+    },
+    {
+      "name": "claude_session_health",
+      "description": "Health score (0-100) for a Claude Code session across 5 dimensions: process_alive, tasks_completion, git_clean, recency, plan_progress. Returns per-dimension scores and actionable recommendations."
+    },
+    {
+      "name": "claude_session_logs",
+      "description": "Read the last N structured log entries from a Claude Code session's JSONL interaction log. Returns parsed entries with type, timestamp, and content summary."
+    },
+    {
+      "name": "claude_session_replay",
+      "description": "Reconstruct the conversation thread from a session's JSONL log as user/assistant exchange pairs with tool use summaries."
+    },
+    {
+      "name": "claude_session_scan",
+      "description": "Scan all Claude Code sessions, check PID liveness, and correlate with history for last activity timestamps. Returns per-session status (alive/dead), repo, name, and timestamps."
+    },
+    {
+      "name": "claude_session_search",
+      "description": "Full-text keyword search across all Claude Code session JSONL logs. Finds sessions by topic, tool names, or content. Returns ranked matches with context snippets and resume commands."
+    },
+    {
+      "name": "claude_session_tag",
+      "description": "Extract structured metadata tags for a Claude Code session: repo name, last commit timestamp, last session activity, plan file, and task counts."
+    },
+    {
+      "name": "claude_workspace_snapshot",
+      "description": "Capture a point-in-time snapshot of all Claude Code sessions and repo git states across the studio directory. Saves to ~/.claude/snapshots/ for later comparison."
+    },
+    {
+      "name": "clipboard_read",
+      "description": "Read the current Wayland clipboard contents as text. Uses wl-paste."
+    },
+    {
+      "name": "clipboard_read_image",
+      "description": "Read an image from the Wayland clipboard. Uses wl-paste --type image/png. Returns the image inline as base64-encoded PNG."
+    },
+    {
+      "name": "clipboard_write",
+      "description": "Write text to the Wayland clipboard. Uses wl-copy. Optionally specify a MIME type."
+    },
+    {
+      "name": "desktop_click_text",
+      "description": "DESTRUCTIVE: Find text on screen via OCR and click at its center. The atomic 'click the button labeled X' primitive. Requires explicit approval."
+    },
+    {
+      "name": "desktop_find_text",
+      "description": "Screenshot + OCR + locate text on screen. Returns bounding box coordinates in desktop space suitable for ydotool. Use to find where a button or label appears before clicking."
+    },
+    {
+      "name": "desktop_screenshot_ocr",
+      "description": "Screenshot the full desktop or a specific window (by address/class) and extract text via OCR. Returns both the image (for LLM vision) and extracted text. Use for seeing what is on screen."
+    },
+    {
+      "name": "desktop_wait_for_text",
+      "description": "Poll screenshot+OCR until text appears on screen or timeout. Returns coordinates and final screenshot when found. Use to wait for UI state changes (dialogs, loading, notifications)."
+    },
+    {
+      "name": "dotfiles_bulk_pipeline",
+      "description": "Run build+test pipeline across multiple repos. Detects language and runs appropriate build/test steps. Returns per-repo pass/fail with output."
+    },
+    {
+      "name": "dotfiles_cascade_reload",
+      "description": "Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → eww), verifying each is healthy before proceeding to the next."
+    },
+    {
+      "name": "dotfiles_check_symlinks",
+      "description": "Check health of all expected dotfiles symlinks (healthy, broken, or missing)."
+    },
+    {
+      "name": "dotfiles_create_repo",
+      "description": "Scaffold a new hairglasses-studio repo with standard files (CI, LICENSE, .editorconfig, pre-commit hooks). Auto-detects or uses specified language for templates."
+    },
+    {
+      "name": "dotfiles_dep_audit",
+      "description": "Audit Go dependency version skew across all hairglasses-studio repos. Reports which deps are unified vs which have version drift."
+    },
+    {
+      "name": "dotfiles_eww_get",
+      "description": "Get the current value of an eww variable. Useful for debugging bar widgets (e.g. bar_workspaces_dp1, bar_cpu, bar_shader, rg_fleet)."
+    },
+    {
+      "name": "dotfiles_eww_restart",
+      "description": "Kill all eww and waybar processes, restart eww daemon, and open both bars (bar and bar-secondary). Use after editing eww config files."
+    },
+    {
+      "name": "dotfiles_eww_status",
+      "description": "Show eww bar status: daemon health, open windows, layer surfaces, key variable values, and whether waybar is incorrectly running."
+    },
+    {
+      "name": "dotfiles_fleet_audit",
+      "description": "Comprehensive fleet audit: per-repo language, Go version, CI status, test count, last commit age, pipeline.mk and CLAUDE.md presence. Single tool replaces manual health+dep+CI checks."
+    },
+    {
+      "name": "dotfiles_gh_bulk_archive",
+      "description": "Archive multiple repos in a GitHub org. Useful for housekeeping old reference repos. Set execute=true to run (dry-run by default)."
+    },
+    {
+      "name": "dotfiles_gh_bulk_clone",
+      "description": "Clone all missing org repos to the local directory. Skips repos already cloned. Pairs with dotfiles_gh_local_sync_audit to act on missing repos. Set execute=true to run (dry-run by default)."
+    },
+    {
+      "name": "dotfiles_gh_bulk_settings",
+      "description": "Batch-apply repo settings across multiple org repos. Supports auto-delete head branches, wiki, projects, and merge strategy toggles. Set execute=true to run (dry-run by default)."
+    },
+    {
+      "name": "dotfiles_gh_clean_stale",
+      "description": "Remove local clones that have no matching repo in the GitHub org. Identifies orphaned directories (local git repos whose origin doesn't point to the org). Set execute=true to delete (dry-run by default)."
+    },
+    {
+      "name": "dotfiles_gh_full_sync",
+      "description": "One-command fleet sync: pulls all local repos, identifies missing org repos, clones them, and reports orphaned dirs. Set execute=true to clone missing repos (dry-run by default for clones; pull always runs)."
+    },
+    {
+      "name": "dotfiles_gh_list_org_repos",
+      "description": "List all repos in a GitHub org with local clone sync status. Shows whether each repo is cloned locally, missing, or has a wrong remote."
+    },
+    {
+      "name": "dotfiles_gh_list_personal_repos",
+      "description": "List GitHub repos under a personal account, optionally excluding repos already in an org. Shows fork status, visibility, and language."
+    },
+    {
+      "name": "dotfiles_gh_local_sync_audit",
+      "description": "Audit local directory against GitHub org repos. Finds orphaned local dirs (no org repo), missing clones (org repo not cloned), and remote mismatches."
+    },
+    {
+      "name": "dotfiles_gh_onboard_repos",
+      "description": "Onboard public repos into a GitHub org for architecture reference. For each repo: forks to org (if not already there), clones locally, strips git history to a single squashed commit on the default branch, and force-pushes. Designed for batch operations on 8-15+ repos. Set execute=true to run (dry-run by default)."
+    },
+    {
+      "name": "dotfiles_gh_pull_all",
+      "description": "Fetch or pull updates for all git repos in the local directory. Uses --ff-only by default to avoid merge conflicts. Set fetch_only=true to just fetch without merging."
+    },
+    {
+      "name": "dotfiles_gh_recreate_forks",
+      "description": "Recreate forked repos as fresh repos under a GitHub org. Clones each fork, squashes all history to a single initial commit on the default branch, creates a new repo in the org, pushes, and deletes the original fork. Set execute=true to run (dry-run by default)."
+    },
+    {
+      "name": "dotfiles_gh_transfer_repos",
+      "description": "Bulk transfer non-fork repos from a personal account to a GitHub org. Skips repos that already exist in the target. Set execute=true to run (dry-run by default)."
+    },
+    {
+      "name": "dotfiles_go_sync",
+      "description": "Sync Go version across all repos to match dotfiles/make/go-version. Updates go.mod and optionally runs go mod tidy."
+    },
+    {
+      "name": "dotfiles_health_check",
+      "description": "Run org-wide health dashboard across all hairglasses-studio repos. Shows build status, Go version, pipeline.mk inclusion, and CI workflow presence for every repo."
+    },
+    {
+      "name": "dotfiles_list_configs",
+      "description": "List all dotfiles config directories with symlink health and detected format."
+    },
+    {
+      "name": "dotfiles_mcpkit_version_sync",
+      "description": "Sync mcpkit dependency version across all thin MCP servers. Finds latest mcpkit version and updates go.mod in each MCP repo. Set execute=true to run go get + go mod tidy (dry-run by default)."
+    },
+    {
+      "name": "dotfiles_onboard_repo",
+      "description": "Onboard a repo with hairglasses-studio standard files (.editorconfig, CI workflows, LICENSE, CONTRIBUTING.md, pre-commit hooks). Detects language and adds appropriate config."
+    },
+    {
+      "name": "dotfiles_oss_check",
+      "description": "Run open-source readiness checks for a single category (community, readme, gomod, testing, cicd, security, release, maintenance)"
+    },
+    {
+      "name": "dotfiles_oss_score",
+      "description": "Score a repository's open-source readiness (0-100) across 8 categories based on GitHub best practices, OpenSSF Scorecard criteria, and Go module conventions"
+    },
+    {
+      "name": "dotfiles_pipeline_run",
+      "description": "Run the build+test pipeline (hg-pipeline.sh) on a repo. Supports Go, Node.js, and Python. Returns JSON results with per-step timing."
+    },
+    {
+      "name": "dotfiles_reload_service",
+      "description": "Reload a desktop service after config changes."
+    },
+    {
+      "name": "dotfiles_rice_check",
+      "description": "Rice health check: reports compositor, shader, wallpaper, service states, and (with level=full) scans all configs for non-Snazzy palette violations."
+    },
+    {
+      "name": "dotfiles_server_health",
+      "description": "Show the active dotfiles-mcp contract shape: discovery coverage, tool counts, profile, and resource/prompt availability."
+    },
+    {
+      "name": "dotfiles_tool_catalog",
+      "description": "Summarize the dotfiles tool catalog by category with deferred-loading hints."
+    },
+    {
+      "name": "dotfiles_tool_schema",
+      "description": "Inspect one tool descriptor including schemas, search terms, and deferred-loading hints."
+    },
+    {
+      "name": "dotfiles_tool_search",
+      "description": "Search the dotfiles tool catalog by keyword before invoking a desktop or workflow tool."
+    },
+    {
+      "name": "dotfiles_tool_stats",
+      "description": "Show high-level catalog statistics, including how many tools are marked deferred in the active profile."
+    },
+    {
+      "name": "dotfiles_validate_config",
+      "description": "Validate config file content syntax (TOML or JSON)."
+    },
+    {
+      "name": "dotfiles_workflow_sync",
+      "description": "Sync CI workflow files across all repos from canonical sources. Detects stale workflows and optionally updates, commits, and pushes."
+    },
+    {
+      "name": "gh_star_lists_delete",
+      "description": "Delete GitHub star folders (user lists) by name. Dry-run by default."
+    },
+    {
+      "name": "gh_star_lists_ensure",
+      "description": "Create or update GitHub star folders (user lists). Dry-run by default."
+    },
+    {
+      "name": "gh_star_lists_list",
+      "description": "List the current GitHub star folders (user lists), optionally including list items."
+    },
+    {
+      "name": "gh_star_lists_rename",
+      "description": "Rename an existing GitHub star folder while preserving its description and privacy settings. Dry-run by default."
+    },
+    {
+      "name": "gh_star_membership_set",
+      "description": "Update which GitHub star folders a repo belongs to. Supports merge, replace, remove, and replace_managed. Dry-run by default."
+    },
+    {
+      "name": "gh_stars_bootstrap",
+      "description": "Bootstrap the GitHub Stars workflow: star the researched MCP repos, create the MCP / Production|Experimental|Alpha folders, assign repos, and optionally install the Codex MCP entries. Dry-run by default."
+    },
+    {
+      "name": "gh_stars_cleanup_candidates",
+      "description": "Find starred repositories that look like cleanup candidates, such as archived repos, forks, stale repos, unlisted repos, or repos missing a managed prefix."
+    },
+    {
+      "name": "gh_stars_install_codex_mcp",
+      "description": "Install the global Codex MCP entries for the official GitHub server and the dotfiles GitHub Stars workflow surface. Dry-run by default."
+    },
+    {
+      "name": "gh_stars_list",
+      "description": "List starred GitHub repositories with optional filters and current GitHub star-list membership."
+    },
+    {
+      "name": "gh_stars_set",
+      "description": "Star or unstar GitHub repositories in batch. Dry-run by default."
+    },
+    {
+      "name": "gh_stars_summary",
+      "description": "Summarize current GitHub stars with counts by list, language, topic, archived/fork totals, and optional managed-prefix coverage."
+    },
+    {
+      "name": "gh_stars_taxonomy_audit",
+      "description": "Audit managed GitHub star-list coverage and compare current stars against an optional desired taxonomy profile."
+    },
+    {
+      "name": "gh_stars_taxonomy_suggest",
+      "description": "Suggest useful GitHub star folders from your current stars using GitHub suggestions plus topic, language, and keyword clustering."
+    },
+    {
+      "name": "gh_stars_taxonomy_sync",
+      "description": "Ensure GitHub star folders and reconcile repo membership from an explicit repo-to-list taxonomy. Dry-run by default."
+    },
+    {
+      "name": "gpu_status",
+      "description": "Query NVIDIA GPU status: driver, temperature, utilization, memory, power draw, and running GPU processes."
+    },
+    {
+      "name": "hypr_click",
+      "description": "Click at absolute screen coordinates using ydotool."
+    },
+    {
+      "name": "hypr_close_window",
+      "description": "Close a window. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_focus_window",
+      "description": "Focus a window by its address or class name."
+    },
+    {
+      "name": "hypr_fullscreen_window",
+      "description": "Toggle fullscreen for a window. Focuses the window first, then applies fullscreen. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_get_monitors",
+      "description": "List connected monitors with resolution, refresh rate, position, scale, and active workspace."
+    },
+    {
+      "name": "hypr_key",
+      "description": "Send key events using ydotool. Use Linux input event codes (e.g. '29:1 29:0' for Ctrl tap, '56:1 31:1 31:0 56:0' for Alt+S)."
+    },
+    {
+      "name": "hypr_list_windows",
+      "description": "List all windows managed by Hyprland with their address, title, class, workspace, size, position, and focus state."
+    },
+    {
+      "name": "hypr_list_workspaces",
+      "description": "List all Hyprland workspaces with window count, monitor, and focused status."
+    },
+    {
+      "name": "hypr_minimize_window",
+      "description": "Minimize a window by moving it to the special:minimized workspace. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_move_window",
+      "description": "Move a window to exact pixel coordinates. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_reload_config",
+      "description": "Reload the Hyprland configuration and check for config errors."
+    },
+    {
+      "name": "hypr_resize_window",
+      "description": "Resize a window to exact pixel dimensions. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_screenshot",
+      "description": "Capture a screenshot. Specify a monitor name for a single output, or omit to capture all monitors combined. For per-monitor detail (especially menubars), use hypr_screenshot_monitors instead."
+    },
+    {
+      "name": "hypr_screenshot_monitors",
+      "description": "Capture separate screenshots of each monitor. Returns multiple images, one per active monitor, each resized individually for better detail than a single combined capture. Also captures a cropped menubar view (top 48px) of each monitor for bar inspection."
+    },
+    {
+      "name": "hypr_screenshot_window",
+      "description": "Take a screenshot of a specific window by address or class name. Returns the image inline for LLM vision."
+    },
+    {
+      "name": "hypr_set_monitor",
+      "description": "Configure a monitor's resolution, position, or scale."
+    },
+    {
+      "name": "hypr_switch_workspace",
+      "description": "Switch to a workspace by ID."
+    },
+    {
+      "name": "hypr_toggle_floating",
+      "description": "Toggle floating state of a window. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_type_text",
+      "description": "Type text at the current cursor position using wtype (Wayland)."
+    },
+    {
+      "name": "input_auto_setup_controller",
+      "description": "Detect all connected controllers, generate makima profiles for each, and optionally restart makima. Single tool replaces detect + generate + restart."
+    },
+    {
+      "name": "input_controller_test",
+      "description": "Read events from a controller for 3 seconds to verify it works. Returns last 10 button/axis events."
+    },
+    {
+      "name": "input_delete_makima_profile",
+      "description": "Delete a makima per-app profile."
+    },
+    {
+      "name": "input_detect_controllers",
+      "description": "Scan for connected gamepad/controller devices. Returns brand (xbox/playstation/nintendo), capabilities, event path, and whether a makima profile exists."
+    },
+    {
+      "name": "input_generate_controller_profile",
+      "description": "Generate a starter makima TOML profile for a controller with preset mappings (desktop, claude-code, gaming, media). Includes brand-aware button label comments."
+    },
+    {
+      "name": "input_get_juhradial_battery",
+      "description": "Read MX battery status from the juhradial D-Bus daemon, falling back to bluetoothctl when D-Bus is unavailable."
+    },
+    {
+      "name": "input_get_juhradial_config",
+      "description": "Read the tracked juhradial config.json from dotfiles."
+    },
+    {
+      "name": "input_get_juhradial_profiles",
+      "description": "Read the tracked juhradial profiles.json from dotfiles."
+    },
+    {
+      "name": "input_get_makima_profile",
+      "description": "Read a specific makima per-app profile by name."
+    },
+    {
+      "name": "input_key_press",
+      "description": "DESTRUCTIVE: Press a key combination (e.g. ctrl+shift+t, Return, super) using wtype -k or ydotool key. Simulates real key events — requires explicit approval."
+    },
+    {
+      "name": "input_list_makima_profiles",
+      "description": "List all makima per-app button remapping profiles with their remap and command bindings."
+    },
+    {
+      "name": "input_mouse_click",
+      "description": "DESTRUCTIVE: Click mouse button at current or specified position using ydotool. Simulates a real mouse click — requires explicit approval."
+    },
+    {
+      "name": "input_mouse_move",
+      "description": "DESTRUCTIVE: Move mouse cursor to coordinates using ydotool mousemove. Simulates real mouse movement — requires explicit approval."
+    },
+    {
+      "name": "input_mouse_scroll",
+      "description": "DESTRUCTIVE: Scroll the mouse wheel up or down using ydotool. Simulates real scroll events — requires explicit approval."
+    },
+    {
+      "name": "input_restart_services",
+      "description": "Restart juhradial mouse services or the makima controller service. Restarting the controller service may require elevated systemd permissions."
+    },
+    {
+      "name": "input_screenshot_click",
+      "description": "DESTRUCTIVE: Take a screenshot, then click at the specified coordinates. Combines screenshot capture for agent visual context with coordinate-based clicking. Requires explicit approval."
+    },
+    {
+      "name": "input_set_juhradial_config",
+      "description": "Write dotfiles juhradial config.json after validating that the content is valid JSON."
+    },
+    {
+      "name": "input_set_juhradial_profiles",
+      "description": "Write dotfiles juhradial profiles.json after validating that the content is valid JSON."
+    },
+    {
+      "name": "input_set_makima_profile",
+      "description": "Create or update a makima per-app profile. Validates TOML before writing."
+    },
+    {
+      "name": "input_status",
+      "description": "Show running state of juhradial mouse services, the makima controller service, and MX battery status when available."
+    },
+    {
+      "name": "input_type_text",
+      "description": "DESTRUCTIVE: Type text as if from keyboard using wtype (Wayland) or ydotool as fallback. This simulates real keystrokes — requires explicit approval."
+    },
+    {
+      "name": "investigate_port",
+      "description": "Investigate a TCP port: find the listening process, show its tree, check systemd unit status, and fetch recent logs. Single tool replaces port_list + ps_list + systemd_status + systemd_logs."
+    },
+    {
+      "name": "investigate_service",
+      "description": "Investigate a systemd service: get status, find its processes, check its ports, and fetch recent logs. Single tool replaces systemd_status + ps_list + port_list + systemd_logs."
+    },
+    {
+      "name": "kill_process",
+      "description": "Send a signal to a process. Supports TERM, KILL, HUP, INT, USR1, USR2, STOP, CONT."
+    },
+    {
+      "name": "mapping_auto_setup",
+      "description": "Detect all connected controllers and MIDI devices, generate missing profiles from templates, and optionally restart makima. Dry-run by default."
+    },
+    {
+      "name": "mapping_daemon_control",
+      "description": "Control the mapitall daemon. Actions: status (health/uptime), reload (hot-reload profiles), list_devices (connected controllers), list_profiles (loaded profiles), get_state (variables/active app), set_variable (set a runtime variable)."
+    },
+    {
+      "name": "mapping_delete_profile",
+      "description": "Delete a mapping profile from disk."
+    },
+    {
+      "name": "mapping_diff",
+      "description": "Compare two mapping profiles and show differences in their bindings."
+    },
+    {
+      "name": "mapping_export",
+      "description": "Export a mapping profile for sharing. Optionally sanitize to strip local paths."
+    },
+    {
+      "name": "mapping_generate",
+      "description": "Generate a mapping profile from a built-in template for a specified device."
+    },
+    {
+      "name": "mapping_get_profile",
+      "description": "Read a mapping profile with parsed structure and raw TOML content."
+    },
+    {
+      "name": "mapping_import",
+      "description": "Import a mapping profile from TOML content. Validates before writing. Dry-run mode available."
+    },
+    {
+      "name": "mapping_learn",
+      "description": "Listen to a controller or MIDI device and capture which controls are moved. Use this to discover available inputs before creating mappings. Returns detected controls with type classification (button, axis, encoder, MIDI CC/note) and mapping suggestions."
+    },
+    {
+      "name": "mapping_list_profiles",
+      "description": "List all mapping profiles with device info, format, and mapping counts. Supports filtering by format (unified/legacy), device name, and tag."
+    },
+    {
+      "name": "mapping_list_templates",
+      "description": "List all available mapping templates for gamepad and MIDI controllers."
+    },
+    {
+      "name": "mapping_migrate_legacy",
+      "description": "Convert legacy makima profiles to the unified mapping format. Dry-run by default."
+    },
+    {
+      "name": "mapping_monitor",
+      "description": "Live-monitor controller events for debugging. Shows raw events with timestamps. Use to verify a controller is working and identify input codes."
+    },
+    {
+      "name": "mapping_quick_map",
+      "description": "Add a single mapping rule to an existing profile without writing full TOML. Specify the input source, output type, and target. Creates the profile if it doesn't exist."
+    },
+    {
+      "name": "mapping_resolve_test",
+      "description": "Simulate rule resolution: given an input source and app context, show which mapping rule would fire."
+    },
+    {
+      "name": "mapping_set_profile",
+      "description": "Create or update a mapping profile. Validates TOML syntax and schema before writing."
+    },
+    {
+      "name": "mapping_status",
+      "description": "Show complete controller mapping status: connected devices, active profiles, template availability, and directory paths. Call this first to understand the current setup."
+    },
+    {
+      "name": "mapping_validate",
+      "description": "Validate a mapping profile for schema compliance. Provide either content (TOML string) or name (profile on disk)."
+    },
+    {
+      "name": "midi_generate_mapping",
+      "description": "Generate a MIDI controller mapping config (TOML) with preset templates: desktop-control (volume/brightness/workspaces), shader-control (shader/wallpaper cycling), volume-mixer (per-sink audio)."
+    },
+    {
+      "name": "midi_get_mapping",
+      "description": "Read an existing MIDI controller mapping config from dotfiles."
+    },
+    {
+      "name": "midi_list_devices",
+      "description": "Detect connected USB MIDI controllers via ALSA. Returns card/device numbers, names, raw MIDI paths, and whether a mapping config exists in dotfiles."
+    },
+    {
+      "name": "midi_set_mapping",
+      "description": "Create or update a MIDI controller mapping config. Validates TOML before writing."
+    },
+    {
+      "name": "network_connections",
+      "description": "List all saved NetworkManager connection profiles (WiFi, VPN, Ethernet, etc.) with name, UUID, type, and device."
+    },
+    {
+      "name": "network_dns",
+      "description": "Show DNS servers per network interface. Tries resolvectl first, falls back to /etc/resolv.conf."
+    },
+    {
+      "name": "network_status",
+      "description": "Show overall network status: connectivity state, WiFi enabled, and active connections. Uses nmcli."
+    },
+    {
+      "name": "network_vpn_toggle",
+      "description": "DESTRUCTIVE: Connect or disconnect a VPN/connection profile by name. Use action 'up' to connect and 'down' to disconnect. Requires explicit approval."
+    },
+    {
+      "name": "network_wifi_connect",
+      "description": "DESTRUCTIVE: Connect to a WiFi network by SSID. Provide password for protected networks, omit for open networks. Requires explicit approval."
+    },
+    {
+      "name": "network_wifi_list",
+      "description": "Scan and list available WiFi networks sorted by signal strength. Returns SSID, signal, security, channel, and frequency. Deduplicates SSIDs keeping strongest signal."
+    },
+    {
+      "name": "notify_count",
+      "description": "Get the current notification count from SwayNotificationCenter."
+    },
+    {
+      "name": "notify_dismiss",
+      "description": "DESTRUCTIVE: Dismiss notifications in SwayNotificationCenter. Scope: all (dismiss everything) or latest (dismiss most recent only)."
+    },
+    {
+      "name": "notify_dnd",
+      "description": "Manage Do Not Disturb mode in SwayNotificationCenter. Actions: get (query current state), toggle, on, off."
+    },
+    {
+      "name": "notify_history",
+      "description": "Get SwayNotificationCenter status snapshot: notification count, DND state, panel visibility, inhibitor state. (swaync does not expose individual notification history via CLI.)"
+    },
+    {
+      "name": "notify_panel",
+      "description": "DESTRUCTIVE: Control the SwayNotificationCenter panel visibility. Actions: toggle, open, close."
+    },
+    {
+      "name": "notify_send",
+      "description": "Send a desktop notification via notify-send. Supports urgency levels, timeout, and custom icons."
+    },
+    {
+      "name": "ops_analyze_failures",
+      "description": "Categorize build/test failures into types (compile_error, type_error, missing_dep, test_assertion, timeout, import_cycle) with suggested fix order. Pass build_errors from ops_build and/or test_failures from ops_test_smart."
+    },
+    {
+      "name": "ops_auto_fix",
+      "description": "Auto-fix mechanical failures from ops_analyze_failures: missing deps (go mod tidy), missing imports (goimports), unused vars (remove). Pass issues from analyze output. Dry-run by default — pass execute=true to apply patches."
+    },
+    {
+      "name": "ops_branch_create",
+      "description": "Create a feature branch with conventional naming (feat/fix/chore prefix). Dry-run by default — pass execute=true to create."
+    },
+    {
+      "name": "ops_build",
+      "description": "Run go build and parse compiler errors into structured JSON with file, line, column, message, and package. Returns success/failure with error count."
+    },
+    {
+      "name": "ops_changed_files",
+      "description": "List changed files with diff stats and Go package mapping. Useful for understanding what was modified before building or testing."
+    },
+    {
+      "name": "ops_changelog_generate",
+      "description": "Generate markdown changelog from conventional commits since last tag. Groups by feat/fix/chore/etc. Pass write=true to prepend to CHANGELOG.md."
+    },
+    {
+      "name": "ops_ci_status",
+      "description": "Check GitHub Actions check status for a branch or PR. Returns per-check pass/fail with overall verdict. Use wait=true to poll until all checks complete (up to 5 minutes)."
+    },
+    {
+      "name": "ops_commit",
+      "description": "Stage changed files and create a conventional commit. Validates message format, never amends. Dry-run by default — pass execute=true to commit."
+    },
+    {
+      "name": "ops_coverage_report",
+      "description": "Run test coverage and return per-package percentages. Set threshold\u003e0 to gate on minimum overall coverage. Go: go test -coverprofile, Node: nyc/c8, Python: coverage.py."
+    },
+    {
+      "name": "ops_dep_graph",
+      "description": "Generate a dependency graph for a Go workspace or module. Uses go mod graph for accurate module-level dependencies. Outputs Mermaid markdown (for GitHub rendering) or DOT format. Filter to internal org modules or include all transitive deps."
+    },
+    {
+      "name": "ops_fleet_diff",
+      "description": "Show what changed across all repos since a date or ref. Returns per-repo commit counts, insertions/deletions, commit type breakdown (feat/fix/chore), and fleet-wide totals. Use since='3d' for relative or '2024-04-01' for absolute."
+    },
+    {
+      "name": "ops_fleet_iterate",
+      "description": "Run build+test across all repos in a directory. Returns per-repo health matrix with build/test status, error counts, and overall fleet summary. Scans for Go/Node/Python projects."
+    },
+    {
+      "name": "ops_iterate",
+      "description": "Core SDLC loop tool: build → test (changed packages) → analyze failures → track iteration. Call this after each round of edits. Returns structured next_actions with files to fix. Tracks iteration count and error trends for convergence detection."
+    },
+    {
+      "name": "ops_iteration_patterns",
+      "description": "Analyze historical SDLC sessions for patterns: common failure types, average iterations to convergence, hot files that appear in most failures. Useful for identifying systemic issues and improving auto-fix heuristics."
+    },
+    {
+      "name": "ops_lint_fix",
+      "description": "Auto-fix lint issues in-place. Go: goimports + golangci-lint --fix, Node: eslint --fix + prettier, Python: black + isort. Reports files changed and remaining errors."
+    },
+    {
+      "name": "ops_pr_create",
+      "description": "Push branch and create a GitHub PR via gh CLI. Returns PR URL and number. Dry-run by default — pass execute=true to create."
+    },
+    {
+      "name": "ops_pre_push",
+      "description": "Pre-push gate: run vet → lint → build → test (changed packages only). Short-circuits on first failure. Returns structured per-step results."
+    },
+    {
+      "name": "ops_release",
+      "description": "Bump version, generate changelog entry, commit, and tag. Detects language (Go/Node/Python) and updates the appropriate version file. Dry-run by default — pass execute=true."
+    },
+    {
+      "name": "ops_repo_analyze",
+      "description": "Analyze a repo and tag it with languages, protocols (gRPC, REST, MCP, WebSocket), frameworks, key dependencies, and project metadata (CI, tests, MCP server detection). Returns structured repo profile."
+    },
+    {
+      "name": "ops_research_check",
+      "description": "Search the docs knowledge base for existing research on a topic. Returns matching documents with relevance scores and identifies gaps where no research exists. Check this before starting new research to avoid duplication."
+    },
+    {
+      "name": "ops_revert",
+      "description": "Safely undo the last commit. If unpushed: soft reset (keeps changes staged). If pushed: creates a revert commit. Never force-pushes. Dry-run by default — pass execute=true."
+    },
+    {
+      "name": "ops_session_create",
+      "description": "Create a new SDLC session for iteration tracking. Optional — ops_iterate auto-creates one if absent."
+    },
+    {
+      "name": "ops_session_handoff",
+      "description": "Generate an Agent Handoff Protocol document from the current ops session and git state. Captures branch, dirty files, iteration history, and pending work. Set write=true to persist to repo."
+    },
+    {
+      "name": "ops_session_list",
+      "description": "List all active SDLC sessions with summary stats. Auto-cleans sessions older than 7 days."
+    },
+    {
+      "name": "ops_session_status",
+      "description": "Get SDLC session status: iteration count, error trend, convergence detection, total time spent."
+    },
+    {
+      "name": "ops_ship",
+      "description": "Ship changes: pre-push gate → commit → push → create PR. Only proceeds if gate passes. Dry-run by default — pass execute=true to ship."
+    },
+    {
+      "name": "ops_tech_debt",
+      "description": "Score tech debt 0-100 across 6 dimensions: dependency freshness, test coverage, lint cleanliness, CI health, documentation, code age. Single repo or fleet mode. Set store=true for trend tracking."
+    },
+    {
+      "name": "ops_test_smart",
+      "description": "Run go test -json on only changed packages (via git diff), returning per-test pass/fail/skip results. Use all=true to test everything. Smart filtering avoids running the full suite on every iteration."
+    },
+    {
+      "name": "port_list",
+      "description": "List listening TCP ports with process info via ss. Optionally filter by port number."
+    },
+    {
+      "name": "prompt_capture",
+      "description": "Capture a prompt with auto-scoring. Computes SHA-256 hash for dedup, classifies task type, scores against 10 quality dimensions, and saves to docs/prompts/{repo}/unsorted/. Use when you want to store a prompt for later retrieval and analysis."
+    },
+    {
+      "name": "prompt_export",
+      "description": "Export prompts matching filters as JSONL or markdown. Use for batch analysis, training data export, or prompt collection sharing."
+    },
+    {
+      "name": "prompt_get",
+      "description": "Retrieve a single prompt by full hash or short hash (first 12 chars). Returns the complete prompt text and all metadata. Use when you need the full content of a specific prompt."
+    },
+    {
+      "name": "prompt_improve",
+      "description": "Improve a prompt via the 13-stage enhancement pipeline (specificity, positive reframing, tone, XML structure, context reordering, format enforcement, etc). Saves the improved version to sorted/. Works on stored prompts (by hash) or raw text."
+    },
+    {
+      "name": "prompt_score",
+      "description": "Score a prompt against 10 quality dimensions (Clarity, Specificity, Context, Structure, Examples, DocPlacement, Role, TaskFocus, Format, Tone). Returns 0-100 overall score with per-dimension breakdown. Works on stored prompts (by hash) or raw text."
+    },
+    {
+      "name": "prompt_search",
+      "description": "Search the prompt registry with full-text query and/or tag/repo/status/score filters. Returns previews sorted by recency. Use when finding previously captured prompts or exploring prompt patterns."
+    },
+    {
+      "name": "prompt_stats",
+      "description": "Aggregate statistics for the prompt registry: counts by repo, status, task type, grade, average score, top tags, and recent capture rate. Use to understand the prompt database composition."
+    },
+    {
+      "name": "prompt_tag",
+      "description": "Add or remove tags on a stored prompt. Tags are validated against the docs taxonomy (mcp, agents, go, terminal, etc). Use to organize and categorize prompts for easier retrieval."
+    },
+    {
+      "name": "ps_list",
+      "description": "List running processes sorted by CPU, memory, or PID. Optionally filter by command substring."
+    },
+    {
+      "name": "ps_tree",
+      "description": "Show process tree for a given PID using pstree. Falls back to ps --forest if pstree is unavailable."
+    },
+    {
+      "name": "sandbox_create",
+      "description": "Create a new Docker sandbox container for dotfile testing. Uses the host's RTX 3080 via nvidia-container-toolkit for GPU-accelerated Hyprland headless rendering. Dotfiles are bind-mounted read-only from the host working tree."
+    },
+    {
+      "name": "sandbox_destroy",
+      "description": "Destroy a sandbox container and clean up resources. Use force=true to remove even if running."
+    },
+    {
+      "name": "sandbox_diff",
+      "description": "Compare sandbox symlink and config state against the host dotfiles working tree. Reports missing, modified, extra, and broken symlinks."
+    },
+    {
+      "name": "sandbox_exec",
+      "description": "Execute an arbitrary command inside a sandbox container. Returns stdout, stderr, exit code, and duration."
+    },
+    {
+      "name": "sandbox_list",
+      "description": "List all managed sandbox containers with status, profile, and age."
+    },
+    {
+      "name": "sandbox_screenshot",
+      "description": "Capture a screenshot of the sandbox's headless Hyprland display via grim. Returns the image inline as base64 PNG. Optionally waits for visual settle before capture."
+    },
+    {
+      "name": "sandbox_start",
+      "description": "Start a stopped sandbox container."
+    },
+    {
+      "name": "sandbox_status",
+      "description": "Get detailed status of a sandbox including GPU utilization, memory, and CPU usage."
+    },
+    {
+      "name": "sandbox_stop",
+      "description": "Stop a running sandbox container."
+    },
+    {
+      "name": "sandbox_sync",
+      "description": "Sync dotfiles into a running sandbox. Runs install.sh to create symlinks and reloads Hyprland config."
+    },
+    {
+      "name": "sandbox_test",
+      "description": "Run test suite inside a sandbox. Suites: bats (BATS tests), selftest (rice validation), symlinks (symlink health), shaders (GPU GLSL compilation), config (TOML/JSON syntax), all (everything). Returns structured pass/fail results."
+    },
+    {
+      "name": "sandbox_validate",
+      "description": "Composed: create sandbox → sync dotfiles → run all tests → capture screenshot → destroy. Returns structured results with pass/fail and screenshot. Early aborts if tests fail."
+    },
+    {
+      "name": "sandbox_visual_diff",
+      "description": "Compare a sandbox screenshot against a reference image using ImageMagick. Returns the diff image inline and a similarity percentage."
+    },
+    {
+      "name": "screen_annotate",
+      "description": "Open a screenshot file in swappy for annotation. The swappy GUI opens as a fire-and-forget process. Not useful if swappy is not installed."
+    },
+    {
+      "name": "screen_color_pick",
+      "description": "Pick a color from the screen. Uses hyprpicker if available, otherwise captures a 1x1 screenshot at cursor position via wayshot. Returns the hex color value."
+    },
+    {
+      "name": "screen_ocr",
+      "description": "Take a screenshot and extract text via OCR using tesseract. Returns the extracted text."
+    },
+    {
+      "name": "screen_record_start",
+      "description": "Start recording the screen using wf-recorder (Wayland). Runs in the background. Use screen_record_stop to finish."
+    },
+    {
+      "name": "screen_record_status",
+      "description": "Return the current recording state: active/inactive, PID, output path, and elapsed duration. No input required."
+    },
+    {
+      "name": "screen_record_stop",
+      "description": "Stop an active screen recording started by screen_record_start. Returns the output file path."
+    },
+    {
+      "name": "screen_screenshot",
+      "description": "Take a screenshot of the current screen or a region. Uses wayshot (Wayland). Returns the image inline and the saved file path."
+    },
+    {
+      "name": "screen_screenshot_annotated",
+      "description": "Take a screenshot and immediately open it in swappy for annotation. Composed: wayshot capture then swappy launch."
+    },
+    {
+      "name": "shader_audit_trail",
+      "description": "View the raw, append-only shader change history log. Returns all recorded shader changes with timestamps and sources."
+    },
+    {
+      "name": "shader_build",
+      "description": "Run glslangValidator to preprocess and validate shaders. Test a single shader or all shaders. Returns structured results."
+    },
+    {
+      "name": "shader_cycle",
+      "description": "Advance the shader playlist (next/prev). Reads current playlist state, advances position, and applies the next shader."
+    },
+    {
+      "name": "shader_diff",
+      "description": "Compare the last two shader changes from the history log. Shows what changed between shader switches."
+    },
+    {
+      "name": "shader_get_state",
+      "description": "Read the currently active shader from the Ghostty config."
+    },
+    {
+      "name": "shader_hot_reload",
+      "description": "Force Ghostty to reload its config. Touches the config file to trigger inotify; falls back to SIGUSR1."
+    },
+    {
+      "name": "shader_list",
+      "description": "List all GLSL shaders in the Ghostty shaders directory. Optionally filter by category."
+    },
+    {
+      "name": "shader_log",
+      "description": "View shader change history with computed durations. Shows when each shader was active and for how long."
+    },
+    {
+      "name": "shader_meta",
+      "description": "Get full metadata for a shader from the manifest (category, cost, source, description, playlists)."
+    },
+    {
+      "name": "shader_playlist",
+      "description": "List curated shader playlists or pick a random shader from one. Omit name to list all playlists."
+    },
+    {
+      "name": "shader_preview",
+      "description": "Preview a shader for N seconds, then automatically revert to the previous shader. Cancels any in-progress preview."
+    },
+    {
+      "name": "shader_random",
+      "description": "Pick a random shader and apply it to Ghostty."
+    },
+    {
+      "name": "shader_set",
+      "description": "Apply a shader to Ghostty by updating the config with an atomic write. Ghostty auto-reloads."
+    },
+    {
+      "name": "shader_status",
+      "description": "Rich status: current shader, animation state, active playlist, position, and auto-rotate timer status."
+    },
+    {
+      "name": "shader_test",
+      "description": "Compile-test shaders via glslangValidator. If name is provided, test that shader; otherwise test all."
+    },
+    {
+      "name": "system_disk",
+      "description": "List disk usage per mount point (excluding tmpfs/devtmpfs). Returns total, used, available, and percent for each filesystem."
+    },
+    {
+      "name": "system_gpu",
+      "description": "Read NVIDIA GPU stats: name, temperature, GPU/memory utilization, VRAM usage, and power draw via nvidia-smi. Returns not_available if no NVIDIA GPU is present."
+    },
+    {
+      "name": "system_health_check",
+      "description": "Composed health dashboard: aggregates temps, GPU, memory, disk, uptime, and updates into a single report with threshold-based warnings. Returns overall OK/WARN/CRIT status with per-subsystem detail."
+    },
+    {
+      "name": "system_info",
+      "description": "Show system information: hostname, kernel, uptime, load average, CPU count, memory, and swap."
+    },
+    {
+      "name": "system_memory",
+      "description": "Read RAM and swap usage from /proc/meminfo. Returns total, used, available in MB with usage percentage."
+    },
+    {
+      "name": "system_temps",
+      "description": "Read CPU, GPU, and NVMe temperatures plus fan RPMs via lm_sensors. Returns structured sensor data. Gracefully returns partial data if sensors is not installed."
+    },
+    {
+      "name": "system_updates",
+      "description": "Check pending package updates. Returns pacman (official) and AUR (via yay) update counts. Graceful if checkupdates or yay is not installed."
+    },
+    {
+      "name": "system_uptime",
+      "description": "Read system uptime, load averages (1/5/15 min), and last boot time. Uses /proc/uptime, /proc/loadavg, and who -b."
+    },
+    {
+      "name": "systemd_disable",
+      "description": "Disable a systemd unit from starting on boot/login. Critical services (sshd, NetworkManager, systemd-*, dbus, polkit) require confirm: true."
+    },
+    {
+      "name": "systemd_enable",
+      "description": "Enable a systemd unit to start on boot/login."
+    },
+    {
+      "name": "systemd_failed",
+      "description": "List failed systemd units."
+    },
+    {
+      "name": "systemd_list_timers",
+      "description": "List active systemd timers with their next/last trigger times."
+    },
+    {
+      "name": "systemd_list_units",
+      "description": "List systemd units, optionally filtered by state."
+    },
+    {
+      "name": "systemd_logs",
+      "description": "Fetch recent journal logs for a systemd unit."
+    },
+    {
+      "name": "systemd_restart",
+      "description": "Restart a systemd unit."
+    },
+    {
+      "name": "systemd_restart_verify",
+      "description": "Composed workflow: restart a systemd unit, poll until active (or timeout), and return previous state, new state, and recent logs. Eliminates the multi-step restart→status→logs dance."
+    },
+    {
+      "name": "systemd_start",
+      "description": "Start a systemd unit."
+    },
+    {
+      "name": "systemd_status",
+      "description": "Show detailed status of a systemd unit including active state, PID, memory, and CPU usage."
+    },
+    {
+      "name": "systemd_stop",
+      "description": "Stop a systemd unit. Critical services (sshd, NetworkManager, systemd-*, dbus, polkit) require confirm: true."
+    },
+    {
+      "name": "tmux_capture_pane",
+      "description": "Capture visible text content from a tmux pane. Default 50 lines of scrollback."
+    },
+    {
+      "name": "tmux_kill_session",
+      "description": "Kill a tmux session by name."
+    },
+    {
+      "name": "tmux_list_panes",
+      "description": "List panes in a session or window with index, dimensions, current command, and active status."
+    },
+    {
+      "name": "tmux_list_sessions",
+      "description": "List all tmux sessions with window count, creation time, and attached status."
+    },
+    {
+      "name": "tmux_list_windows",
+      "description": "List windows in a tmux session with index, name, pane count, active status, and layout."
+    },
+    {
+      "name": "tmux_new_session",
+      "description": "Create a new detached tmux session with optional working directory and initial command."
+    },
+    {
+      "name": "tmux_new_window",
+      "description": "Create a new window in an existing tmux session with optional name and command."
+    },
+    {
+      "name": "tmux_search_panes",
+      "description": "Search across all panes in a session for a regex pattern. Returns matching lines with window/pane indices."
+    },
+    {
+      "name": "tmux_send_keys",
+      "description": "Send keystrokes to a tmux pane. Keys can be literal text or tmux key names like Enter, C-c, etc."
+    },
+    {
+      "name": "tmux_wait_for_text",
+      "description": "Poll a tmux pane until specific text appears. Returns the matching line or times out."
+    },
+    {
+      "name": "tmux_workspace",
+      "description": "Create a multi-window, multi-pane tmux workspace from a declarative spec. Single tool replaces new_session + new_window + send_keys sequences."
+    },
+    {
+      "name": "wallpaper_list",
+      "description": "List available wallpaper shaders (GLSL fragment shaders rendered as live animated wallpapers via shaderbg)."
+    },
+    {
+      "name": "wallpaper_random",
+      "description": "Set a random wallpaper shader. Picks a random GLSL fragment shader and launches it as a live animated wallpaper."
+    },
+    {
+      "name": "wallpaper_set",
+      "description": "Set a specific wallpaper shader by name. Launches shaderbg to render the shader as a live animated wallpaper."
+    }
   ],
-  "tags": ["linux", "desktop", "hyprland", "wayland", "shaders", "bluetooth", "midi", "github-org", "fleet-management"],
-  "tool_count": 94,
-  "categories": [
-    "config-management",
-    "github-org-lifecycle",
-    "fleet-auditing",
-    "build-sync",
+  "tags": [
+    "linux",
     "desktop",
     "hyprland",
-    "shaders",
+    "wayland",
     "bluetooth",
-    "input-devices",
-    "midi",
-    "oss-readiness",
-    "prompt-registry"
+    "input",
+    "github-org",
+    "fleet-management",
+    "publish-mirror"
   ],
-  "generated_at": "2026-04-05T00:00:00Z"
+  "tool_count": 276,
+  "resource_count": 8,
+  "prompt_count": 4,
+  "categories": [
+    "",
+    "desktop_interact",
+    "discovery",
+    "github",
+    "hyprland",
+    "input_simulate",
+    "systemd",
+    "workflow"
+  ]
 }

@@ -1,0 +1,102 @@
+[
+  {
+    "uri": "dotfiles://config/ghostty",
+    "name": "Ghostty Config",
+    "description": "Current Ghostty terminal configuration",
+    "mime_type": "text/plain",
+    "category": "config",
+    "tags": [
+      "ghostty",
+      "terminal",
+      "config"
+    ]
+  },
+  {
+    "uri": "dotfiles://config/hyprland",
+    "name": "Hyprland Config",
+    "description": "Current Hyprland window manager configuration",
+    "mime_type": "text/plain",
+    "category": "config",
+    "tags": [
+      "hyprland",
+      "wm",
+      "config"
+    ]
+  },
+  {
+    "uri": "dotfiles://palette/snazzy",
+    "name": "Snazzy Color Palette",
+    "description": "Snazzy terminal color palette as JSON",
+    "mime_type": "application/json",
+    "category": "config",
+    "tags": [
+      "palette",
+      "colors",
+      "snazzy"
+    ]
+  },
+  {
+    "uri": "dotfiles://server/overview",
+    "name": "dotfiles-mcp Overview",
+    "description": "Server card covering profile shape, discovery-first usage, and highest-value workflows",
+    "mime_type": "text/markdown",
+    "category": "overview",
+    "tags": [
+      "dotfiles",
+      "desktop",
+      "fleet",
+      "overview"
+    ]
+  },
+  {
+    "uri": "dotfiles://shader/current",
+    "name": "Active Shader",
+    "description": "Currently active Ghostty shader name and path",
+    "mime_type": "application/json",
+    "category": "config",
+    "tags": [
+      "shader",
+      "ghostty",
+      "glsl"
+    ]
+  },
+  {
+    "uri": "dotfiles://workflows/desktop-triage",
+    "name": "Desktop Triage Workflow",
+    "description": "Compact read-first workflow for compositor, bar, shader, and service issues",
+    "mime_type": "text/markdown",
+    "category": "workflow",
+    "tags": [
+      "desktop",
+      "hyprland",
+      "eww",
+      "workflow"
+    ]
+  },
+  {
+    "uri": "dotfiles://workflows/fleet-maintenance",
+    "name": "Fleet Maintenance Workflow",
+    "description": "Compact workflow for org sync, dependency drift, and fleet auditing",
+    "mime_type": "text/markdown",
+    "category": "workflow",
+    "tags": [
+      "fleet",
+      "sync",
+      "audit",
+      "workflow"
+    ]
+  },
+  {
+    "uri": "dotfiles://workflows/session-recovery",
+    "name": "Claude Session Recovery Workflow",
+    "description": "Compact workflow for dead-session triage and recovery planning",
+    "mime_type": "text/markdown",
+    "category": "workflow",
+    "tags": [
+      "claude",
+      "session",
+      "recovery",
+      "workflow"
+    ]
+  }
+]

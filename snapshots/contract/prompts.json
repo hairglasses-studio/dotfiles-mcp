@@ -1,0 +1,43 @@
+[
+  {
+    "name": "dotfiles_audit_fleet",
+    "description": "Run a bounded fleet audit and sync analysis before changing repos",
+    "category": "workflow",
+    "tags": [
+      "fleet",
+      "audit",
+      "sync"
+    ]
+  },
+  {
+    "name": "dotfiles_onboard_repository",
+    "description": "Onboard an existing repo or create a new one with the standard studio baseline",
+    "category": "workflow",
+    "tags": [
+      "repo",
+      "onboarding",
+      "workflow"
+    ]
+  },
+  {
+    "name": "dotfiles_recover_sessions",
+    "description": "Investigate dead or degraded Claude Code sessions before attempting recovery",
+    "category": "workflow",
+    "tags": [
+      "claude",
+      "sessions",
+      "recovery"
+    ]
+  },
+  {
+    "name": "dotfiles_triage_desktop",
+    "description": "Investigate a desktop symptom with read-first tools before reloads",
+    "category": "workflow",
+    "tags": [
+      "desktop",
+      "triage",
+      "hyprland",
+      "eww"
+    ]
+  }
+]

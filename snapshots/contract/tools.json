@@ -1,0 +1,2271 @@
+[
+  {
+    "name": "audio_device_switch",
+    "description": "Switch the default audio output device. Provide a PipeWire node ID (numeric) or a device name substring to match. Uses wpctl set-default.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "audio_devices",
+    "description": "List all audio devices (sinks and sources) with type, name, ID, and state. Uses pactl for structured output.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "audio_mute",
+    "description": "Toggle or set mute state for an audio sink. Actions: toggle, on (mute), off (unmute). Uses wpctl.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "audio_status",
+    "description": "Show current audio status: default sink/source, volume level, mute state. Uses wpctl to query PipeWire.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "audio_volume",
+    "description": "Set audio volume. Accepts absolute percentage (e.g. '50'), float 0-1 (e.g. '0.5'), or relative adjustment (e.g. '+5', '-10'). Uses wpctl to control PipeWire.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_connect",
+    "description": "Connect to a Bluetooth device with BLE retry logic. Resolves names against all known devices (paired + scanned).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_device_info",
+    "description": "Get detailed info for a Bluetooth device including battery, profiles, and trust status.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_disconnect",
+    "description": "Disconnect a Bluetooth device.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_discover_and_connect",
+    "description": "Full BLE-safe workflow: scan, find device by name, remove stale bond, pair with agent, trust, connect with retry. Handles BLE re-pairing (MAC changes, auth failures).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_list_devices",
+    "description": "List Bluetooth devices with connection status and battery levels.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_pair",
+    "description": "Pair with a Bluetooth device using interactive agent (handles BLE auth). Set remove_first=true to clear stale bonds before re-pairing.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_power",
+    "description": "Toggle Bluetooth adapter power on or off.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_remove",
+    "description": "Remove (forget) a paired Bluetooth device.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "bt_scan",
+    "description": "Scan for nearby Bluetooth devices. 'start' scans for 8 seconds (configurable) and returns discovered devices.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "bt_trust",
+    "description": "Trust or untrust a Bluetooth device.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_crash_detect",
+    "description": "Detect Claude Code session crashes by checking PID liveness, dead session count within a time window, and crash indicators in history. Returns severity assessment (minor/major/catastrophic).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_fleet_recovery",
+    "description": "Composed recovery workflow: detect dead sessions across all repos, analyze git state, generate recovery steps with resume commands. Dry-run by default — set execute=true to trigger resumes.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_recovery_history",
+    "description": "Audit trail of crash and recovery events extracted from history.jsonl. Shows crash timestamps, resume attempts, and session outcomes.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_recovery_report",
+    "description": "Comprehensive cross-session, cross-repo recovery report. Scans all sessions, correlates with git state, identifies orphaned repos, and builds a priority queue for session resumption ranked by incomplete tasks.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_repo_diff",
+    "description": "Compare a repository against origin/main: unpushed commits, local-only branches, and stash entries.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_repo_roadmap_status",
+    "description": "Parse ROADMAP.md checkbox items and compare completion against a session's task list. Returns progress percentage and unchecked items.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_repo_status",
+    "description": "Get git status for a repository: current branch, last commit, staged/unstaged/untracked files, and remote tracking status.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_session_compare",
+    "description": "Compare progress between two Claude Code sessions: task completion delta, commit delta, file change count, and time gap.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_session_detail",
+    "description": "Deep inspection of a single Claude Code session: metadata, recent interaction logs, associated plan file, task list with statuses, and memory files.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_session_health",
+    "description": "Health score (0-100) for a Claude Code session across 5 dimensions: process_alive, tasks_completion, git_clean, recency, plan_progress. Returns per-dimension scores and actionable recommendations.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_session_logs",
+    "description": "Read the last N structured log entries from a Claude Code session's JSONL interaction log. Returns parsed entries with type, timestamp, and content summary.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_session_replay",
+    "description": "Reconstruct the conversation thread from a session's JSONL log as user/assistant exchange pairs with tool use summaries.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_session_scan",
+    "description": "Scan all Claude Code sessions, check PID liveness, and correlate with history for last activity timestamps. Returns per-session status (alive/dead), repo, name, and timestamps.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_session_search",
+    "description": "Full-text keyword search across all Claude Code session JSONL logs. Finds sessions by topic, tool names, or content. Returns ranked matches with context snippets and resume commands.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_session_tag",
+    "description": "Extract structured metadata tags for a Claude Code session: repo name, last commit timestamp, last session activity, plan file, and task counts.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "claude_workspace_snapshot",
+    "description": "Capture a point-in-time snapshot of all Claude Code sessions and repo git states across the studio directory. Saves to ~/.claude/snapshots/ for later comparison.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "clipboard_read",
+    "description": "Read the current Wayland clipboard contents as text. Uses wl-paste.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "clipboard_read_image",
+    "description": "Read an image from the Wayland clipboard. Uses wl-paste --type image/png. Returns the image inline as base64-encoded PNG.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "clipboard_write",
+    "description": "Write text to the Wayland clipboard. Uses wl-copy. Optionally specify a MIME type.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "desktop_click_text",
+    "description": "DESTRUCTIVE: Find text on screen via OCR and click at its center. The atomic 'click the button labeled X' primitive. Requires explicit approval.",
+    "category": "desktop_interact",
+    "tags": [
+      "desktop",
+      "click",
+      "text",
+      "ocr",
+      "interact"
+    ],
+    "search_terms": [
+      "click text",
+      "click button",
+      "click label",
+      "ocr click",
+      "desktop click"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "desktop_find_text",
+    "description": "Screenshot + OCR + locate text on screen. Returns bounding box coordinates in desktop space suitable for ydotool. Use to find where a button or label appears before clicking.",
+    "category": "desktop_interact",
+    "tags": [
+      "desktop",
+      "find",
+      "text",
+      "ocr",
+      "locate"
+    ],
+    "search_terms": [
+      "find text",
+      "locate text",
+      "text position",
+      "text bounding box",
+      "ocr find"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "desktop_screenshot_ocr",
+    "description": "Screenshot the full desktop or a specific window (by address/class) and extract text via OCR. Returns both the image (for LLM vision) and extracted text. Use for seeing what is on screen.",
+    "category": "desktop_interact",
+    "tags": [
+      "desktop",
+      "screenshot",
+      "ocr",
+      "vision",
+      "see"
+    ],
+    "search_terms": [
+      "screenshot ocr",
+      "screen text",
+      "read screen",
+      "capture text",
+      "desktop vision"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "desktop_wait_for_text",
+    "description": "Poll screenshot+OCR until text appears on screen or timeout. Returns coordinates and final screenshot when found. Use to wait for UI state changes (dialogs, loading, notifications).",
+    "category": "desktop_interact",
+    "tags": [
+      "desktop",
+      "wait",
+      "text",
+      "poll",
+      "ocr"
+    ],
+    "search_terms": [
+      "wait for text",
+      "poll screen",
+      "wait ui",
+      "text appears",
+      "wait for button"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_bulk_pipeline",
+    "description": "Run build+test pipeline across multiple repos. Detects language and runs appropriate build/test steps. Returns per-repo pass/fail with output.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_cascade_reload",
+    "description": "Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → eww), verifying each is healthy before proceeding to the next.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_check_symlinks",
+    "description": "Check health of all expected dotfiles symlinks (healthy, broken, or missing).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_create_repo",
+    "description": "Scaffold a new hairglasses-studio repo with standard files (CI, LICENSE, .editorconfig, pre-commit hooks). Auto-detects or uses specified language for templates.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_dep_audit",
+    "description": "Audit Go dependency version skew across all hairglasses-studio repos. Reports which deps are unified vs which have version drift.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_eww_get",
+    "description": "Get the current value of an eww variable. Useful for debugging bar widgets (e.g. bar_workspaces_dp1, bar_cpu, bar_shader, rg_fleet).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_eww_restart",
+    "description": "Kill all eww and waybar processes, restart eww daemon, and open both bars (bar and bar-secondary). Use after editing eww config files.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_eww_status",
+    "description": "Show eww bar status: daemon health, open windows, layer surfaces, key variable values, and whether waybar is incorrectly running.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_fleet_audit",
+    "description": "Comprehensive fleet audit: per-repo language, Go version, CI status, test count, last commit age, pipeline.mk and CLAUDE.md presence. Single tool replaces manual health+dep+CI checks.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_bulk_archive",
+    "description": "Archive multiple repos in a GitHub org. Useful for housekeeping old reference repos. Set execute=true to run (dry-run by default).",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_bulk_clone",
+    "description": "Clone all missing org repos to the local directory. Skips repos already cloned. Pairs with dotfiles_gh_local_sync_audit to act on missing repos. Set execute=true to run (dry-run by default).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_bulk_settings",
+    "description": "Batch-apply repo settings across multiple org repos. Supports auto-delete head branches, wiki, projects, and merge strategy toggles. Set execute=true to run (dry-run by default).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_clean_stale",
+    "description": "Remove local clones that have no matching repo in the GitHub org. Identifies orphaned directories (local git repos whose origin doesn't point to the org). Set execute=true to delete (dry-run by default).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_full_sync",
+    "description": "One-command fleet sync: pulls all local repos, identifies missing org repos, clones them, and reports orphaned dirs. Set execute=true to clone missing repos (dry-run by default for clones; pull always runs).",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_list_org_repos",
+    "description": "List all repos in a GitHub org with local clone sync status. Shows whether each repo is cloned locally, missing, or has a wrong remote.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_list_personal_repos",
+    "description": "List GitHub repos under a personal account, optionally excluding repos already in an org. Shows fork status, visibility, and language.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_local_sync_audit",
+    "description": "Audit local directory against GitHub org repos. Finds orphaned local dirs (no org repo), missing clones (org repo not cloned), and remote mismatches.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_onboard_repos",
+    "description": "Onboard public repos into a GitHub org for architecture reference. For each repo: forks to org (if not already there), clones locally, strips git history to a single squashed commit on the default branch, and force-pushes. Designed for batch operations on 8-15+ repos. Set execute=true to run (dry-run by default).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_pull_all",
+    "description": "Fetch or pull updates for all git repos in the local directory. Uses --ff-only by default to avoid merge conflicts. Set fetch_only=true to just fetch without merging.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_recreate_forks",
+    "description": "Recreate forked repos as fresh repos under a GitHub org. Clones each fork, squashes all history to a single initial commit on the default branch, creates a new repo in the org, pushes, and deletes the original fork. Set execute=true to run (dry-run by default).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_gh_transfer_repos",
+    "description": "Bulk transfer non-fork repos from a personal account to a GitHub org. Skips repos that already exist in the target. Set execute=true to run (dry-run by default).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_go_sync",
+    "description": "Sync Go version across all repos to match dotfiles/make/go-version. Updates go.mod and optionally runs go mod tidy.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_health_check",
+    "description": "Run org-wide health dashboard across all hairglasses-studio repos. Shows build status, Go version, pipeline.mk inclusion, and CI workflow presence for every repo.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_list_configs",
+    "description": "List all dotfiles config directories with symlink health and detected format.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_mcpkit_version_sync",
+    "description": "Sync mcpkit dependency version across all thin MCP servers. Finds latest mcpkit version and updates go.mod in each MCP repo. Set execute=true to run go get + go mod tidy (dry-run by default).",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_onboard_repo",
+    "description": "Onboard a repo with hairglasses-studio standard files (.editorconfig, CI workflows, LICENSE, CONTRIBUTING.md, pre-commit hooks). Detects language and adds appropriate config.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_oss_check",
+    "description": "Run open-source readiness checks for a single category (community, readme, gomod, testing, cicd, security, release, maintenance)",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_oss_score",
+    "description": "Score a repository's open-source readiness (0-100) across 8 categories based on GitHub best practices, OpenSSF Scorecard criteria, and Go module conventions",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_pipeline_run",
+    "description": "Run the build+test pipeline (hg-pipeline.sh) on a repo. Supports Go, Node.js, and Python. Returns JSON results with per-step timing.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_reload_service",
+    "description": "Reload a desktop service after config changes.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_rice_check",
+    "description": "Rice health check: reports compositor, shader, wallpaper, service states, and (with level=full) scans all configs for non-Snazzy palette violations.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_server_health",
+    "description": "Show the active dotfiles-mcp contract shape: discovery coverage, tool counts, profile, and resource/prompt availability.",
+    "category": "discovery",
+    "search_terms": [
+      "server health",
+      "mcp health",
+      "contract status",
+      "server overview"
+    ],
+    "is_write": false,
+    "deferred": false
+  },
+  {
+    "name": "dotfiles_tool_catalog",
+    "description": "Summarize the dotfiles tool catalog by category with deferred-loading hints.",
+    "category": "discovery",
+    "search_terms": [
+      "tool catalog",
+      "tool list",
+      "categories",
+      "browse tools"
+    ],
+    "is_write": false,
+    "deferred": false
+  },
+  {
+    "name": "dotfiles_tool_schema",
+    "description": "Inspect one tool descriptor including schemas, search terms, and deferred-loading hints.",
+    "category": "discovery",
+    "search_terms": [
+      "tool schema",
+      "tool descriptor",
+      "input schema",
+      "output schema"
+    ],
+    "is_write": false,
+    "deferred": false
+  },
+  {
+    "name": "dotfiles_tool_search",
+    "description": "Search the dotfiles tool catalog by keyword before invoking a desktop or workflow tool.",
+    "category": "discovery",
+    "search_terms": [
+      "find tool",
+      "which tool",
+      "tool discovery",
+      "catalog search"
+    ],
+    "is_write": false,
+    "deferred": false
+  },
+  {
+    "name": "dotfiles_tool_stats",
+    "description": "Show high-level catalog statistics, including how many tools are marked deferred in the active profile.",
+    "category": "discovery",
+    "search_terms": [
+      "tool stats",
+      "catalog stats",
+      "tool counts"
+    ],
+    "is_write": false,
+    "deferred": false
+  },
+  {
+    "name": "dotfiles_validate_config",
+    "description": "Validate config file content syntax (TOML or JSON).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_workflow_sync",
+    "description": "Sync CI workflow files across all repos from canonical sources. Detects stale workflows and optionally updates, commits, and pushes.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gh_star_lists_delete",
+    "description": "Delete GitHub star folders (user lists) by name. Dry-run by default.",
+    "category": "github",
+    "search_terms": [
+      "delete github list",
+      "remove star folders",
+      "delete user list"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gh_star_lists_ensure",
+    "description": "Create or update GitHub star folders (user lists). Dry-run by default.",
+    "category": "github",
+    "search_terms": [
+      "create github list",
+      "ensure star lists",
+      "update star folders"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gh_star_lists_list",
+    "description": "List the current GitHub star folders (user lists), optionally including list items.",
+    "category": "github",
+    "search_terms": [
+      "github star lists",
+      "folders",
+      "lists",
+      "star categories"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "gh_star_lists_rename",
+    "description": "Rename an existing GitHub star folder while preserving its description and privacy settings. Dry-run by default.",
+    "category": "github",
+    "search_terms": [
+      "rename github list",
+      "rename star folder",
+      "rename star list"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gh_star_membership_set",
+    "description": "Update which GitHub star folders a repo belongs to. Supports merge, replace, remove, and replace_managed. Dry-run by default.",
+    "category": "github",
+    "search_terms": [
+      "assign star folder",
+      "move star to list",
+      "repo list membership",
+      "github folders"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_bootstrap",
+    "description": "Bootstrap the GitHub Stars workflow: star the researched MCP repos, create the MCP / Production|Experimental|Alpha folders, assign repos, and optionally install the Codex MCP entries. Dry-run by default.",
+    "category": "workflow",
+    "search_terms": [
+      "github stars bootstrap",
+      "install github stars workflow",
+      "mcp stars bootstrap"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_cleanup_candidates",
+    "description": "Find starred repositories that look like cleanup candidates, such as archived repos, forks, stale repos, unlisted repos, or repos missing a managed prefix.",
+    "category": "github",
+    "search_terms": [
+      "cleanup starred repos",
+      "find stale stars",
+      "archived fork stars",
+      "star pruning"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_install_codex_mcp",
+    "description": "Install the global Codex MCP entries for the official GitHub server and the dotfiles GitHub Stars workflow surface. Dry-run by default.",
+    "category": "workflow",
+    "search_terms": [
+      "install codex mcp",
+      "global github stars mcp",
+      "codex config github stars"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_list",
+    "description": "List starred GitHub repositories with optional filters and current GitHub star-list membership.",
+    "category": "github",
+    "search_terms": [
+      "github stars",
+      "starred repos",
+      "list stars",
+      "star folders"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_set",
+    "description": "Star or unstar GitHub repositories in batch. Dry-run by default.",
+    "category": "github",
+    "search_terms": [
+      "star repo",
+      "unstar repo",
+      "batch star",
+      "batch unstar"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_summary",
+    "description": "Summarize current GitHub stars with counts by list, language, topic, archived/fork totals, and optional managed-prefix coverage.",
+    "category": "github",
+    "search_terms": [
+      "github stars summary",
+      "star overview",
+      "list coverage",
+      "star statistics"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_taxonomy_audit",
+    "description": "Audit managed GitHub star-list coverage and compare current stars against an optional desired taxonomy profile.",
+    "category": "github",
+    "search_terms": [
+      "audit github taxonomy",
+      "audit star folders",
+      "managed list drift",
+      "star list coverage"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_taxonomy_suggest",
+    "description": "Suggest useful GitHub star folders from your current stars using GitHub suggestions plus topic, language, and keyword clustering.",
+    "category": "github",
+    "search_terms": [
+      "suggest github folders",
+      "taxonomy suggestion",
+      "organize stars"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_taxonomy_sync",
+    "description": "Ensure GitHub star folders and reconcile repo membership from an explicit repo-to-list taxonomy. Dry-run by default.",
+    "category": "github",
+    "search_terms": [
+      "sync github folders",
+      "taxonomy sync",
+      "reconcile star lists"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "gpu_status",
+    "description": "Query NVIDIA GPU status: driver, temperature, utilization, memory, power draw, and running GPU processes.",
+    "category": "",
+    "search_terms": [
+      "nvidia",
+      "gpu usage",
+      "gpu processes",
+      "cuda processes"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_click",
+    "description": "Click at absolute screen coordinates using ydotool.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_close_window",
+    "description": "Close a window. Resolves window by address or class.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_focus_window",
+    "description": "Focus a window by its address or class name.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_fullscreen_window",
+    "description": "Toggle fullscreen for a window. Focuses the window first, then applies fullscreen. Resolves window by address or class.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_get_monitors",
+    "description": "List connected monitors with resolution, refresh rate, position, scale, and active workspace.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_key",
+    "description": "Send key events using ydotool. Use Linux input event codes (e.g. '29:1 29:0' for Ctrl tap, '56:1 31:1 31:0 56:0' for Alt+S).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_list_windows",
+    "description": "List all windows managed by Hyprland with their address, title, class, workspace, size, position, and focus state.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_list_workspaces",
+    "description": "List all Hyprland workspaces with window count, monitor, and focused status.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_minimize_window",
+    "description": "Minimize a window by moving it to the special:minimized workspace. Resolves window by address or class.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_move_window",
+    "description": "Move a window to exact pixel coordinates. Resolves window by address or class.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_reload_config",
+    "description": "Reload the Hyprland configuration and check for config errors.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_resize_window",
+    "description": "Resize a window to exact pixel dimensions. Resolves window by address or class.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_screenshot",
+    "description": "Capture a screenshot. Specify a monitor name for a single output, or omit to capture all monitors combined. For per-monitor detail (especially menubars), use hypr_screenshot_monitors instead.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_screenshot_monitors",
+    "description": "Capture separate screenshots of each monitor. Returns multiple images, one per active monitor, each resized individually for better detail than a single combined capture. Also captures a cropped menubar view (top 48px) of each monitor for bar inspection.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_screenshot_window",
+    "description": "Take a screenshot of a specific window by address or class name. Returns the image inline for LLM vision.",
+    "category": "hyprland",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_set_monitor",
+    "description": "Configure a monitor's resolution, position, or scale.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_switch_workspace",
+    "description": "Switch to a workspace by ID.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_toggle_floating",
+    "description": "Toggle floating state of a window. Resolves window by address or class.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "hypr_type_text",
+    "description": "Type text at the current cursor position using wtype (Wayland).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_auto_setup_controller",
+    "description": "Detect all connected controllers, generate makima profiles for each, and optionally restart makima. Single tool replaces detect + generate + restart.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_controller_test",
+    "description": "Read events from a controller for 3 seconds to verify it works. Returns last 10 button/axis events.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_delete_makima_profile",
+    "description": "Delete a makima per-app profile.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_detect_controllers",
+    "description": "Scan for connected gamepad/controller devices. Returns brand (xbox/playstation/nintendo), capabilities, event path, and whether a makima profile exists.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_generate_controller_profile",
+    "description": "Generate a starter makima TOML profile for a controller with preset mappings (desktop, claude-code, gaming, media). Includes brand-aware button label comments.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_get_juhradial_battery",
+    "description": "Read MX battery status from the juhradial D-Bus daemon, falling back to bluetoothctl when D-Bus is unavailable.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_get_juhradial_config",
+    "description": "Read the tracked juhradial config.json from dotfiles.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_get_juhradial_profiles",
+    "description": "Read the tracked juhradial profiles.json from dotfiles.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_get_makima_profile",
+    "description": "Read a specific makima per-app profile by name.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_key_press",
+    "description": "DESTRUCTIVE: Press a key combination (e.g. ctrl+shift+t, Return, super) using wtype -k or ydotool key. Simulates real key events — requires explicit approval.",
+    "category": "input_simulate",
+    "tags": [
+      "input",
+      "keyboard",
+      "key",
+      "hotkey",
+      "simulate"
+    ],
+    "search_terms": [
+      "key press",
+      "hotkey",
+      "keyboard shortcut",
+      "key combo",
+      "simulate key"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "input_list_makima_profiles",
+    "description": "List all makima per-app button remapping profiles with their remap and command bindings.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_mouse_click",
+    "description": "DESTRUCTIVE: Click mouse button at current or specified position using ydotool. Simulates a real mouse click — requires explicit approval.",
+    "category": "input_simulate",
+    "tags": [
+      "input",
+      "mouse",
+      "click",
+      "simulate"
+    ],
+    "search_terms": [
+      "mouse click",
+      "click button",
+      "left click",
+      "right click",
+      "ydotool click"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "input_mouse_move",
+    "description": "DESTRUCTIVE: Move mouse cursor to coordinates using ydotool mousemove. Simulates real mouse movement — requires explicit approval.",
+    "category": "input_simulate",
+    "tags": [
+      "input",
+      "mouse",
+      "move",
+      "cursor",
+      "simulate"
+    ],
+    "search_terms": [
+      "mouse move",
+      "cursor position",
+      "move cursor",
+      "ydotool mousemove"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "input_mouse_scroll",
+    "description": "DESTRUCTIVE: Scroll the mouse wheel up or down using ydotool. Simulates real scroll events — requires explicit approval.",
+    "category": "input_simulate",
+    "tags": [
+      "input",
+      "mouse",
+      "scroll",
+      "wheel",
+      "simulate"
+    ],
+    "search_terms": [
+      "mouse scroll",
+      "scroll wheel",
+      "scroll up",
+      "scroll down"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "input_restart_services",
+    "description": "Restart juhradial mouse services or the makima controller service. Restarting the controller service may require elevated systemd permissions.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_screenshot_click",
+    "description": "DESTRUCTIVE: Take a screenshot, then click at the specified coordinates. Combines screenshot capture for agent visual context with coordinate-based clicking. Requires explicit approval.",
+    "category": "input_simulate",
+    "tags": [
+      "input",
+      "screenshot",
+      "click",
+      "visual",
+      "simulate"
+    ],
+    "search_terms": [
+      "screenshot click",
+      "visual click",
+      "click element",
+      "screen interaction"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "input_set_juhradial_config",
+    "description": "Write dotfiles juhradial config.json after validating that the content is valid JSON.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_set_juhradial_profiles",
+    "description": "Write dotfiles juhradial profiles.json after validating that the content is valid JSON.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_set_makima_profile",
+    "description": "Create or update a makima per-app profile. Validates TOML before writing.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_status",
+    "description": "Show running state of juhradial mouse services, the makima controller service, and MX battery status when available.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "input_type_text",
+    "description": "DESTRUCTIVE: Type text as if from keyboard using wtype (Wayland) or ydotool as fallback. This simulates real keystrokes — requires explicit approval.",
+    "category": "input_simulate",
+    "tags": [
+      "input",
+      "keyboard",
+      "type",
+      "simulate"
+    ],
+    "search_terms": [
+      "type text",
+      "keyboard input",
+      "simulate typing",
+      "wtype",
+      "ydotool"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "investigate_port",
+    "description": "Investigate a TCP port: find the listening process, show its tree, check systemd unit status, and fetch recent logs. Single tool replaces port_list + ps_list + systemd_status + systemd_logs.",
+    "category": "",
+    "search_terms": [
+      "debug port",
+      "what is using this port",
+      "port investigation"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "investigate_service",
+    "description": "Investigate a systemd service: get status, find its processes, check its ports, and fetch recent logs. Single tool replaces systemd_status + ps_list + port_list + systemd_logs.",
+    "category": "",
+    "search_terms": [
+      "debug service",
+      "service investigation",
+      "why is my service failing"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kill_process",
+    "description": "Send a signal to a process. Supports TERM, KILL, HUP, INT, USR1, USR2, STOP, CONT.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "mapping_auto_setup",
+    "description": "Detect all connected controllers and MIDI devices, generate missing profiles from templates, and optionally restart makima. Dry-run by default.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_daemon_control",
+    "description": "Control the mapitall daemon. Actions: status (health/uptime), reload (hot-reload profiles), list_devices (connected controllers), list_profiles (loaded profiles), get_state (variables/active app), set_variable (set a runtime variable).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_delete_profile",
+    "description": "Delete a mapping profile from disk.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_diff",
+    "description": "Compare two mapping profiles and show differences in their bindings.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_export",
+    "description": "Export a mapping profile for sharing. Optionally sanitize to strip local paths.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_generate",
+    "description": "Generate a mapping profile from a built-in template for a specified device.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_get_profile",
+    "description": "Read a mapping profile with parsed structure and raw TOML content.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_import",
+    "description": "Import a mapping profile from TOML content. Validates before writing. Dry-run mode available.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "mapping_learn",
+    "description": "Listen to a controller or MIDI device and capture which controls are moved. Use this to discover available inputs before creating mappings. Returns detected controls with type classification (button, axis, encoder, MIDI CC/note) and mapping suggestions.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_list_profiles",
+    "description": "List all mapping profiles with device info, format, and mapping counts. Supports filtering by format (unified/legacy), device name, and tag.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_list_templates",
+    "description": "List all available mapping templates for gamepad and MIDI controllers.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_migrate_legacy",
+    "description": "Convert legacy makima profiles to the unified mapping format. Dry-run by default.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_monitor",
+    "description": "Live-monitor controller events for debugging. Shows raw events with timestamps. Use to verify a controller is working and identify input codes.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_quick_map",
+    "description": "Add a single mapping rule to an existing profile without writing full TOML. Specify the input source, output type, and target. Creates the profile if it doesn't exist.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_resolve_test",
+    "description": "Simulate rule resolution: given an input source and app context, show which mapping rule would fire.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_set_profile",
+    "description": "Create or update a mapping profile. Validates TOML syntax and schema before writing.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_status",
+    "description": "Show complete controller mapping status: connected devices, active profiles, template availability, and directory paths. Call this first to understand the current setup.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "mapping_validate",
+    "description": "Validate a mapping profile for schema compliance. Provide either content (TOML string) or name (profile on disk).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "midi_generate_mapping",
+    "description": "Generate a MIDI controller mapping config (TOML) with preset templates: desktop-control (volume/brightness/workspaces), shader-control (shader/wallpaper cycling), volume-mixer (per-sink audio).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "midi_get_mapping",
+    "description": "Read an existing MIDI controller mapping config from dotfiles.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "midi_list_devices",
+    "description": "Detect connected USB MIDI controllers via ALSA. Returns card/device numbers, names, raw MIDI paths, and whether a mapping config exists in dotfiles.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "midi_set_mapping",
+    "description": "Create or update a MIDI controller mapping config. Validates TOML before writing.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "network_connections",
+    "description": "List all saved NetworkManager connection profiles (WiFi, VPN, Ethernet, etc.) with name, UUID, type, and device.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "network_dns",
+    "description": "Show DNS servers per network interface. Tries resolvectl first, falls back to /etc/resolv.conf.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "network_status",
+    "description": "Show overall network status: connectivity state, WiFi enabled, and active connections. Uses nmcli.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "network_vpn_toggle",
+    "description": "DESTRUCTIVE: Connect or disconnect a VPN/connection profile by name. Use action 'up' to connect and 'down' to disconnect. Requires explicit approval.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "network_wifi_connect",
+    "description": "DESTRUCTIVE: Connect to a WiFi network by SSID. Provide password for protected networks, omit for open networks. Requires explicit approval.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "network_wifi_list",
+    "description": "Scan and list available WiFi networks sorted by signal strength. Returns SSID, signal, security, channel, and frequency. Deduplicates SSIDs keeping strongest signal.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "notify_count",
+    "description": "Get the current notification count from SwayNotificationCenter.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "notify_dismiss",
+    "description": "DESTRUCTIVE: Dismiss notifications in SwayNotificationCenter. Scope: all (dismiss everything) or latest (dismiss most recent only).",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "notify_dnd",
+    "description": "Manage Do Not Disturb mode in SwayNotificationCenter. Actions: get (query current state), toggle, on, off.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "notify_history",
+    "description": "Get SwayNotificationCenter status snapshot: notification count, DND state, panel visibility, inhibitor state. (swaync does not expose individual notification history via CLI.)",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "notify_panel",
+    "description": "DESTRUCTIVE: Control the SwayNotificationCenter panel visibility. Actions: toggle, open, close.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "notify_send",
+    "description": "Send a desktop notification via notify-send. Supports urgency levels, timeout, and custom icons.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "ops_analyze_failures",
+    "description": "Categorize build/test failures into types (compile_error, type_error, missing_dep, test_assertion, timeout, import_cycle) with suggested fix order. Pass build_errors from ops_build and/or test_failures from ops_test_smart.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_auto_fix",
+    "description": "Auto-fix mechanical failures from ops_analyze_failures: missing deps (go mod tidy), missing imports (goimports), unused vars (remove). Pass issues from analyze output. Dry-run by default — pass execute=true to apply patches.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_branch_create",
+    "description": "Create a feature branch with conventional naming (feat/fix/chore prefix). Dry-run by default — pass execute=true to create.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "ops_build",
+    "description": "Run go build and parse compiler errors into structured JSON with file, line, column, message, and package. Returns success/failure with error count.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_changed_files",
+    "description": "List changed files with diff stats and Go package mapping. Useful for understanding what was modified before building or testing.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_changelog_generate",
+    "description": "Generate markdown changelog from conventional commits since last tag. Groups by feat/fix/chore/etc. Pass write=true to prepend to CHANGELOG.md.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_ci_status",
+    "description": "Check GitHub Actions check status for a branch or PR. Returns per-check pass/fail with overall verdict. Use wait=true to poll until all checks complete (up to 5 minutes).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_commit",
+    "description": "Stage changed files and create a conventional commit. Validates message format, never amends. Dry-run by default — pass execute=true to commit.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_coverage_report",
+    "description": "Run test coverage and return per-package percentages. Set threshold\u003e0 to gate on minimum overall coverage. Go: go test -coverprofile, Node: nyc/c8, Python: coverage.py.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_dep_graph",
+    "description": "Generate a dependency graph for a Go workspace or module. Uses go mod graph for accurate module-level dependencies. Outputs Mermaid markdown (for GitHub rendering) or DOT format. Filter to internal org modules or include all transitive deps.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_fleet_diff",
+    "description": "Show what changed across all repos since a date or ref. Returns per-repo commit counts, insertions/deletions, commit type breakdown (feat/fix/chore), and fleet-wide totals. Use since='3d' for relative or '2024-04-01' for absolute.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_fleet_iterate",
+    "description": "Run build+test across all repos in a directory. Returns per-repo health matrix with build/test status, error counts, and overall fleet summary. Scans for Go/Node/Python projects.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_iterate",
+    "description": "Core SDLC loop tool: build → test (changed packages) → analyze failures → track iteration. Call this after each round of edits. Returns structured next_actions with files to fix. Tracks iteration count and error trends for convergence detection.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_iteration_patterns",
+    "description": "Analyze historical SDLC sessions for patterns: common failure types, average iterations to convergence, hot files that appear in most failures. Useful for identifying systemic issues and improving auto-fix heuristics.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_lint_fix",
+    "description": "Auto-fix lint issues in-place. Go: goimports + golangci-lint --fix, Node: eslint --fix + prettier, Python: black + isort. Reports files changed and remaining errors.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_pr_create",
+    "description": "Push branch and create a GitHub PR via gh CLI. Returns PR URL and number. Dry-run by default — pass execute=true to create.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "ops_pre_push",
+    "description": "Pre-push gate: run vet → lint → build → test (changed packages only). Short-circuits on first failure. Returns structured per-step results.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "ops_release",
+    "description": "Bump version, generate changelog entry, commit, and tag. Detects language (Go/Node/Python) and updates the appropriate version file. Dry-run by default — pass execute=true.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_repo_analyze",
+    "description": "Analyze a repo and tag it with languages, protocols (gRPC, REST, MCP, WebSocket), frameworks, key dependencies, and project metadata (CI, tests, MCP server detection). Returns structured repo profile.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_research_check",
+    "description": "Search the docs knowledge base for existing research on a topic. Returns matching documents with relevance scores and identifies gaps where no research exists. Check this before starting new research to avoid duplication.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_revert",
+    "description": "Safely undo the last commit. If unpushed: soft reset (keeps changes staged). If pushed: creates a revert commit. Never force-pushes. Dry-run by default — pass execute=true.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_session_create",
+    "description": "Create a new SDLC session for iteration tracking. Optional — ops_iterate auto-creates one if absent.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "ops_session_handoff",
+    "description": "Generate an Agent Handoff Protocol document from the current ops session and git state. Captures branch, dirty files, iteration history, and pending work. Set write=true to persist to repo.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_session_list",
+    "description": "List all active SDLC sessions with summary stats. Auto-cleans sessions older than 7 days.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_session_status",
+    "description": "Get SDLC session status: iteration count, error trend, convergence detection, total time spent.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_ship",
+    "description": "Ship changes: pre-push gate → commit → push → create PR. Only proceeds if gate passes. Dry-run by default — pass execute=true to ship.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_tech_debt",
+    "description": "Score tech debt 0-100 across 6 dimensions: dependency freshness, test coverage, lint cleanliness, CI health, documentation, code age. Single repo or fleet mode. Set store=true for trend tracking.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ops_test_smart",
+    "description": "Run go test -json on only changed packages (via git diff), returning per-test pass/fail/skip results. Use all=true to test everything. Smart filtering avoids running the full suite on every iteration.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "port_list",
+    "description": "List listening TCP ports with process info via ss. Optionally filter by port number.",
+    "category": "",
+    "search_terms": [
+      "open ports",
+      "listening ports",
+      "network sockets"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "prompt_capture",
+    "description": "Capture a prompt with auto-scoring. Computes SHA-256 hash for dedup, classifies task type, scores against 10 quality dimensions, and saves to docs/prompts/{repo}/unsorted/. Use when you want to store a prompt for later retrieval and analysis.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "prompt_export",
+    "description": "Export prompts matching filters as JSONL or markdown. Use for batch analysis, training data export, or prompt collection sharing.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "prompt_get",
+    "description": "Retrieve a single prompt by full hash or short hash (first 12 chars). Returns the complete prompt text and all metadata. Use when you need the full content of a specific prompt.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "prompt_improve",
+    "description": "Improve a prompt via the 13-stage enhancement pipeline (specificity, positive reframing, tone, XML structure, context reordering, format enforcement, etc). Saves the improved version to sorted/. Works on stored prompts (by hash) or raw text.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "prompt_score",
+    "description": "Score a prompt against 10 quality dimensions (Clarity, Specificity, Context, Structure, Examples, DocPlacement, Role, TaskFocus, Format, Tone). Returns 0-100 overall score with per-dimension breakdown. Works on stored prompts (by hash) or raw text.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "prompt_search",
+    "description": "Search the prompt registry with full-text query and/or tag/repo/status/score filters. Returns previews sorted by recency. Use when finding previously captured prompts or exploring prompt patterns.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "prompt_stats",
+    "description": "Aggregate statistics for the prompt registry: counts by repo, status, task type, grade, average score, top tags, and recent capture rate. Use to understand the prompt database composition.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "prompt_tag",
+    "description": "Add or remove tags on a stored prompt. Tags are validated against the docs taxonomy (mcp, agents, go, terminal, etc). Use to organize and categorize prompts for easier retrieval.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ps_list",
+    "description": "List running processes sorted by CPU, memory, or PID. Optionally filter by command substring.",
+    "category": "",
+    "search_terms": [
+      "top processes",
+      "running processes",
+      "cpu usage",
+      "memory usage"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "ps_tree",
+    "description": "Show process tree for a given PID using pstree. Falls back to ps --forest if pstree is unavailable.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_create",
+    "description": "Create a new Docker sandbox container for dotfile testing. Uses the host's RTX 3080 via nvidia-container-toolkit for GPU-accelerated Hyprland headless rendering. Dotfiles are bind-mounted read-only from the host working tree.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_destroy",
+    "description": "Destroy a sandbox container and clean up resources. Use force=true to remove even if running.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_diff",
+    "description": "Compare sandbox symlink and config state against the host dotfiles working tree. Reports missing, modified, extra, and broken symlinks.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_exec",
+    "description": "Execute an arbitrary command inside a sandbox container. Returns stdout, stderr, exit code, and duration.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_list",
+    "description": "List all managed sandbox containers with status, profile, and age.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_screenshot",
+    "description": "Capture a screenshot of the sandbox's headless Hyprland display via grim. Returns the image inline as base64 PNG. Optionally waits for visual settle before capture.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_start",
+    "description": "Start a stopped sandbox container.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_status",
+    "description": "Get detailed status of a sandbox including GPU utilization, memory, and CPU usage.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_stop",
+    "description": "Stop a running sandbox container.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_sync",
+    "description": "Sync dotfiles into a running sandbox. Runs install.sh to create symlinks and reloads Hyprland config.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_test",
+    "description": "Run test suite inside a sandbox. Suites: bats (BATS tests), selftest (rice validation), symlinks (symlink health), shaders (GPU GLSL compilation), config (TOML/JSON syntax), all (everything). Returns structured pass/fail results.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_validate",
+    "description": "Composed: create sandbox → sync dotfiles → run all tests → capture screenshot → destroy. Returns structured results with pass/fail and screenshot. Early aborts if tests fail.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "sandbox_visual_diff",
+    "description": "Compare a sandbox screenshot against a reference image using ImageMagick. Returns the diff image inline and a similarity percentage.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "screen_annotate",
+    "description": "Open a screenshot file in swappy for annotation. The swappy GUI opens as a fire-and-forget process. Not useful if swappy is not installed.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "screen_color_pick",
+    "description": "Pick a color from the screen. Uses hyprpicker if available, otherwise captures a 1x1 screenshot at cursor position via wayshot. Returns the hex color value.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "screen_ocr",
+    "description": "Take a screenshot and extract text via OCR using tesseract. Returns the extracted text.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "screen_record_start",
+    "description": "Start recording the screen using wf-recorder (Wayland). Runs in the background. Use screen_record_stop to finish.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "screen_record_status",
+    "description": "Return the current recording state: active/inactive, PID, output path, and elapsed duration. No input required.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "screen_record_stop",
+    "description": "Stop an active screen recording started by screen_record_start. Returns the output file path.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "screen_screenshot",
+    "description": "Take a screenshot of the current screen or a region. Uses wayshot (Wayland). Returns the image inline and the saved file path.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "screen_screenshot_annotated",
+    "description": "Take a screenshot and immediately open it in swappy for annotation. Composed: wayshot capture then swappy launch.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_audit_trail",
+    "description": "View the raw, append-only shader change history log. Returns all recorded shader changes with timestamps and sources.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_build",
+    "description": "Run glslangValidator to preprocess and validate shaders. Test a single shader or all shaders. Returns structured results.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_cycle",
+    "description": "Advance the shader playlist (next/prev). Reads current playlist state, advances position, and applies the next shader.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_diff",
+    "description": "Compare the last two shader changes from the history log. Shows what changed between shader switches.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_get_state",
+    "description": "Read the currently active shader from the Ghostty config.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_hot_reload",
+    "description": "Force Ghostty to reload its config. Touches the config file to trigger inotify; falls back to SIGUSR1.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_list",
+    "description": "List all GLSL shaders in the Ghostty shaders directory. Optionally filter by category.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_log",
+    "description": "View shader change history with computed durations. Shows when each shader was active and for how long.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_meta",
+    "description": "Get full metadata for a shader from the manifest (category, cost, source, description, playlists).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_playlist",
+    "description": "List curated shader playlists or pick a random shader from one. Omit name to list all playlists.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_preview",
+    "description": "Preview a shader for N seconds, then automatically revert to the previous shader. Cancels any in-progress preview.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_random",
+    "description": "Pick a random shader and apply it to Ghostty.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_set",
+    "description": "Apply a shader to Ghostty by updating the config with an atomic write. Ghostty auto-reloads.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "shader_status",
+    "description": "Rich status: current shader, animation state, active playlist, position, and auto-rotate timer status.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "shader_test",
+    "description": "Compile-test shaders via glslangValidator. If name is provided, test that shader; otherwise test all.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "system_disk",
+    "description": "List disk usage per mount point (excluding tmpfs/devtmpfs). Returns total, used, available, and percent for each filesystem.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "system_gpu",
+    "description": "Read NVIDIA GPU stats: name, temperature, GPU/memory utilization, VRAM usage, and power draw via nvidia-smi. Returns not_available if no NVIDIA GPU is present.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "system_health_check",
+    "description": "Composed health dashboard: aggregates temps, GPU, memory, disk, uptime, and updates into a single report with threshold-based warnings. Returns overall OK/WARN/CRIT status with per-subsystem detail.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "system_info",
+    "description": "Show system information: hostname, kernel, uptime, load average, CPU count, memory, and swap.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "system_memory",
+    "description": "Read RAM and swap usage from /proc/meminfo. Returns total, used, available in MB with usage percentage.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "system_temps",
+    "description": "Read CPU, GPU, and NVMe temperatures plus fan RPMs via lm_sensors. Returns structured sensor data. Gracefully returns partial data if sensors is not installed.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "system_updates",
+    "description": "Check pending package updates. Returns pacman (official) and AUR (via yay) update counts. Graceful if checkupdates or yay is not installed.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "system_uptime",
+    "description": "Read system uptime, load averages (1/5/15 min), and last boot time. Uses /proc/uptime, /proc/loadavg, and who -b.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "systemd_disable",
+    "description": "Disable a systemd unit from starting on boot/login. Critical services (sshd, NetworkManager, systemd-*, dbus, polkit) require confirm: true.",
+    "category": "systemd",
+    "search_terms": [
+      "disable service",
+      "disable unit",
+      "remove autostart"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "systemd_enable",
+    "description": "Enable a systemd unit to start on boot/login.",
+    "category": "systemd",
+    "search_terms": [
+      "enable service",
+      "enable unit",
+      "autostart"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "systemd_failed",
+    "description": "List failed systemd units.",
+    "category": "systemd",
+    "search_terms": [
+      "failed services",
+      "broken units",
+      "systemd errors"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "systemd_list_timers",
+    "description": "List active systemd timers with their next/last trigger times.",
+    "category": "systemd",
+    "search_terms": [
+      "list timers",
+      "cron",
+      "scheduled",
+      "timer"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "systemd_list_units",
+    "description": "List systemd units, optionally filtered by state.",
+    "category": "systemd",
+    "search_terms": [
+      "list services",
+      "list units",
+      "systemd units"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "systemd_logs",
+    "description": "Fetch recent journal logs for a systemd unit.",
+    "category": "systemd",
+    "search_terms": [
+      "journal",
+      "journald",
+      "service logs",
+      "unit logs"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "systemd_restart",
+    "description": "Restart a systemd unit.",
+    "category": "systemd",
+    "search_terms": [
+      "restart service",
+      "restart unit"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "systemd_restart_verify",
+    "description": "Composed workflow: restart a systemd unit, poll until active (or timeout), and return previous state, new state, and recent logs. Eliminates the multi-step restart→status→logs dance.",
+    "category": "systemd",
+    "search_terms": [
+      "restart verify",
+      "restart check",
+      "restart poll",
+      "composed restart",
+      "service health"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "systemd_start",
+    "description": "Start a systemd unit.",
+    "category": "systemd",
+    "search_terms": [
+      "start service",
+      "start unit"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "systemd_status",
+    "description": "Show detailed status of a systemd unit including active state, PID, memory, and CPU usage.",
+    "category": "systemd",
+    "search_terms": [
+      "service status",
+      "unit status",
+      "systemd",
+      "systemctl"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "systemd_stop",
+    "description": "Stop a systemd unit. Critical services (sshd, NetworkManager, systemd-*, dbus, polkit) require confirm: true.",
+    "category": "systemd",
+    "search_terms": [
+      "stop service",
+      "stop unit",
+      "kill service"
+    ],
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "tmux_capture_pane",
+    "description": "Capture visible text content from a tmux pane. Default 50 lines of scrollback.",
+    "category": "",
+    "search_terms": [
+      "scrollback",
+      "pane output",
+      "terminal output",
+      "copy pane"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "tmux_kill_session",
+    "description": "Kill a tmux session by name.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "tmux_list_panes",
+    "description": "List panes in a session or window with index, dimensions, current command, and active status.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "tmux_list_sessions",
+    "description": "List all tmux sessions with window count, creation time, and attached status.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "tmux_list_windows",
+    "description": "List windows in a tmux session with index, name, pane count, active status, and layout.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "tmux_new_session",
+    "description": "Create a new detached tmux session with optional working directory and initial command.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "tmux_new_window",
+    "description": "Create a new window in an existing tmux session with optional name and command.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "tmux_search_panes",
+    "description": "Search across all panes in a session for a regex pattern. Returns matching lines with window/pane indices.",
+    "category": "",
+    "search_terms": [
+      "grep panes",
+      "find in panes",
+      "search session output"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "tmux_send_keys",
+    "description": "Send keystrokes to a tmux pane. Keys can be literal text or tmux key names like Enter, C-c, etc.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "tmux_wait_for_text",
+    "description": "Poll a tmux pane until specific text appears. Returns the matching line or times out.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "tmux_workspace",
+    "description": "Create a multi-window, multi-pane tmux workspace from a declarative spec. Single tool replaces new_session + new_window + send_keys sequences.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "wallpaper_list",
+    "description": "List available wallpaper shaders (GLSL fragment shaders rendered as live animated wallpapers via shaderbg).",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "wallpaper_random",
+    "description": "Set a random wallpaper shader. Picks a random GLSL fragment shader and launches it as a live animated wallpaper.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "wallpaper_set",
+    "description": "Set a specific wallpaper shader by name. Launches shaderbg to render the shader as a live animated wallpaper.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  }
+]
