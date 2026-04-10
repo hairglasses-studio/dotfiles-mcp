@@ -349,6 +349,10 @@
       "description": "Update which GitHub star folders a repo belongs to. Supports merge, replace, remove, and replace_managed. Dry-run by default."
     },
     {
+      "name": "gh_stars_audit_markdown",
+      "description": "Audit markdown-derived GitHub repo lists against the matching live GitHub star folders without mutating anything."
+    },
+    {
       "name": "gh_stars_bootstrap",
       "description": "Bootstrap the GitHub Stars workflow: star the researched MCP repos, create the MCP / Production|Experimental|Alpha folders, assign repos, and optionally install the Codex MCP entries. Dry-run by default."
     },
@@ -371,6 +375,10 @@
     {
       "name": "gh_stars_summary",
       "description": "Summarize current GitHub stars with counts by list, language, topic, archived/fork totals, and optional managed-prefix coverage."
+    },
+    {
+      "name": "gh_stars_sync_markdown",
+      "description": "Parse markdown GitHub links into per-file star lists, then exactly reconcile those target lists while preserving unrelated list memberships. Dry-run by default."
     },
     {
       "name": "gh_stars_taxonomy_audit",
@@ -1140,7 +1148,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 276,
+  "tool_count": 278,
   "resource_count": 8,
   "prompt_count": 4,
   "categories": [

@@ -3,9 +3,9 @@
   "profile": "default",
   "canonical_source": "https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp",
   "publish_mirror": true,
-  "total_tools": 276,
+  "total_tools": 278,
   "module_count": 32,
-  "deferred_tools": 271,
+  "deferred_tools": 273,
   "resource_count": 8,
   "template_count": 0,
   "prompt_count": 4,
@@ -17,10 +17,10 @@
     "hyprland": 1,
     "input_simulate": 6,
     "systemd": 11,
-    "workflow": 2
+    "workflow": 4
   },
   "by_runtime_group": {
-    "unassigned": 276
+    "unassigned": 278
   },
   "discovery_tools": [
     "dotfiles_tool_search",
