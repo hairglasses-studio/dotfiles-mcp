@@ -828,6 +828,7 @@ func shouldDeferDotfilesTool(profile string, td registry.ToolDefinition) bool {
 		return !(strings.HasPrefix(td.Tool.Name, "dotfiles_") ||
 			strings.HasPrefix(td.Tool.Name, "workflow_") ||
 			strings.HasPrefix(td.Tool.Name, "oss_") ||
+			strings.HasPrefix(td.Tool.Name, "archwiki_") ||
 			strings.HasPrefix(td.Tool.Name, "arch_"))
 	default:
 		return true
