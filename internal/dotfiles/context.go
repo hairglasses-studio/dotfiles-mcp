@@ -50,6 +50,54 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 		},
 		{
 			Resource: mcp.NewResource(
+				"dotfiles://catalog/workflows",
+				"Workflow Catalog",
+				mcp.WithResourceDescription("Canonical workflow catalog for the highest-value dotfiles operator entrypoints"),
+				mcp.WithMIMEType("application/json"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				data, _ := json.MarshalIndent(dotfilesWorkflowCatalog(), "", "  ")
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{URI: "dotfiles://catalog/workflows", MIMEType: "application/json", Text: string(data)},
+				}, nil
+			},
+			Category: "catalog",
+			Tags:     []string{"catalog", "workflow", "dotfiles"},
+		},
+		{
+			Resource: mcp.NewResource(
+				"dotfiles://catalog/skills",
+				"Skill Catalog",
+				mcp.WithResourceDescription("Canonical skill-to-workflow routing map for dotfiles operator work"),
+				mcp.WithMIMEType("application/json"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				data, _ := json.MarshalIndent(dotfilesSkillCatalog(), "", "  ")
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{URI: "dotfiles://catalog/skills", MIMEType: "application/json", Text: string(data)},
+				}, nil
+			},
+			Category: "catalog",
+			Tags:     []string{"catalog", "skills", "dotfiles"},
+		},
+		{
+			Resource: mcp.NewResource(
+				"dotfiles://catalog/priorities",
+				"Workflow Priorities",
+				mcp.WithResourceDescription("Front-door coverage summary for canonical dotfiles workflows"),
+				mcp.WithMIMEType("application/json"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				data, _ := json.MarshalIndent(buildDotfilesPrioritySummary(), "", "  ")
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{URI: "dotfiles://catalog/priorities", MIMEType: "application/json", Text: string(data)},
+				}, nil
+			},
+			Category: "catalog",
+			Tags:     []string{"catalog", "priorities", "workflow"},
+		},
+		{
+			Resource: mcp.NewResource(
 				"dotfiles://workflows/fleet-maintenance",
 				"Fleet Maintenance Workflow",
 				mcp.WithResourceDescription("Compact workflow for org sync, dependency drift, and fleet auditing"),
@@ -75,6 +123,30 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 		},
 		{
 			Resource: mcp.NewResource(
+				"dotfiles://workflows/config-repair",
+				"Config Repair Workflow",
+				mcp.WithResourceDescription("Compact read-first workflow for config inspection, validation, and smallest-safe reloads"),
+				mcp.WithMIMEType("text/markdown"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      "dotfiles://workflows/config-repair",
+						MIMEType: "text/markdown",
+						Text: strings.Join([]string{
+							"1. Start with `dotfiles_list_configs` or one of the config resources to confirm the exact file you are touching.",
+							"2. Use `dotfiles_validate_config` on the narrowest changed TOML or JSON payload before any reload.",
+							"3. Use `dotfiles_reload_service` for one service when the blast radius is small; reserve `dotfiles_cascade_reload` for layered desktop changes.",
+							"4. Re-check the visible outcome after reload instead of assuming syntax validity fixed the runtime symptom.",
+						}, "\n"),
+					},
+				}, nil
+			},
+			Category: "workflow",
+			Tags:     []string{"config", "validate", "reload", "workflow"},
+		},
+		{
+			Resource: mcp.NewResource(
 				"dotfiles://workflows/desktop-triage",
 				"Desktop Triage Workflow",
 				mcp.WithResourceDescription("Compact read-first workflow for compositor, bar, shader, and service issues"),
@@ -88,7 +160,7 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 						Text: strings.Join([]string{
 							"1. Start with `dotfiles_rice_check` for compositor, shader, wallpaper, and service state.",
 							"2. Use `system_health_check` if the symptom may be machine-wide rather than desktop-specific.",
-							"3. Use `dotfiles_eww_status`, `hypr_list_windows`, or `hypr_get_monitors` to narrow the failing surface.",
+							"3. Use `dotfiles_eww_status`, `dotfiles_eww_inspect`, `notify_history_entries`, `hypr_list_windows`, or `hypr_get_monitors` to narrow the failing surface.",
 							"4. Only run `dotfiles_cascade_reload` or `dotfiles_reload_service` after the read path explains which layer is stale.",
 						}, "\n"),
 					},
@@ -96,6 +168,129 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 			},
 			Category: "workflow",
 			Tags:     []string{"desktop", "hyprland", "eww", "workflow"},
+		},
+		{
+			Resource: mcp.NewResource(
+				"dotfiles://workflows/desktop-control",
+				"Desktop Control Workflow",
+				mcp.WithResourceDescription("Compact workflow for desktop capability checks, OCR-assisted targeting, input actions, and the smallest safe reload"),
+				mcp.WithMIMEType("text/markdown"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      "dotfiles://workflows/desktop-control",
+						MIMEType: "text/markdown",
+						Text: strings.Join([]string{
+							"1. Start with `dotfiles_desktop_status` and `dotfiles_rice_check` to confirm Wayland, Hyprland, shell-stack, Eww, notification-history, OCR, input, and shader readiness before trying UI writes.",
+							"2. Use `hypr_list_windows` or `hypr_get_monitors` to identify the exact target surface before taking screenshots or sending input.",
+							"3. Use `screen_screenshot`, `desktop_screenshot_ocr`, or `desktop_find_text` to prove the visible state and coordinates you are about to act on.",
+							"4. Use `hypr_monitor_preset_list`, `hypr_layout_list`, `hypr_monitor_preset_restore`, `hypr_layout_restore`, or `desktop_project_open` when the task is a scene change rather than a single click.",
+							"5. Use `input_type_text`, `desktop_click_text`, `hypr_click`, or other narrow write tools only after the read path proves the target.",
+							"6. Prefer `dotfiles_eww_reload`, `dotfiles_reload_service`, or `hypr_reload_config` for one stale layer; reserve `dotfiles_cascade_reload` for broader desktop refreshes.",
+						}, "\n"),
+					},
+				}, nil
+			},
+			Category: "workflow",
+			Tags:     []string{"desktop", "automation", "ocr", "hyprland", "workflow"},
+		},
+		{
+			Resource: mcp.NewResource(
+				"dotfiles://workflows/workstation-diagnose",
+				"Workstation Diagnose Workflow",
+				mcp.WithResourceDescription("Compact read-first workflow for machine health, services, and local workstation failures"),
+				mcp.WithMIMEType("text/markdown"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      "dotfiles://workflows/workstation-diagnose",
+						MIMEType: "text/markdown",
+						Text: strings.Join([]string{
+							"1. Start with `system_health_check` to establish whether the symptom is machine-wide.",
+							"2. Use targeted reads such as `system_info`, `system_updates`, `system_disk`, or `system_memory` to isolate the failing subsystem.",
+							"3. Use `systemd_failed` when background services may be the cause.",
+							"4. Use `dotfiles_rice_check` only when the failure looks desktop-specific rather than machine-wide.",
+						}, "\n"),
+					},
+				}, nil
+			},
+			Category: "workflow",
+			Tags:     []string{"workstation", "health", "services", "workflow"},
+		},
+		{
+			Resource: mcp.NewResource(
+				"dotfiles://workflows/repo-validate",
+				"Repo Validate Workflow",
+				mcp.WithResourceDescription("Compact workflow for repo readiness, build validation, and baseline drift checks"),
+				mcp.WithMIMEType("text/markdown"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      "dotfiles://workflows/repo-validate",
+						MIMEType: "text/markdown",
+						Text: strings.Join([]string{
+							"1. Start with `dotfiles_oss_check` or `dotfiles_oss_score` to read repo readiness before making changes.",
+							"2. Use `dotfiles_pipeline_run` to validate build and test behavior in the target repo.",
+							"3. Use `dotfiles_workflow_sync` in dry-run mode if CI or baseline files may be stale.",
+							"4. Escalate to write flows only after the read path shows the concrete validation gap.",
+						}, "\n"),
+					},
+				}, nil
+			},
+			Category: "workflow",
+			Tags:     []string{"repo", "validate", "pipeline", "workflow"},
+		},
+		{
+			Resource: mcp.NewResource(
+				"dotfiles://workflows/repo-hygiene",
+				"Repo Hygiene Workflow",
+				mcp.WithResourceDescription("Compact workflow for dry-run-first branch, worktree, and managed worktree cleanup"),
+				mcp.WithMIMEType("text/markdown"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      "dotfiles://workflows/repo-hygiene",
+						MIMEType: "text/markdown",
+						Text: strings.Join([]string{
+							"1. Start with `dotfiles_repo_git_hygiene` in dry-run mode for the target repo, usually with `cleanup_local_merged=true` and `cleanup_worktrees=true`.",
+							"2. Review blocked branches or dirty worktrees before enabling `execute=true`; only enable `cleanup_remote_merged=true` once the merged remote branch list is clearly safe.",
+							"3. Add `branch_prefixes` when you want to constrain cleanup to a family such as `codex/`, `claude/`, or `dependabot/`.",
+							"4. Use `prune_managed_state=true` when Codex-managed worktree metadata or orphaned agent worktrees are part of the repo debt.",
+							"5. Follow with `dotfiles_pipeline_run` or the repo baseline when cleanup coincides with merge or integration work.",
+						}, "\n"),
+					},
+				}, nil
+			},
+			Category: "workflow",
+			Tags:     []string{"repo", "git", "worktree", "cleanup", "workflow"},
+		},
+		{
+			Resource: mcp.NewResource(
+				"dotfiles://workflows/repo-onboarding",
+				"Repo Onboarding Workflow",
+				mcp.WithResourceDescription("Compact workflow for creating or onboarding repos into the shared studio baseline"),
+				mcp.WithMIMEType("text/markdown"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      "dotfiles://workflows/repo-onboarding",
+						MIMEType: "text/markdown",
+						Text: strings.Join([]string{
+							"1. Use `dotfiles_create_repo` for a new repo and `dotfiles_onboard_repo` for an existing checkout.",
+							"2. Keep onboarding dry-run first when the script path supports it.",
+							"3. Finish with `dotfiles_workflow_sync` so the repo lands on the current baseline.",
+							"4. Use `dotfiles_oss_check` if you need a readiness readout before opening follow-up work.",
+						}, "\n"),
+					},
+				}, nil
+			},
+			Category: "workflow",
+			Tags:     []string{"repo", "onboarding", "baseline", "workflow"},
 		},
 		{
 			Resource: mcp.NewResource(
@@ -249,12 +444,17 @@ func (m *dotfilesResourceModule) overviewMarkdown() string {
 		"",
 		"1. Use `dotfiles_tool_search` to find the smallest relevant tool set.",
 		"2. Use `dotfiles_tool_schema` for exact parameters and write-safety details.",
-		"3. Prefer composed workflows such as `dotfiles_fleet_audit`, `dotfiles_cascade_reload`, `dotfiles_gh_full_sync`, and `claude_fleet_recovery` over shell reconstruction.",
+		"3. Read `dotfiles://catalog/workflows` or `dotfiles://catalog/priorities` when the task matches a repeated operator workflow.",
+		"4. Prefer composed workflows such as `dotfiles_fleet_audit`, `dotfiles_cascade_reload`, `dotfiles_gh_full_sync`, and `claude_fleet_recovery` over shell reconstruction.",
 		"",
 		"Highest-value paths:",
 		"",
+		"- Desktop control: `dotfiles_desktop_status` -> `dotfiles_rice_check` -> `hypr_list_windows` / `hypr_get_monitors` / `hypr_monitor_preset_list` / `hypr_layout_list` -> `desktop_screenshot_ocr` / `desktop_find_text` -> narrow input or scene restore action.",
 		"- Fleet maintenance: `dotfiles_fleet_audit` -> `dotfiles_dep_audit` / `dotfiles_gh_local_sync_audit` -> `dotfiles_workflow_sync` or `dotfiles_gh_full_sync`.",
-		"- Desktop triage: `dotfiles_rice_check` -> `system_health_check` / targeted Hyprland or eww reads -> reload only the failing layer.",
+		"- Desktop triage: `dotfiles_desktop_status` / `dotfiles_rice_check` -> `system_health_check` / targeted Hyprland or eww reads / `notify_history_entries` -> reload only the failing layer.",
+		"- Config repair: `dotfiles_list_configs` / config resources -> `dotfiles_validate_config` -> smallest-safe reload.",
+		"- Workstation diagnosis: `system_health_check` -> subsystem reads -> `systemd_failed` before desktop-specific escalation.",
+		"- Repo validation: `dotfiles_oss_check` / `dotfiles_oss_score` -> `dotfiles_pipeline_run` -> `dotfiles_workflow_sync` in dry-run mode.",
 		"- Repo onboarding: `dotfiles_create_repo` or `dotfiles_onboard_repo`, then `dotfiles_workflow_sync`.",
 		"- Session recovery: `claude_recovery_report` -> `claude_session_detail` / `claude_session_health` -> `claude_fleet_recovery`.",
 	}, "\n"), dotfilesMCPVersion, dotfilesProfile(), runtime.GOOS, toolCount, promptCount)
@@ -264,7 +464,7 @@ type dotfilesPromptModule struct{}
 
 func (m *dotfilesPromptModule) Name() string { return "dotfiles_prompts" }
 func (m *dotfilesPromptModule) Description() string {
-	return "Prompt workflows for fleet maintenance, desktop triage, onboarding, and recovery"
+	return "Prompt workflows for desktop control, fleet maintenance, desktop triage, config repair, workstation diagnosis, onboarding, repo validation, and recovery"
 }
 
 func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
@@ -292,6 +492,31 @@ func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
 		},
 		{
 			Prompt: mcp.NewPrompt(
+				"dotfiles_repair_config",
+				mcp.WithPromptDescription("Inspect and repair one config surface before reloading services"),
+				mcp.WithArgument("path", mcp.RequiredArgument(), mcp.ArgumentDescription("Config path or config resource URI to inspect")),
+				mcp.WithArgument("service", mcp.ArgumentDescription("Optional service to reload after validation")),
+			),
+			Handler: func(_ context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+				path := req.Params.Arguments["path"]
+				service := strings.TrimSpace(req.Params.Arguments["service"])
+				reloadHint := "Use `dotfiles_reload_service` for the smallest affected layer or `dotfiles_cascade_reload` only if the change spans multiple desktop services."
+				if service != "" {
+					reloadHint = fmt.Sprintf("After validation, prefer `dotfiles_reload_service` with service %q before any broader reload.", service)
+				}
+				return mcp.NewGetPromptResult("Repair config surface", []mcp.PromptMessage{
+					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
+						"Repair the config surface at %q. Start with `dotfiles_list_configs` or a matching config resource to confirm the target file. Use `dotfiles_validate_config` on the narrowest changed content before any reload. %s Re-check the visible outcome after reload instead of assuming syntax validity fixed the issue.",
+						path,
+						reloadHint,
+					))),
+				}), nil
+			},
+			Category: "workflow",
+			Tags:     []string{"config", "repair", "validate", "reload"},
+		},
+		{
+			Prompt: mcp.NewPrompt(
 				"dotfiles_triage_desktop",
 				mcp.WithPromptDescription("Investigate a desktop symptom with read-first tools before reloads"),
 				mcp.WithArgument("symptom", mcp.RequiredArgument(), mcp.ArgumentDescription("Short description of the desktop symptom")),
@@ -300,13 +525,52 @@ func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
 				symptom := req.Params.Arguments["symptom"]
 				return mcp.NewGetPromptResult("Triage desktop issue", []mcp.PromptMessage{
 					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
-						"Triage this desktop issue: %q. Start with `dotfiles_rice_check`. Use `system_health_check` if the symptom might be machine-wide. Use `dotfiles_eww_status`, `hypr_list_windows`, or `hypr_get_monitors` to narrow the failing layer. Only use `dotfiles_cascade_reload` or `dotfiles_reload_service` after the read path shows which layer is stale.",
+						"Triage this desktop issue: %q. Start with `dotfiles_rice_check`. Use `system_health_check` if the symptom might be machine-wide. Use `dotfiles_eww_status`, `dotfiles_eww_inspect`, `notify_history_entries`, `hypr_list_windows`, or `hypr_get_monitors` to narrow the failing layer. Only use `dotfiles_cascade_reload` or `dotfiles_reload_service` after the read path shows which layer is stale.",
 						symptom,
 					))),
 				}), nil
 			},
 			Category: "workflow",
 			Tags:     []string{"desktop", "triage", "hyprland", "eww"},
+		},
+		{
+			Prompt: mcp.NewPrompt(
+				"dotfiles_control_desktop",
+				mcp.WithPromptDescription("Drive a desktop automation task with capability checks, OCR-assisted targeting, and the smallest write action"),
+				mcp.WithArgument("objective", mcp.RequiredArgument(), mcp.ArgumentDescription("Short description of the desktop task to complete")),
+			),
+			Handler: func(_ context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+				objective := req.Params.Arguments["objective"]
+				return mcp.NewGetPromptResult("Control desktop surface", []mcp.PromptMessage{
+					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
+						"Complete this desktop control task: %q. Start with `dotfiles_desktop_status` and `dotfiles_rice_check` to confirm runtime readiness. Use `hypr_list_windows`, `hypr_get_monitors`, `hypr_monitor_preset_list`, or `hypr_layout_list` to find the target or scene, then use `screen_screenshot`, `desktop_screenshot_ocr`, or `desktop_find_text` to prove the visible state before any write. After the target is confirmed, prefer narrow actions such as `input_type_text`, `desktop_click_text`, `hypr_click`, `hypr_focus_window`, `hypr_monitor_preset_restore`, `hypr_layout_restore`, or `desktop_project_open`, and only use `dotfiles_eww_reload`, `dotfiles_reload_service`, `hypr_reload_config`, or `dotfiles_cascade_reload` when the failing layer is clear.",
+						objective,
+					))),
+				}), nil
+			},
+			Category: "workflow",
+			Tags:     []string{"desktop", "control", "ocr", "hyprland"},
+		},
+		{
+			Prompt: mcp.NewPrompt(
+				"dotfiles_diagnose_workstation",
+				mcp.WithPromptDescription("Investigate a workstation symptom with read-first machine health tools"),
+				mcp.WithArgument("symptom", mcp.ArgumentDescription("Short description of the workstation symptom")),
+			),
+			Handler: func(_ context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+				symptom := strings.TrimSpace(req.Params.Arguments["symptom"])
+				if symptom == "" {
+					symptom = "general workstation instability"
+				}
+				return mcp.NewGetPromptResult("Diagnose workstation issue", []mcp.PromptMessage{
+					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
+						"Diagnose this workstation issue: %q. Start with `system_health_check` to classify whether the problem is machine-wide. Use targeted reads such as `system_info`, `system_updates`, `system_disk`, or `system_memory` to isolate the subsystem. Use `systemd_failed` if background services may be involved, and only then narrow to desktop-specific reads like `dotfiles_rice_check` if needed.",
+						symptom,
+					))),
+				}), nil
+			},
+			Category: "workflow",
+			Tags:     []string{"workstation", "health", "diagnose"},
 		},
 		{
 			Prompt: mcp.NewPrompt(
@@ -325,6 +589,49 @@ func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
 			},
 			Category: "workflow",
 			Tags:     []string{"repo", "onboarding", "workflow"},
+		},
+		{
+			Prompt: mcp.NewPrompt(
+				"dotfiles_validate_repository",
+				mcp.WithPromptDescription("Validate repo readiness, build behavior, and baseline drift before making repo-wide changes"),
+				mcp.WithArgument("repo_path", mcp.RequiredArgument(), mcp.ArgumentDescription("Repo path to validate")),
+			),
+			Handler: func(_ context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+				repoPath := req.Params.Arguments["repo_path"]
+				return mcp.NewGetPromptResult("Validate repository", []mcp.PromptMessage{
+					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
+						"Validate the repository at %q before changing it. Start with `dotfiles_oss_check` or `dotfiles_oss_score` for a read-only readiness view. Use `dotfiles_pipeline_run` to confirm build and test behavior. If baseline files may be stale, use `dotfiles_workflow_sync` in dry-run mode before any write path.",
+						repoPath,
+					))),
+				}), nil
+			},
+			Category: "workflow",
+			Tags:     []string{"repo", "validate", "pipeline"},
+		},
+		{
+			Prompt: mcp.NewPrompt(
+				"dotfiles_cleanup_repo_hygiene",
+				mcp.WithPromptDescription("Scan or clean repo branch and worktree drift with a dry-run-first workflow"),
+				mcp.WithArgument("repo_path", mcp.RequiredArgument(), mcp.ArgumentDescription("Repo path to scan or clean")),
+				mcp.WithArgument("branch_prefixes", mcp.ArgumentDescription("Optional comma-separated branch prefixes such as codex/,claude/,dependabot/")),
+			),
+			Handler: func(_ context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+				repoPath := req.Params.Arguments["repo_path"]
+				branchPrefixes := strings.TrimSpace(req.Params.Arguments["branch_prefixes"])
+				prefixHint := ""
+				if branchPrefixes != "" {
+					prefixHint = fmt.Sprintf(" Limit cleanup candidates to the branch prefixes %q.", branchPrefixes)
+				}
+				return mcp.NewGetPromptResult("Clean repo git hygiene", []mcp.PromptMessage{
+					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
+						"Clean git branch and worktree drift for %q. Start with `dotfiles_repo_git_hygiene` in dry-run mode with `cleanup_local_merged=true` and `cleanup_worktrees=true`, then inspect blocked or dirty candidates before enabling `execute=true`. Only enable `cleanup_remote_merged=true` once the merged remote branch list is clearly safe, and use `prune_managed_state=true` if Codex-managed worktree residue is part of the problem.%s",
+						repoPath,
+						prefixHint,
+					))),
+				}), nil
+			},
+			Category: "workflow",
+			Tags:     []string{"repo", "git", "cleanup", "worktree"},
 		},
 		{
 			Prompt: mcp.NewPrompt(
@@ -353,11 +660,13 @@ func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
 func buildDotfilesResourceRegistry(reg *registry.ToolRegistry, promptReg *prompts.PromptRegistry) *resources.ResourceRegistry {
 	resReg := resources.NewResourceRegistry()
 	resReg.RegisterModule(&dotfilesResourceModule{reg: reg, promptReg: promptReg})
+	resReg.RegisterModule(&archResourceModule{})
 	return resReg
 }
 
 func buildDotfilesPromptRegistry() *prompts.PromptRegistry {
 	promptReg := prompts.NewPromptRegistry()
 	promptReg.RegisterModule(&dotfilesPromptModule{})
+	promptReg.RegisterModule(&archPromptModule{})
 	return promptReg
 }

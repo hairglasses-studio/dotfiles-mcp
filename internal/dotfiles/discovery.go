@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -81,6 +82,8 @@ type dotfilesToolStatsOutput struct {
 	DeferredTools   int            `json:"deferred_tools"`
 	ResourceCount   int            `json:"resource_count"`
 	PromptCount     int            `json:"prompt_count"`
+	WorkflowCount   int            `json:"workflow_count"`
+	SkillCount      int            `json:"skill_count"`
 	ByCategory      map[string]int `json:"by_category"`
 	ByRuntimeGroup  map[string]int `json:"by_runtime_group"`
 	WriteToolsCount int            `json:"write_tools_count"`
@@ -90,17 +93,51 @@ type dotfilesToolStatsOutput struct {
 type dotfilesServerHealthInput struct{}
 
 type dotfilesServerHealthOutput struct {
-	Name           string   `json:"name"`
-	Version        string   `json:"version"`
-	Status         string   `json:"status"`
-	Profile        string   `json:"profile"`
-	RuntimeOS      string   `json:"runtime_os"`
-	TotalTools     int      `json:"total_tools"`
-	ModuleCount    int      `json:"module_count"`
-	DeferredTools  int      `json:"deferred_tools"`
-	ResourceCount  int      `json:"resource_count"`
-	PromptCount    int      `json:"prompt_count"`
-	DiscoveryTools []string `json:"discovery_tools"`
+	Name            string   `json:"name"`
+	Version         string   `json:"version"`
+	Status          string   `json:"status"`
+	Profile         string   `json:"profile"`
+	RuntimeOS       string   `json:"runtime_os"`
+	TotalTools      int      `json:"total_tools"`
+	ModuleCount     int      `json:"module_count"`
+	DeferredTools   int      `json:"deferred_tools"`
+	ResourceCount   int      `json:"resource_count"`
+	PromptCount     int      `json:"prompt_count"`
+	WorkflowCount   int      `json:"workflow_count"`
+	SkillCount      int      `json:"skill_count"`
+	PrioritySummary any      `json:"priority_summary,omitempty"`
+	DiscoveryTools  []string `json:"discovery_tools"`
+}
+
+type dotfilesDesktopStatusInput struct{}
+
+type dotfilesDesktopRuntime struct {
+	XDGRuntimeDir             string `json:"xdg_runtime_dir,omitempty"`
+	WaylandDisplay            string `json:"wayland_display,omitempty"`
+	HyprlandInstanceSignature string `json:"hyprland_instance_signature,omitempty"`
+	HyprlandSocketDir         string `json:"hyprland_socket_dir,omitempty"`
+}
+
+type dotfilesDesktopCapability struct {
+	Ready   bool     `json:"ready"`
+	Details []string `json:"details,omitempty"`
+	Missing []string `json:"missing,omitempty"`
+}
+
+type dotfilesDesktopStatusOutput struct {
+	Profile         string                    `json:"profile"`
+	Status          string                    `json:"status"`
+	Runtime         dotfilesDesktopRuntime    `json:"runtime"`
+	Hyprland        dotfilesDesktopCapability `json:"hyprland"`
+	Shell           dotfilesDesktopCapability `json:"shell"`
+	Screenshot      dotfilesDesktopCapability `json:"screenshot"`
+	OCR             dotfilesDesktopCapability `json:"ocr"`
+	Input           dotfilesDesktopCapability `json:"input"`
+	Eww             dotfilesDesktopCapability `json:"eww"`
+	Notifications   dotfilesDesktopCapability `json:"notifications"`
+	Terminal        dotfilesDesktopCapability `json:"terminal"`
+	Shader          dotfilesDesktopCapability `json:"shader"`
+	MissingCommands []string                  `json:"missing_commands,omitempty"`
 }
 
 type DotfilesDiscoveryModule struct {
@@ -238,6 +275,8 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				DeferredTools:   len(m.reg.ListDeferredTools()),
 				ResourceCount:   resourceCount,
 				PromptCount:     promptCount,
+				WorkflowCount:   len(dotfilesWorkflowCatalog()),
+				SkillCount:      len(dotfilesSkillCatalog()),
 				ByCategory:      toolStats.ByCategory,
 				ByRuntimeGroup:  toolStats.ByRuntimeGroup,
 				WriteToolsCount: toolStats.WriteToolsCount,
@@ -262,43 +301,350 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				promptCount = m.prompts.PromptCount()
 			}
 
-			discoveryTools := make([]string, 0, 5)
-			for _, name := range []string{
-				"dotfiles_tool_search",
-				"dotfiles_tool_schema",
-				"dotfiles_tool_catalog",
-				"dotfiles_tool_stats",
-				"dotfiles_server_health",
-			} {
+			discoveryTools := make([]string, 0, len(dotfilesDiscoveryToolNames()))
+			for _, name := range dotfilesDiscoveryToolNames() {
 				if _, ok := m.reg.GetTool(name); ok {
 					discoveryTools = append(discoveryTools, name)
 				}
 			}
 
 			status := "ok"
-			if len(discoveryTools) < 5 || resourceCount == 0 || promptCount == 0 {
+			if len(discoveryTools) < len(dotfilesDiscoveryToolNames()) || resourceCount == 0 || promptCount == 0 {
 				status = "degraded"
 			}
 
 			return dotfilesServerHealthOutput{
-				Name:           "dotfiles-mcp",
-				Version:        m.version,
-				Status:         status,
-				Profile:        dotfilesProfile(),
-				RuntimeOS:      runtime.GOOS,
-				TotalTools:     toolStats.TotalTools,
-				ModuleCount:    toolStats.ModuleCount,
-				DeferredTools:  len(m.reg.ListDeferredTools()),
-				ResourceCount:  resourceCount,
-				PromptCount:    promptCount,
-				DiscoveryTools: discoveryTools,
+				Name:            "dotfiles-mcp",
+				Version:         m.version,
+				Status:          status,
+				Profile:         dotfilesProfile(),
+				RuntimeOS:       runtime.GOOS,
+				TotalTools:      toolStats.TotalTools,
+				ModuleCount:     toolStats.ModuleCount,
+				DeferredTools:   len(m.reg.ListDeferredTools()),
+				ResourceCount:   resourceCount,
+				PromptCount:     promptCount,
+				WorkflowCount:   len(dotfilesWorkflowCatalog()),
+				SkillCount:      len(dotfilesSkillCatalog()),
+				PrioritySummary: buildDotfilesPrioritySummary(),
+				DiscoveryTools:  discoveryTools,
 			}, nil
 		},
 	)
 	serverHealth.Category = "discovery"
 	serverHealth.SearchTerms = []string{"server health", "mcp health", "contract status", "server overview"}
 
-	return []registry.ToolDefinition{search, schema, catalog, stats, serverHealth}
+	desktopStatus := handler.TypedHandler[dotfilesDesktopStatusInput, dotfilesDesktopStatusOutput](
+		"dotfiles_desktop_status",
+		"Report desktop control readiness, including Hyprland, screenshot/OCR, input injection, and the kitty-to-ghostty terminal shader pipeline.",
+		func(_ context.Context, _ dotfilesDesktopStatusInput) (dotfilesDesktopStatusOutput, error) {
+			runtimeDir := dotfilesRuntimeDir()
+			waylandDisplay := dotfilesWaylandDisplay(runtimeDir)
+			hyprSignature := dotfilesHyprlandSignature(runtimeDir)
+			hyprSocketDir := ""
+			if runtimeDir != "" {
+				candidate := filepath.Join(runtimeDir, "hypr")
+				if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+					hyprSocketDir = candidate
+				}
+			}
+
+			missingCommands := make([]string, 0)
+
+			hyprlandMissing := make([]string, 0)
+			hyprlandDetails := make([]string, 0)
+			if hasCmd("hyprctl") {
+				hyprlandDetails = append(hyprlandDetails, "hyprctl available")
+			} else {
+				hyprlandMissing = append(hyprlandMissing, "hyprctl")
+				missingCommands = append(missingCommands, "hyprctl")
+			}
+			if waylandDisplay != "" {
+				hyprlandDetails = append(hyprlandDetails, "WAYLAND_DISPLAY="+waylandDisplay)
+			} else {
+				hyprlandMissing = append(hyprlandMissing, "WAYLAND_DISPLAY")
+			}
+			if hyprSignature != "" {
+				hyprlandDetails = append(hyprlandDetails, "HYPRLAND_INSTANCE_SIGNATURE resolved")
+			} else {
+				hyprlandMissing = append(hyprlandMissing, "HYPRLAND_INSTANCE_SIGNATURE")
+			}
+			if hyprSocketDir != "" {
+				hyprlandDetails = append(hyprlandDetails, "Hyprland socket dir "+hyprSocketDir)
+			}
+
+			shellMissing := make([]string, 0)
+			shellDetails := make([]string, 0)
+			for _, cmd := range []string{"hyprshell", "hypr-dock", "hyprdynamicmonitors", "hyprland-autoname-workspaces"} {
+				if hasCmd(cmd) {
+					shellDetails = append(shellDetails, cmd+" available")
+				} else {
+					shellMissing = append(shellMissing, cmd)
+					missingCommands = append(missingCommands, cmd)
+				}
+			}
+			for _, component := range []struct {
+				name    string
+				running bool
+			}{
+				{name: "hyprshell", running: processRunningExact("hyprshell")},
+				{name: "hypr-dock", running: processRunningExact("hypr-dock")},
+				{name: "hyprdynamicmonitors", running: processRunningExact("hyprdynamicmonitors")},
+				{name: "hyprland-autoname-workspaces", running: processRunningExact("hyprland-autoname-workspaces")},
+			} {
+				if component.running {
+					shellDetails = append(shellDetails, component.name+" running")
+				} else {
+					shellDetails = append(shellDetails, component.name+" not running")
+				}
+			}
+			monitorInclude := desktopMonitorIncludePath()
+			if pathExists(monitorInclude) {
+				shellDetails = append(shellDetails, "dynamic monitor include present at "+monitorInclude)
+			} else {
+				shellMissing = append(shellMissing, "monitors.dynamic.conf")
+			}
+
+			screenshotMissing := make([]string, 0)
+			screenshotDetails := make([]string, 0)
+			if hasCmd("wayshot") {
+				screenshotDetails = append(screenshotDetails, "wayshot available")
+			} else {
+				screenshotMissing = append(screenshotMissing, "wayshot")
+				missingCommands = append(missingCommands, "wayshot")
+			}
+			if hasCmd("magick") {
+				screenshotDetails = append(screenshotDetails, "ImageMagick inline resize enabled")
+			} else {
+				screenshotMissing = append(screenshotMissing, "magick")
+				missingCommands = append(missingCommands, "magick")
+			}
+			if waylandDisplay == "" {
+				screenshotMissing = append(screenshotMissing, "WAYLAND_DISPLAY")
+			}
+
+			ocrMissing := make([]string, 0)
+			ocrDetails := make([]string, 0)
+			if hasCmd("tesseract") {
+				ocrDetails = append(ocrDetails, "tesseract available")
+			} else {
+				ocrMissing = append(ocrMissing, "tesseract")
+				missingCommands = append(missingCommands, "tesseract")
+			}
+			if hasCmd("magick") {
+				ocrDetails = append(ocrDetails, "ImageMagick preprocessing enabled")
+			} else {
+				ocrMissing = append(ocrMissing, "magick")
+			}
+			if !hasCmd("wayshot") {
+				ocrMissing = append(ocrMissing, "wayshot")
+			}
+			if waylandDisplay == "" {
+				ocrMissing = append(ocrMissing, "WAYLAND_DISPLAY")
+			}
+
+			inputMissing := make([]string, 0)
+			inputDetails := make([]string, 0)
+			if hasCmd("ydotool") {
+				inputDetails = append(inputDetails, "ydotool pointer and key injection available")
+			} else {
+				inputMissing = append(inputMissing, "ydotool")
+				missingCommands = append(missingCommands, "ydotool")
+			}
+			if hasCmd("wtype") {
+				inputDetails = append(inputDetails, "wtype text entry available")
+			} else {
+				inputMissing = append(inputMissing, "wtype")
+				missingCommands = append(missingCommands, "wtype")
+			}
+
+			ewwStatus := currentEwwStatus()
+			ewwMissing := make([]string, 0)
+			ewwDetails := make([]string, 0)
+			if hasCmd("eww") {
+				ewwDetails = append(ewwDetails, "eww available")
+			} else {
+				ewwMissing = append(ewwMissing, "eww")
+				missingCommands = append(missingCommands, "eww")
+			}
+			ewwConfig := dotfilesEwwConfigDir()
+			if pathExists(ewwConfig) {
+				ewwDetails = append(ewwDetails, "config rooted at "+ewwConfig)
+			} else {
+				ewwMissing = append(ewwMissing, "eww config")
+			}
+			if ewwStatus.DaemonRunning {
+				ewwDetails = append(ewwDetails, fmt.Sprintf("daemon running (%d processes)", ewwStatus.DaemonCount))
+			} else {
+				ewwMissing = append(ewwMissing, "eww daemon")
+			}
+			ewwDetails = append(ewwDetails, fmt.Sprintf("%d active windows", len(ewwStatus.Windows)))
+			ewwDetails = append(ewwDetails, fmt.Sprintf("%d defined windows", len(ewwStatus.DefinedWindows)))
+
+			notificationMissing := make([]string, 0)
+			notificationDetails := make([]string, 0)
+			if hasCmd("swaync-client") {
+				notificationDetails = append(notificationDetails, "swaync-client available")
+			} else {
+				notificationMissing = append(notificationMissing, "swaync-client")
+				missingCommands = append(missingCommands, "swaync-client")
+			}
+			if hasCmd("dbus-monitor") {
+				notificationDetails = append(notificationDetails, "dbus-monitor available")
+			} else {
+				notificationMissing = append(notificationMissing, "dbus-monitor")
+				missingCommands = append(missingCommands, "dbus-monitor")
+			}
+			if hasCmd("python3") {
+				notificationDetails = append(notificationDetails, "python3 available for notification history listener")
+			} else {
+				notificationMissing = append(notificationMissing, "python3")
+				missingCommands = append(missingCommands, "python3")
+			}
+			listenerPath := dotfilesNotificationHistoryListenerPath()
+			if pathExists(listenerPath) {
+				notificationDetails = append(notificationDetails, "history listener script present at "+listenerPath)
+			} else {
+				notificationMissing = append(notificationMissing, "notification-history-listener.py")
+			}
+			historyEntries, _ := readNotificationHistoryEntries()
+			notificationDetails = append(notificationDetails, fmt.Sprintf("%d tracked notification entries", len(historyEntries)))
+			if notificationHistoryListenerRunning() {
+				notificationDetails = append(notificationDetails, "notification history listener running")
+			} else {
+				notificationDetails = append(notificationDetails, "notification history listener not running")
+			}
+
+			kittyConfigPath := filepath.Join(dotfilesDir(), "kitty", "kitty.conf")
+			ghosttyConfigPath := filepath.Join(dotfilesDir(), "ghostty", "config")
+			terminalMissing := make([]string, 0)
+			terminalDetails := make([]string, 0)
+			kittyInstalled := hasCmd("kitty")
+			ghosttyInstalled := hasCmd("ghostty")
+			if kittyInstalled {
+				terminalDetails = append(terminalDetails, "kitty available")
+			} else {
+				terminalMissing = append(terminalMissing, "kitty")
+				missingCommands = append(missingCommands, "kitty")
+			}
+			if ghosttyInstalled {
+				terminalDetails = append(terminalDetails, "ghostty available")
+			} else {
+				terminalMissing = append(terminalMissing, "ghostty")
+				missingCommands = append(missingCommands, "ghostty")
+			}
+			if _, err := os.Stat(kittyConfigPath); err == nil {
+				terminalDetails = append(terminalDetails, "kitty config rooted at "+kittyConfigPath)
+			}
+			if _, err := os.Stat(ghosttyConfigPath); err == nil {
+				terminalDetails = append(terminalDetails, "ghostty state-aware config rooted at "+ghosttyConfigPath)
+			}
+
+			shaderScriptPath := filepath.Join(dotfilesDir(), "scripts", "kitty-shader-playlist.sh")
+			shaderDir := filepath.Join(dotfilesDir(), "kitty", "shaders", "crtty")
+			shaderMissing := make([]string, 0)
+			shaderDetails := make([]string, 0)
+			if _, err := os.Stat(shaderScriptPath); err == nil {
+				shaderDetails = append(shaderDetails, "kitty shader playlist script available")
+			} else {
+				shaderMissing = append(shaderMissing, "kitty-shader-playlist.sh")
+			}
+			if _, err := os.Stat(shaderDir); err == nil {
+				shaderDetails = append(shaderDetails, "kitty shader source dir available")
+			} else {
+				shaderMissing = append(shaderMissing, "kitty shader source dir")
+			}
+			if kittyInstalled {
+				shaderDetails = append(shaderDetails, "kitty is the active shader write target")
+			} else {
+				shaderMissing = append(shaderMissing, "kitty")
+			}
+			if _, err := os.Stat(ghosttyConfigPath); err == nil {
+				shaderDetails = append(shaderDetails, "ghostty config present for state-aware terminal parity")
+			}
+
+			output := dotfilesDesktopStatusOutput{
+				Profile: dotfilesProfile(),
+				Status:  "ok",
+				Runtime: dotfilesDesktopRuntime{
+					XDGRuntimeDir:             runtimeDir,
+					WaylandDisplay:            waylandDisplay,
+					HyprlandInstanceSignature: hyprSignature,
+					HyprlandSocketDir:         hyprSocketDir,
+				},
+				Hyprland: dotfilesDesktopCapability{
+					Ready:   len(hyprlandMissing) == 0,
+					Details: hyprlandDetails,
+					Missing: uniqueSortedStrings(hyprlandMissing),
+				},
+				Shell: dotfilesDesktopCapability{
+					Ready:   len(shellMissing) == 0,
+					Details: shellDetails,
+					Missing: uniqueSortedStrings(shellMissing),
+				},
+				Screenshot: dotfilesDesktopCapability{
+					Ready:   len(screenshotMissing) == 0,
+					Details: screenshotDetails,
+					Missing: uniqueSortedStrings(screenshotMissing),
+				},
+				OCR: dotfilesDesktopCapability{
+					Ready:   len(ocrMissing) == 0,
+					Details: ocrDetails,
+					Missing: uniqueSortedStrings(ocrMissing),
+				},
+				Input: dotfilesDesktopCapability{
+					Ready:   len(inputMissing) == 0,
+					Details: inputDetails,
+					Missing: uniqueSortedStrings(inputMissing),
+				},
+				Eww: dotfilesDesktopCapability{
+					Ready:   len(ewwMissing) == 0,
+					Details: ewwDetails,
+					Missing: uniqueSortedStrings(ewwMissing),
+				},
+				Notifications: dotfilesDesktopCapability{
+					Ready:   len(notificationMissing) == 0,
+					Details: notificationDetails,
+					Missing: uniqueSortedStrings(notificationMissing),
+				},
+				Terminal: dotfilesDesktopCapability{
+					Ready:   kittyInstalled || ghosttyInstalled,
+					Details: terminalDetails,
+					Missing: uniqueSortedStrings(terminalMissing),
+				},
+				Shader: dotfilesDesktopCapability{
+					Ready:   len(shaderMissing) == 0,
+					Details: shaderDetails,
+					Missing: uniqueSortedStrings(shaderMissing),
+				},
+				MissingCommands: uniqueSortedStrings(missingCommands),
+			}
+			if !(output.Hyprland.Ready && output.Shell.Ready && output.Screenshot.Ready && output.OCR.Ready && output.Input.Ready && output.Eww.Ready && output.Notifications.Ready && output.Terminal.Ready && output.Shader.Ready) {
+				output.Status = "degraded"
+			}
+			return output, nil
+		},
+	)
+	desktopStatus.Category = "discovery"
+	desktopStatus.SearchTerms = []string{
+		"desktop status",
+		"desktop readiness",
+		"hyprland status",
+		"hyprshell",
+		"hypr-dock",
+		"hyprdynamicmonitors",
+		"autoname",
+		"wayland env",
+		"ocr readiness",
+		"click automation",
+		"eww",
+		"notification history",
+		"kitty",
+		"ghostty",
+		"terminal shader",
+	}
+
+	return []registry.ToolDefinition{search, schema, catalog, stats, serverHealth, desktopStatus}
 }
 
 // annotatedModule wraps a ToolModule to apply MCP annotations and circuit breaker groups.
@@ -340,6 +686,7 @@ func dotfilesModules() []registry.ToolModule {
 		&DotfilesModule{},
 		&GitHubStarsModule{},
 		&HyprlandModule{},
+		&KittyModule{},
 		&ShaderModule{},
 		&InputModule{},
 		&BluetoothModule{},
@@ -356,6 +703,7 @@ func dotfilesModules() []registry.ToolModule {
 		&ClipboardModule{},
 		&NotifyModule{},
 		&NotificationModule{},
+		&EwwDesktopModule{},
 		&InputSimulateModule{},
 		&DesktopInteractModule{},
 		&ClaudeSessionModule{},
@@ -364,6 +712,7 @@ func dotfilesModules() []registry.ToolModule {
 		&OpsModule{},
 		&AudioModule{},
 		&NetworkModule{},
+		&ArchModule{},
 		&SystemModule{},
 		&SystemdModule{},
 		&TmuxModule{},
@@ -395,10 +744,120 @@ func shouldDeferDotfilesTool(profile string, td registry.ToolDefinition) bool {
 	case "ops":
 		return !(strings.HasPrefix(td.Tool.Name, "dotfiles_") ||
 			strings.HasPrefix(td.Tool.Name, "workflow_") ||
-			strings.HasPrefix(td.Tool.Name, "oss_"))
+			strings.HasPrefix(td.Tool.Name, "oss_") ||
+			strings.HasPrefix(td.Tool.Name, "arch_"))
 	default:
 		return true
 	}
+}
+
+func dotfilesDiscoveryToolNames() []string {
+	return []string{
+		"dotfiles_tool_search",
+		"dotfiles_tool_schema",
+		"dotfiles_tool_catalog",
+		"dotfiles_tool_stats",
+		"dotfiles_server_health",
+		"dotfiles_desktop_status",
+	}
+}
+
+func isDesktopProfileTool(name string) bool {
+	switch {
+	case strings.HasPrefix(name, "hypr_"),
+		strings.HasPrefix(name, "kitty_"),
+		strings.HasPrefix(name, "screen_"),
+		strings.HasPrefix(name, "desktop_"),
+		strings.HasPrefix(name, "shader_"),
+		strings.HasPrefix(name, "clipboard_"),
+		strings.HasPrefix(name, "notify_"),
+		strings.HasPrefix(name, "notification_"),
+		strings.HasPrefix(name, "input_"):
+		return true
+	}
+
+	switch name {
+	case "dotfiles_list_configs",
+		"dotfiles_validate_config",
+		"dotfiles_reload_service",
+		"dotfiles_cascade_reload",
+		"dotfiles_rice_check",
+		"dotfiles_eww_status",
+		"dotfiles_eww_get",
+		"dotfiles_eww_restart",
+		"dotfiles_eww_inspect",
+		"dotfiles_eww_reload":
+		return true
+	default:
+		return false
+	}
+}
+
+func dotfilesRuntimeDir() string {
+	if dir := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR")); dir != "" {
+		return dir
+	}
+	dir := fmt.Sprintf("/run/user/%d", os.Getuid())
+	if info, err := os.Stat(dir); err == nil && info.IsDir() {
+		return dir
+	}
+	return ""
+}
+
+func dotfilesWaylandDisplay(runtimeDir string) string {
+	if display := strings.TrimSpace(os.Getenv("WAYLAND_DISPLAY")); display != "" {
+		return display
+	}
+	if runtimeDir == "" {
+		return ""
+	}
+	entries, err := os.ReadDir(runtimeDir)
+	if err != nil {
+		return ""
+	}
+	sockets := make([]string, 0)
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "wayland-") {
+			sockets = append(sockets, entry.Name())
+		}
+	}
+	sort.Strings(sockets)
+	for _, preferred := range []string{"wayland-1", "wayland-0"} {
+		for _, socket := range sockets {
+			if socket == preferred {
+				return socket
+			}
+		}
+	}
+	if len(sockets) > 0 {
+		return sockets[0]
+	}
+	return ""
+}
+
+func dotfilesHyprlandSignature(runtimeDir string) string {
+	if sig := strings.TrimSpace(os.Getenv("HYPRLAND_INSTANCE_SIGNATURE")); sig != "" {
+		return sig
+	}
+	if runtimeDir == "" {
+		return ""
+	}
+	hyprDir := filepath.Join(runtimeDir, "hypr")
+	entries, err := os.ReadDir(hyprDir)
+	if err != nil {
+		return ""
+	}
+	signatures := make([]string, 0)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			signatures = append(signatures, entry.Name())
+		}
+	}
+	sort.Strings(signatures)
+	if len(signatures) > 0 {
+		return signatures[0]
+	}
+	return ""
 }
 
 func schemaMap(schema any) map[string]any {

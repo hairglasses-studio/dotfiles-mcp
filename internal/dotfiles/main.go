@@ -592,12 +592,13 @@ type EwwLayerInfo struct {
 }
 
 type EwwStatusOutput struct {
-	DaemonRunning bool              `json:"daemon_running"`
-	DaemonCount   int               `json:"daemon_count"`
-	WaybarRunning bool              `json:"waybar_running"`
-	Windows       []string          `json:"windows"`
-	Layers        []EwwLayerInfo    `json:"layers"`
-	Variables     map[string]string `json:"variables,omitempty"`
+	DaemonRunning  bool              `json:"daemon_running"`
+	DaemonCount    int               `json:"daemon_count"`
+	WaybarRunning  bool              `json:"waybar_running"`
+	Windows        []string          `json:"windows"`
+	DefinedWindows []string          `json:"defined_windows,omitempty"`
+	Layers         []EwwLayerInfo    `json:"layers"`
+	Variables      map[string]string `json:"variables,omitempty"`
 }
 
 // Tool 10: dotfiles_eww_get

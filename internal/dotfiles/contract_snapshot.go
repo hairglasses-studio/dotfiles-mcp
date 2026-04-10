@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/hairglasses-studio/mcpkit/prompts"
 	"github.com/hairglasses-studio/mcpkit/registry"
@@ -54,17 +53,17 @@ type ContractPromptSnapshot struct {
 type ContractOverviewSnapshot struct {
 	Version         string         `json:"version"`
 	Profile         string         `json:"profile"`
-	CanonicalSource string        `json:"canonical_source"`
-	PublishMirror  bool           `json:"publish_mirror"`
-	TotalTools     int            `json:"total_tools"`
-	ModuleCount    int            `json:"module_count"`
-	DeferredTools  int            `json:"deferred_tools"`
-	ResourceCount  int            `json:"resource_count"`
-	TemplateCount  int            `json:"template_count"`
-	PromptCount    int            `json:"prompt_count"`
-	ByCategory     map[string]int `json:"by_category"`
-	ByRuntimeGroup map[string]int `json:"by_runtime_group"`
-	DiscoveryTools []string       `json:"discovery_tools"`
+	CanonicalSource string         `json:"canonical_source"`
+	PublishMirror   bool           `json:"publish_mirror"`
+	TotalTools      int            `json:"total_tools"`
+	ModuleCount     int            `json:"module_count"`
+	DeferredTools   int            `json:"deferred_tools"`
+	ResourceCount   int            `json:"resource_count"`
+	TemplateCount   int            `json:"template_count"`
+	PromptCount     int            `json:"prompt_count"`
+	ByCategory      map[string]int `json:"by_category"`
+	ByRuntimeGroup  map[string]int `json:"by_runtime_group"`
+	DiscoveryTools  []string       `json:"discovery_tools"`
 }
 
 type WellKnownCapabilities struct {
@@ -79,34 +78,34 @@ type WellKnownTool struct {
 }
 
 type WellKnownManifest struct {
-	Name            string               `json:"name"`
-	Description     string               `json:"description"`
-	Version         string               `json:"version"`
-	Homepage        string               `json:"homepage"`
-	License         string               `json:"license"`
-	Organization    string               `json:"organization"`
-	Repository      string               `json:"repository"`
-	CanonicalSource string               `json:"canonical_source"`
-	PublishMirror   bool                 `json:"publish_mirror"`
-	Transport       []string             `json:"transport"`
-	Profiles        []string             `json:"profiles"`
-	DefaultProfile  string               `json:"default_profile"`
+	Name            string                `json:"name"`
+	Description     string                `json:"description"`
+	Version         string                `json:"version"`
+	Homepage        string                `json:"homepage"`
+	License         string                `json:"license"`
+	Organization    string                `json:"organization"`
+	Repository      string                `json:"repository"`
+	CanonicalSource string                `json:"canonical_source"`
+	PublishMirror   bool                  `json:"publish_mirror"`
+	Transport       []string              `json:"transport"`
+	Profiles        []string              `json:"profiles"`
+	DefaultProfile  string                `json:"default_profile"`
 	Capabilities    WellKnownCapabilities `json:"capabilities"`
-	Tools           []WellKnownTool      `json:"tools"`
-	Tags            []string             `json:"tags"`
-	ToolCount       int                  `json:"tool_count"`
-	ResourceCount   int                  `json:"resource_count"`
-	PromptCount     int                  `json:"prompt_count"`
-	Categories      []string             `json:"categories"`
+	Tools           []WellKnownTool       `json:"tools"`
+	Tags            []string              `json:"tags"`
+	ToolCount       int                   `json:"tool_count"`
+	ResourceCount   int                   `json:"resource_count"`
+	PromptCount     int                   `json:"prompt_count"`
+	Categories      []string              `json:"categories"`
 }
 
 type ContractSnapshotBundle struct {
-	Overview  ContractOverviewSnapshot    `json:"overview"`
-	Tools     []ContractToolSnapshot      `json:"tools"`
-	Resources []ContractResourceSnapshot  `json:"resources"`
-	Templates []ContractTemplateSnapshot  `json:"templates"`
-	Prompts   []ContractPromptSnapshot    `json:"prompts"`
-	Manifest  WellKnownManifest           `json:"manifest"`
+	Overview  ContractOverviewSnapshot   `json:"overview"`
+	Tools     []ContractToolSnapshot     `json:"tools"`
+	Resources []ContractResourceSnapshot `json:"resources"`
+	Templates []ContractTemplateSnapshot `json:"templates"`
+	Prompts   []ContractPromptSnapshot   `json:"prompts"`
+	Manifest  WellKnownManifest          `json:"manifest"`
 }
 
 func withDotfilesProfile(profile string, fn func() error) error {
@@ -143,7 +142,9 @@ func BuildContractSnapshotBundle(profile string) (ContractSnapshotBundle, error)
 		resourceDefs := resReg.GetAllResourceDefinitions()
 		sort.Slice(resourceDefs, func(i, j int) bool { return resourceDefs[i].Resource.URI < resourceDefs[j].Resource.URI })
 		templateDefs := resReg.GetAllTemplateDefinitions()
-		sort.Slice(templateDefs, func(i, j int) bool { return templateDefs[i].Template.URITemplate.Raw() < templateDefs[j].Template.URITemplate.Raw() })
+		sort.Slice(templateDefs, func(i, j int) bool {
+			return templateDefs[i].Template.URITemplate.Raw() < templateDefs[j].Template.URITemplate.Raw()
+		})
 		promptDefs := promptReg.GetAllPromptDefinitions()
 		sort.Slice(promptDefs, func(i, j int) bool { return promptDefs[i].Prompt.Name < promptDefs[j].Prompt.Name })
 
@@ -212,16 +213,16 @@ func BuildContractSnapshotBundle(profile string) (ContractSnapshotBundle, error)
 			Version:         dotfilesMCPVersion,
 			Profile:         activeProfile,
 			CanonicalSource: canonicalSourceURL,
-			PublishMirror:  true,
-			TotalTools:     stats.TotalTools,
-			ModuleCount:    stats.ModuleCount,
-			DeferredTools:  len(reg.ListDeferredTools()),
-			ResourceCount:  resReg.ResourceCount() + resReg.TemplateCount(),
-			TemplateCount:  resReg.TemplateCount(),
-			PromptCount:    promptReg.PromptCount(),
-			ByCategory:     stats.ByCategory,
-			ByRuntimeGroup: stats.ByRuntimeGroup,
-			DiscoveryTools: dotfilesDiscoveryToolNames(),
+			PublishMirror:   true,
+			TotalTools:      stats.TotalTools,
+			ModuleCount:     stats.ModuleCount,
+			DeferredTools:   len(reg.ListDeferredTools()),
+			ResourceCount:   resReg.ResourceCount() + resReg.TemplateCount(),
+			TemplateCount:   resReg.TemplateCount(),
+			PromptCount:     promptReg.PromptCount(),
+			ByCategory:      stats.ByCategory,
+			ByRuntimeGroup:  stats.ByRuntimeGroup,
+			DiscoveryTools:  dotfilesDiscoveryToolNames(),
 		}
 		bundle.Tools = tools
 		bundle.Resources = resourcesOut
@@ -259,41 +260,6 @@ func BuildContractSnapshotBundle(profile string) (ContractSnapshotBundle, error)
 
 func SnapshotJSON(v any) ([]byte, error) {
 	return json.MarshalIndent(v, "", "  ")
-}
-
-func dotfilesDiscoveryToolNames() []string {
-	return []string{
-		"dotfiles_tool_search",
-		"dotfiles_tool_schema",
-		"dotfiles_tool_catalog",
-		"dotfiles_tool_stats",
-		"dotfiles_server_health",
-	}
-}
-
-func isDesktopProfileTool(name string) bool {
-	switch {
-	case strings.HasPrefix(name, "hypr_"),
-		strings.HasPrefix(name, "screen_"),
-		strings.HasPrefix(name, "shader_"),
-		strings.HasPrefix(name, "wallpaper_"),
-		strings.HasPrefix(name, "audio_"),
-		strings.HasPrefix(name, "desktop_"),
-		strings.HasPrefix(name, "clipboard_"),
-		strings.HasPrefix(name, "notify_"),
-		strings.HasPrefix(name, "notification_"),
-		strings.HasPrefix(name, "tmux_"),
-		strings.HasPrefix(name, "systemd_"),
-		strings.HasPrefix(name, "dotfiles_eww_"),
-		name == "dotfiles_rice_check",
-		name == "dotfiles_cascade_reload",
-		name == "dotfiles_reload_service",
-		name == "input_status",
-		name == "input_restart_services":
-		return true
-	default:
-		return false
-	}
 }
 
 var _ = resources.NewResourceRegistry
