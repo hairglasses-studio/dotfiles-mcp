@@ -1,6 +1,7 @@
 package dotfiles
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -32,6 +33,9 @@ type desktopSessionRecord struct {
 	WaylandDisplay            string                 `json:"wayland_display,omitempty"`
 	XDGRuntimeDir             string                 `json:"xdg_runtime_dir,omitempty"`
 	HyprlandInstanceSignature string                 `json:"hyprland_instance_signature,omitempty"`
+	DBUSSessionBusAddress     string                 `json:"dbus_session_bus_address,omitempty"`
+	ATSPIBusAddress           string                 `json:"at_spi_bus_address,omitempty"`
+	EnvPath                   string                 `json:"env_path,omitempty"`
 	LogPath                   string                 `json:"log_path,omitempty"`
 	StartedAt                 string                 `json:"started_at"`
 	StoppedAt                 string                 `json:"stopped_at,omitempty"`
@@ -92,6 +96,61 @@ type SessionLogInput struct {
 	Lines     int    `json:"lines,omitempty" jsonschema:"description=Tail line count (default 80)"`
 }
 
+type SessionSemanticTreeInput struct {
+	SessionID string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	App       string `json:"app" jsonschema:"required,description=Application name or unique substring inside the session"`
+	Depth     int    `json:"depth,omitempty" jsonschema:"description=Max tree depth (default 5)"`
+}
+
+type SessionSemanticQueryInput struct {
+	SessionID string   `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	App       string   `json:"app" jsonschema:"required,description=Application name or unique substring inside the session"`
+	Name      string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role      string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref       string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous session semantic result"`
+	Path      string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous session semantic result"`
+	States    []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Exact     bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+}
+
+type SessionSemanticActionInput struct {
+	SessionID string   `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	App       string   `json:"app" jsonschema:"required,description=Application name or unique substring inside the session"`
+	Name      string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role      string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref       string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous session semantic result"`
+	Path      string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous session semantic result"`
+	States    []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Action    string   `json:"action,omitempty" jsonschema:"description=Optional explicit action name to invoke, such as activate or press"`
+	Exact     bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+}
+
+type SessionSemanticWaitInput struct {
+	SessionID string   `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	App       string   `json:"app" jsonschema:"required,description=Application name or unique substring inside the session"`
+	Name      string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role      string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref       string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous session semantic result"`
+	Path      string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous session semantic result"`
+	States    []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Exact     bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+	Timeout   int      `json:"timeout,omitempty" jsonschema:"description=Timeout in seconds (default 5)"`
+}
+
+type SessionTypeTextInput struct {
+	SessionID string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	Text      string `json:"text" jsonschema:"required,description=Text to type inside the session"`
+}
+
+type SessionDBusCallInput struct {
+	SessionID string   `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	Service   string   `json:"service" jsonschema:"required,description=D-Bus service name such as org.kde.KWin"`
+	Path      string   `json:"path" jsonschema:"required,description=D-Bus object path such as /KWin"`
+	Interface string   `json:"interface" jsonschema:"required,description=D-Bus interface name such as org.kde.KWin"`
+	Method    string   `json:"method" jsonschema:"required,description=D-Bus method name such as reconfigure"`
+	Args      []string `json:"args,omitempty" jsonschema:"description=Optional dbus-send argument expressions such as string:foo or int32:1"`
+}
+
 type SessionWindowsOutput struct {
 	Session     desktopSessionRecord `json:"session"`
 	Mode        string               `json:"mode"`
@@ -126,6 +185,29 @@ type SessionCommandOutput struct {
 	Mode    string               `json:"mode,omitempty"`
 }
 
+type SessionSemanticTreeOutput struct {
+	Session    desktopSessionRecord `json:"session"`
+	HelperPath string               `json:"helper_path,omitempty"`
+	App        string               `json:"app"`
+	Depth      int                  `json:"depth"`
+	Matched    bool                 `json:"matched"`
+	Tree       map[string]any       `json:"tree,omitempty"`
+	Error      string               `json:"error,omitempty"`
+}
+
+type SessionSemanticElementOutput struct {
+	Session    desktopSessionRecord      `json:"session"`
+	HelperPath string                    `json:"helper_path,omitempty"`
+	App        string                    `json:"app"`
+	Query      desktopSemanticQueryInput `json:"query"`
+	Matched    bool                      `json:"matched"`
+	Clicked    bool                      `json:"clicked,omitempty"`
+	Invoked    bool                      `json:"invoked,omitempty"`
+	Action     string                    `json:"action,omitempty"`
+	Element    map[string]any            `json:"element,omitempty"`
+	Error      string                    `json:"error,omitempty"`
+}
+
 func desktopSessionsRootDir() string {
 	return dotfilesManagedStateDir("sessions")
 }
@@ -140,6 +222,59 @@ func desktopSessionRecordPath(id string) string {
 
 func desktopSessionID() string {
 	return fmt.Sprintf("session-%d", time.Now().UnixNano())
+}
+
+func desktopSessionEnvValue(env []string, key string) string {
+	prefix := key + "="
+	for _, item := range env {
+		if strings.HasPrefix(item, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(item, prefix))
+		}
+	}
+	return ""
+}
+
+func readDesktopSessionEnvFile(path string) (map[string]string, error) {
+	data, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer data.Close()
+
+	out := map[string]string{}
+	scanner := bufio.NewScanner(data)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		if key == "" {
+			continue
+		}
+		out[key] = parts[1]
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func hydrateDesktopSessionRecord(record *desktopSessionRecord) {
+	if record == nil || strings.TrimSpace(record.EnvPath) == "" || !pathExists(record.EnvPath) {
+		return
+	}
+	values, err := readDesktopSessionEnvFile(record.EnvPath)
+	if err != nil {
+		return
+	}
+	if strings.TrimSpace(record.DBUSSessionBusAddress) == "" {
+		record.DBUSSessionBusAddress = strings.TrimSpace(values["DBUS_SESSION_BUS_ADDRESS"])
+	}
+	if strings.TrimSpace(record.ATSPIBusAddress) == "" {
+		record.ATSPIBusAddress = strings.TrimSpace(values["AT_SPI_BUS_ADDRESS"])
+	}
 }
 
 func saveDesktopSessionRecord(record desktopSessionRecord) error {
@@ -165,6 +300,7 @@ func loadDesktopSessionRecord(id string) (desktopSessionRecord, error) {
 	if err := json.Unmarshal(data, &record); err != nil {
 		return desktopSessionRecord{}, fmt.Errorf("parse session record %s: %w", id, err)
 	}
+	hydrateDesktopSessionRecord(&record)
 	return record, nil
 }
 
@@ -208,6 +344,7 @@ func resolveDesktopSession(id string) (desktopSessionRecord, error) {
 }
 
 func desktopSessionEnv(record desktopSessionRecord) []string {
+	hydrateDesktopSessionRecord(&record)
 	env := os.Environ()
 	setEnv := func(key, value string) {
 		if strings.TrimSpace(value) == "" {
@@ -229,6 +366,8 @@ func desktopSessionEnv(record desktopSessionRecord) []string {
 	setEnv("XDG_RUNTIME_DIR", record.XDGRuntimeDir)
 	setEnv("WAYLAND_DISPLAY", record.WaylandDisplay)
 	setEnv("HYPRLAND_INSTANCE_SIGNATURE", record.HyprlandInstanceSignature)
+	setEnv("DBUS_SESSION_BUS_ADDRESS", record.DBUSSessionBusAddress)
+	setEnv("AT_SPI_BUS_ADDRESS", record.ATSPIBusAddress)
 	setEnv("XDG_SESSION_TYPE", "wayland")
 	return env
 }
@@ -238,6 +377,42 @@ func desktopSessionAlive(pid int) bool {
 		return false
 	}
 	return syscall.Kill(pid, 0) == nil
+}
+
+func waitForDesktopSessionReady(record *desktopSessionRecord, timeout time.Duration) error {
+	if record == nil {
+		return fmt.Errorf("session record is required")
+	}
+	deadline := time.Now().Add(timeout)
+	socketPath := filepath.Join(record.XDGRuntimeDir, record.WaylandDisplay)
+	for time.Now().Before(deadline) {
+		hydrateDesktopSessionRecord(record)
+		if strings.TrimSpace(record.DBUSSessionBusAddress) != "" && pathExists(socketPath) {
+			record.Status = "connected"
+			return nil
+		}
+		if record.PID > 0 && !desktopSessionAlive(record.PID) {
+			logTail := ""
+			if strings.TrimSpace(record.LogPath) != "" && pathExists(record.LogPath) {
+				if data, err := os.ReadFile(record.LogPath); err == nil {
+					logTail = trimTailLines(string(data), 40)
+				}
+			}
+			if strings.TrimSpace(logTail) != "" {
+				return fmt.Errorf("session exited before readiness: %s", strings.TrimSpace(logTail))
+			}
+			return fmt.Errorf("session exited before readiness")
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	if strings.TrimSpace(record.DBUSSessionBusAddress) == "" {
+		record.Notes = append(record.Notes, "DBUS_SESSION_BUS_ADDRESS not detected before timeout")
+	}
+	if !pathExists(socketPath) {
+		record.Notes = append(record.Notes, "wayland socket not detected before timeout")
+	}
+	record.Status = "starting"
+	return nil
 }
 
 func runDesktopSessionCommand(record desktopSessionRecord, name string, args ...string) (string, error) {
@@ -256,6 +431,14 @@ func runDesktopSessionHyprctl(record desktopSessionRecord, args ...string) (stri
 		return "", fmt.Errorf("session %s is not Hyprland-backed", record.ID)
 	}
 	return runDesktopSessionCommand(record, "hyprctl", args...)
+}
+
+func runDesktopSessionSemanticHelper(ctx context.Context, record desktopSessionRecord, args ...string) (any, string, error) {
+	env := desktopSessionEnv(record)
+	if strings.TrimSpace(desktopSessionEnvValue(env, "DBUS_SESSION_BUS_ADDRESS")) == "" {
+		return nil, "", fmt.Errorf("session %s does not expose DBUS_SESSION_BUS_ADDRESS for semantic inspection", record.ID)
+	}
+	return runDesktopSemanticHelperWithEnv(ctx, env, args...)
 }
 
 func sessionDefaultName(prefix string) string {
@@ -317,6 +500,18 @@ func sessionFindHyprWindow(record desktopSessionRecord, input SessionWindowInput
 	return resolveHyprWindow(input.Address, input.Class, clientsJSON)
 }
 
+func sessionSemanticQuery(input SessionSemanticQueryInput) desktopSemanticQueryInput {
+	return desktopSemanticQueryInput{
+		App:    input.App,
+		Name:   input.Name,
+		Role:   input.Role,
+		Ref:    input.Ref,
+		Path:   input.Path,
+		States: input.States,
+		Exact:  input.Exact,
+	}
+}
+
 func (m *DesktopSessionModule) Tools() []registry.ToolDefinition {
 	start := handler.TypedHandler[SessionStartInput, desktopSessionRecord](
 		"session_start",
@@ -336,6 +531,9 @@ func (m *DesktopSessionModule) Tools() []registry.ToolDefinition {
 			if !hasCmd("kwin_wayland") {
 				return desktopSessionRecord{}, fmt.Errorf("kwin_wayland not found")
 			}
+			if !hasCmd("dbus-run-session") {
+				return desktopSessionRecord{}, fmt.Errorf("dbus-run-session not found")
+			}
 
 			id := desktopSessionID()
 			name := strings.TrimSpace(input.Name)
@@ -351,6 +549,7 @@ func (m *DesktopSessionModule) Tools() []registry.ToolDefinition {
 				return desktopSessionRecord{}, fmt.Errorf("create session runtime dir: %w", err)
 			}
 			logPath := filepath.Join(dir, "kwin.log")
+			envPath := filepath.Join(dir, "session.env")
 			logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 			if err != nil {
 				return desktopSessionRecord{}, fmt.Errorf("open session log: %w", err)
@@ -364,20 +563,37 @@ func (m *DesktopSessionModule) Tools() []registry.ToolDefinition {
 				Status:         "starting",
 				WaylandDisplay: "wayland-0",
 				XDGRuntimeDir:  runtimeDir,
+				EnvPath:        envPath,
 				LogPath:        logPath,
 				StartedAt:      time.Now().UTC().Format(time.RFC3339),
-				Notes:          []string{"best-effort KWin virtual session start"},
+				Notes: []string{
+					"KWin virtual session started under dbus-run-session",
+				},
 			}
 
-			cmd := exec.Command("kwin_wayland", "--virtual", "--no-lockscreen")
-			cmd.Env = desktopSessionEnv(record)
+			script := fmt.Sprintf(`
+set -eu
+export XDG_RUNTIME_DIR=%q
+export WAYLAND_DISPLAY=%q
+export XDG_SESSION_TYPE=wayland
+if command -v at-spi-bus-launcher >/dev/null 2>&1; then
+  at-spi-bus-launcher --launch-immediately >/dev/null 2>&1 &
+fi
+env > %q
+exec kwin_wayland --virtual --no-lockscreen
+`, runtimeDir, record.WaylandDisplay, envPath)
+
+			cmd := exec.Command("dbus-run-session", "bash", "-lc", script)
 			cmd.Stdout = logFile
 			cmd.Stderr = logFile
 			if err := cmd.Start(); err != nil {
-				return desktopSessionRecord{}, fmt.Errorf("start kwin_wayland: %w", err)
+				return desktopSessionRecord{}, fmt.Errorf("start kwin_wayland via dbus-run-session: %w", err)
 			}
 
 			record.PID = cmd.Process.Pid
+			if err := waitForDesktopSessionReady(&record, 5*time.Second); err != nil {
+				return desktopSessionRecord{}, err
+			}
 			if err := saveDesktopSessionRecord(record); err != nil {
 				return desktopSessionRecord{}, err
 			}
@@ -687,6 +903,265 @@ func (m *DesktopSessionModule) Tools() []registry.ToolDefinition {
 	readAppLog.Category = "desktop"
 	readAppLog.SearchTerms = []string{"session app log", "launch log", "read session log"}
 
+	accessibilityTree := handler.TypedHandler[SessionSemanticTreeInput, SessionSemanticTreeOutput](
+		"session_accessibility_tree",
+		"Read the AT-SPI accessibility tree for one application inside a tracked session.",
+		func(ctx context.Context, input SessionSemanticTreeInput) (SessionSemanticTreeOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticTreeOutput{}, err
+			}
+			if strings.TrimSpace(input.App) == "" {
+				return SessionSemanticTreeOutput{}, fmt.Errorf("[%s] app is required", handler.ErrInvalidParam)
+			}
+			depth := input.Depth
+			if depth <= 0 {
+				depth = 5
+			}
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, "get_tree", "--app", input.App, "--depth", fmt.Sprintf("%d", depth))
+			if err != nil {
+				return SessionSemanticTreeOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			return SessionSemanticTreeOutput{
+				Session:    record,
+				HelperPath: helperPath,
+				App:        input.App,
+				Depth:      depth,
+				Matched:    result["matched"] == true,
+				Tree:       semanticMapValue(result["tree"]),
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	accessibilityTree.Category = "desktop"
+	accessibilityTree.SearchTerms = []string{"session at-spi tree", "session accessibility", "session semantic tree"}
+
+	findUIElement := handler.TypedHandler[SessionSemanticQueryInput, SessionSemanticElementOutput](
+		"session_find_ui_element",
+		"Find a semantic UI element inside a tracked session by app plus name, role, states, ref, or path.",
+		func(ctx context.Context, input SessionSemanticQueryInput) (SessionSemanticElementOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			query := sessionSemanticQuery(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"find"}, args...)...)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			return SessionSemanticElementOutput{
+				Session:    record,
+				HelperPath: helperPath,
+				App:        input.App,
+				Query:      query,
+				Matched:    result["matched"] == true,
+				Element:    semanticMapValue(result["element"]),
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	findUIElement.Category = "desktop"
+	findUIElement.SearchTerms = []string{"session find element", "session semantic ref", "session at-spi find"}
+
+	waitForElement := handler.TypedHandler[SessionSemanticWaitInput, SessionSemanticElementOutput](
+		"session_wait_for_element",
+		"Wait for a semantic element to appear or satisfy requested states inside a tracked session.",
+		func(ctx context.Context, input SessionSemanticWaitInput) (SessionSemanticElementOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			query := desktopSemanticQueryInput{
+				App:    input.App,
+				Name:   input.Name,
+				Role:   input.Role,
+				Ref:    input.Ref,
+				Path:   input.Path,
+				States: input.States,
+				Exact:  input.Exact,
+			}
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			timeout := input.Timeout
+			if timeout <= 0 {
+				timeout = 5
+			}
+			args = append(args, "--timeout", fmt.Sprintf("%d", timeout))
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"wait"}, args...)...)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			return SessionSemanticElementOutput{
+				Session:    record,
+				HelperPath: helperPath,
+				App:        input.App,
+				Query:      query,
+				Matched:    result["matched"] == true,
+				Element:    semanticMapValue(result["element"]),
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	waitForElement.Category = "desktop"
+	waitForElement.SearchTerms = []string{"session wait element", "session wait for state", "session semantic wait"}
+
+	clickElement := handler.TypedHandler[SessionSemanticQueryInput, SessionSemanticElementOutput](
+		"session_click_element",
+		"Invoke the default clickable AT-SPI action for a semantic element inside a tracked session.",
+		func(ctx context.Context, input SessionSemanticQueryInput) (SessionSemanticElementOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			query := sessionSemanticQuery(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"click"}, args...)...)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			action, _ := result["action"].(string)
+			return SessionSemanticElementOutput{
+				Session:    record,
+				HelperPath: helperPath,
+				App:        input.App,
+				Query:      query,
+				Matched:    result["matched"] == true,
+				Clicked:    result["clicked"] == true,
+				Invoked:    result["invoked"] == true,
+				Action:     action,
+				Element:    semanticMapValue(result["element"]),
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	clickElement.Category = "desktop"
+	clickElement.SearchTerms = []string{"session click element", "session semantic click", "session at-spi click"}
+
+	invokeAction := handler.TypedHandler[SessionSemanticActionInput, SessionSemanticElementOutput](
+		"session_invoke_action",
+		"Invoke a specific AT-SPI action for a semantic element inside a tracked session.",
+		func(ctx context.Context, input SessionSemanticActionInput) (SessionSemanticElementOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			query := desktopSemanticQueryInput{
+				App:    input.App,
+				Name:   input.Name,
+				Role:   input.Role,
+				Ref:    input.Ref,
+				Path:   input.Path,
+				States: input.States,
+				Exact:  input.Exact,
+			}
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			if strings.TrimSpace(input.Action) != "" {
+				args = append(args, "--action", input.Action)
+			}
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"act"}, args...)...)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			action, _ := result["action"].(string)
+			return SessionSemanticElementOutput{
+				Session:    record,
+				HelperPath: helperPath,
+				App:        input.App,
+				Query:      query,
+				Matched:    result["matched"] == true,
+				Invoked:    result["invoked"] == true,
+				Action:     action,
+				Element:    semanticMapValue(result["element"]),
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	invokeAction.Category = "desktop"
+	invokeAction.SearchTerms = []string{"session invoke action", "session focus widget", "session semantic action"}
+
+	typeText := handler.TypedHandler[SessionTypeTextInput, SessionCommandOutput](
+		"session_type_text",
+		"Type text inside a tracked session using wtype against the session Wayland display.",
+		func(_ context.Context, input SessionTypeTextInput) (SessionCommandOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionCommandOutput{}, err
+			}
+			if strings.TrimSpace(input.Text) == "" {
+				return SessionCommandOutput{}, fmt.Errorf("[%s] text is required", handler.ErrInvalidParam)
+			}
+			if !hasCmd("wtype") {
+				return SessionCommandOutput{}, fmt.Errorf("wtype is required for session_type_text")
+			}
+			cmd := exec.Command("wtype", input.Text)
+			cmd.Env = desktopSessionEnv(record)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				return SessionCommandOutput{}, fmt.Errorf("wtype failed: %w: %s", err, strings.TrimSpace(string(out)))
+			}
+			return SessionCommandOutput{
+				Session: record,
+				Mode:    "wtype",
+				Output:  fmt.Sprintf("typed %d chars", len(input.Text)),
+			}, nil
+		},
+	)
+	typeText.Category = "desktop"
+	typeText.SearchTerms = []string{"session type", "session wtype", "type inside session"}
+
+	dbusCall := handler.TypedHandler[SessionDBusCallInput, SessionCommandOutput](
+		"session_dbus_call",
+		"Run a session-scoped dbus-send call for advanced KWin, portal, or app-specific automation.",
+		func(_ context.Context, input SessionDBusCallInput) (SessionCommandOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionCommandOutput{}, err
+			}
+			if !hasCmd("dbus-send") {
+				return SessionCommandOutput{}, fmt.Errorf("dbus-send not found")
+			}
+			if strings.TrimSpace(input.Service) == "" || strings.TrimSpace(input.Path) == "" || strings.TrimSpace(input.Interface) == "" || strings.TrimSpace(input.Method) == "" {
+				return SessionCommandOutput{}, fmt.Errorf("[%s] service, path, interface, and method are required", handler.ErrInvalidParam)
+			}
+			args := []string{
+				"--session",
+				"--print-reply",
+				"--dest=" + input.Service,
+				input.Path,
+				input.Interface + "." + input.Method,
+			}
+			args = append(args, input.Args...)
+			out, err := runDesktopSessionCommand(record, "dbus-send", args...)
+			if err != nil {
+				return SessionCommandOutput{}, err
+			}
+			return SessionCommandOutput{
+				Session: record,
+				Mode:    "dbus-send",
+				Output:  out,
+			}, nil
+		},
+	)
+	dbusCall.Category = "desktop"
+	dbusCall.SearchTerms = []string{"session dbus", "kwin dbus", "dbus-send session"}
+
 	return []registry.ToolDefinition{
 		start,
 		connect,
@@ -699,6 +1174,13 @@ func (m *DesktopSessionModule) Tools() []registry.ToolDefinition {
 		clipboardSet,
 		waylandInfo,
 		readAppLog,
+		accessibilityTree,
+		findUIElement,
+		waitForElement,
+		clickElement,
+		invokeAction,
+		typeText,
+		dbusCall,
 	}
 }
 
@@ -746,11 +1228,16 @@ func sessionConnect(input SessionConnectInput) (desktopSessionRecord, error) {
 		WaylandDisplay:            waylandDisplay,
 		XDGRuntimeDir:             runtimeDir,
 		HyprlandInstanceSignature: hyprSignature,
+		DBUSSessionBusAddress:     strings.TrimSpace(os.Getenv("DBUS_SESSION_BUS_ADDRESS")),
+		ATSPIBusAddress:           strings.TrimSpace(os.Getenv("AT_SPI_BUS_ADDRESS")),
 		StartedAt:                 time.Now().UTC().Format(time.RFC3339),
 	}
 	if strings.TrimSpace(hyprSignature) != "" {
 		record.Backend = "live_hyprland"
 		record.Notes = append(record.Notes, "Hyprland live session")
+	}
+	if strings.TrimSpace(record.DBUSSessionBusAddress) == "" {
+		record.Notes = append(record.Notes, "DBUS_SESSION_BUS_ADDRESS not detected during live attach")
 	}
 	if err := saveDesktopSessionRecord(record); err != nil {
 		return desktopSessionRecord{}, err

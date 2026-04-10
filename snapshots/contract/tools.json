@@ -329,6 +329,19 @@
     "deferred": true
   },
   {
+    "name": "desktop_act",
+    "description": "Invoke a specific AT-SPI action on a semantic element, such as activate, press, select, or grab focus.",
+    "category": "desktop",
+    "search_terms": [
+      "semantic action",
+      "invoke at-spi action",
+      "focus widget",
+      "activate widget"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "desktop_capabilities",
     "description": "Check whether the embedded AT-SPI helper, python3, and pyatspi are available on this host.",
     "category": "desktop",
@@ -342,12 +355,13 @@
   },
   {
     "name": "desktop_click",
-    "description": "Click a semantic element by path or by app plus name and optional role.",
+    "description": "Invoke the default clickable semantic action by ref, path, or by app plus name and optional role.",
     "category": "desktop",
     "search_terms": [
       "semantic click",
       "click button by label",
-      "at-spi click"
+      "at-spi click",
+      "invoke default action"
     ],
     "is_write": false,
     "deferred": true
@@ -375,13 +389,14 @@
   },
   {
     "name": "desktop_find",
-    "description": "Find a semantic element by app plus name, role, or a previously returned path.",
+    "description": "Find a semantic element by app plus name, role, states, ref, or a previously returned path.",
     "category": "desktop",
     "search_terms": [
       "find semantic element",
       "find button",
       "accessibility search",
-      "at-spi find"
+      "at-spi find",
+      "semantic ref"
     ],
     "is_write": false,
     "deferred": true
@@ -493,12 +508,13 @@
   },
   {
     "name": "desktop_wait_for_element",
-    "description": "Wait for a semantic element to appear, then return its resolved element record.",
+    "description": "Wait for a semantic element to appear or satisfy the requested states, then return its resolved element record.",
     "category": "desktop",
     "search_terms": [
       "wait for button",
       "wait for dialog",
-      "wait semantic element"
+      "wait semantic element",
+      "wait for state"
     ],
     "is_write": false,
     "deferred": true
@@ -2467,6 +2483,30 @@
     "deferred": true
   },
   {
+    "name": "session_accessibility_tree",
+    "description": "Read the AT-SPI accessibility tree for one application inside a tracked session.",
+    "category": "desktop",
+    "search_terms": [
+      "session at-spi tree",
+      "session accessibility",
+      "session semantic tree"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_click_element",
+    "description": "Invoke the default clickable AT-SPI action for a semantic element inside a tracked session.",
+    "category": "desktop",
+    "search_terms": [
+      "session click element",
+      "session semantic click",
+      "session at-spi click"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "session_clipboard_get",
     "description": "Read the clipboard for a tracked session using wl-paste.",
     "category": "desktop",
@@ -2503,6 +2543,30 @@
     "deferred": true
   },
   {
+    "name": "session_dbus_call",
+    "description": "Run a session-scoped dbus-send call for advanced KWin, portal, or app-specific automation.",
+    "category": "desktop",
+    "search_terms": [
+      "session dbus",
+      "kwin dbus",
+      "dbus-send session"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_find_ui_element",
+    "description": "Find a semantic UI element inside a tracked session by app plus name, role, states, ref, or path.",
+    "category": "desktop",
+    "search_terms": [
+      "session find element",
+      "session semantic ref",
+      "session at-spi find"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "session_focus_window",
     "description": "Focus a window inside a Hyprland-backed session by address, class, or title substring.",
     "category": "desktop",
@@ -2510,6 +2574,18 @@
       "focus session window",
       "focus by class",
       "focus by title"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_invoke_action",
+    "description": "Invoke a specific AT-SPI action for a semantic element inside a tracked session.",
+    "category": "desktop",
+    "search_terms": [
+      "session invoke action",
+      "session focus widget",
+      "session semantic action"
     ],
     "is_write": false,
     "deferred": true
@@ -2585,6 +2661,30 @@
       "close session"
     ],
     "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "session_type_text",
+    "description": "Type text inside a tracked session using wtype against the session Wayland display.",
+    "category": "desktop",
+    "search_terms": [
+      "session type",
+      "session wtype",
+      "type inside session"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_wait_for_element",
+    "description": "Wait for a semantic element to appear or satisfy requested states inside a tracked session.",
+    "category": "desktop",
+    "search_terms": [
+      "session wait element",
+      "session wait for state",
+      "session semantic wait"
+    ],
+    "is_write": false,
     "deferred": true
   },
   {

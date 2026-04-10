@@ -31,20 +31,35 @@ type desktopSemanticTreeInput struct {
 }
 
 type desktopSemanticQueryInput struct {
-	App   string `json:"app" jsonschema:"required,description=Application name or unique substring"`
-	Name  string `json:"name,omitempty" jsonschema:"description=Element name or substring"`
-	Role  string `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
-	Path  string `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
-	Exact bool   `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+	App    string   `json:"app" jsonschema:"required,description=Application name or unique substring"`
+	Name   string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role   string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref    string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous semantic result"`
+	Path   string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
+	States []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Exact  bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+}
+
+type desktopSemanticActionInput struct {
+	App    string   `json:"app" jsonschema:"required,description=Application name or unique substring"`
+	Name   string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role   string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref    string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous semantic result"`
+	Path   string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
+	States []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Action string   `json:"action,omitempty" jsonschema:"description=Optional explicit action name to invoke, such as activate or press"`
+	Exact  bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
 }
 
 type desktopSemanticWaitInput struct {
-	App     string `json:"app" jsonschema:"required,description=Application name or unique substring"`
-	Name    string `json:"name,omitempty" jsonschema:"description=Element name or substring"`
-	Role    string `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
-	Path    string `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
-	Exact   bool   `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
-	Timeout int    `json:"timeout,omitempty" jsonschema:"description=Timeout in seconds (default 5)"`
+	App     string   `json:"app" jsonschema:"required,description=Application name or unique substring"`
+	Name    string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role    string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref     string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous semantic result"`
+	Path    string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
+	States  []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Exact   bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+	Timeout int      `json:"timeout,omitempty" jsonschema:"description=Timeout in seconds (default 5)"`
 }
 
 type desktopSemanticCapabilitiesOutput struct {
@@ -78,6 +93,7 @@ type desktopSemanticElementOutput struct {
 	Query      desktopSemanticQueryInput `json:"query"`
 	Matched    bool                      `json:"matched"`
 	Clicked    bool                      `json:"clicked,omitempty"`
+	Invoked    bool                      `json:"invoked,omitempty"`
 	Action     string                    `json:"action,omitempty"`
 	Element    map[string]any            `json:"element,omitempty"`
 	Error      string                    `json:"error,omitempty"`
@@ -151,6 +167,10 @@ func desktopSemanticCapabilities() desktopSemanticCapabilitiesOutput {
 }
 
 func runDesktopSemanticHelper(ctx context.Context, args ...string) (any, string, error) {
+	return runDesktopSemanticHelperWithEnv(ctx, os.Environ(), args...)
+}
+
+func runDesktopSemanticHelperWithEnv(ctx context.Context, env []string, args ...string) (any, string, error) {
 	caps := desktopSemanticCapabilities()
 	if !caps.Ready {
 		return nil, caps.HelperPath, fmt.Errorf("AT-SPI not ready: %s", strings.Join(caps.Missing, ", "))
@@ -158,6 +178,9 @@ func runDesktopSemanticHelper(ctx context.Context, args ...string) (any, string,
 
 	cmdArgs := append([]string{caps.HelperPath}, args...)
 	cmd := exec.CommandContext(ctx, "python3", cmdArgs...)
+	if len(env) > 0 {
+		cmd.Env = env
+	}
 	out, err := cmd.CombinedOutput()
 	trimmed := strings.TrimSpace(string(out))
 	if err != nil {
@@ -204,8 +227,8 @@ func semanticQueryArgs(input desktopSemanticQueryInput) ([]string, error) {
 	if strings.TrimSpace(input.App) == "" {
 		return nil, fmt.Errorf("[%s] app is required", handler.ErrInvalidParam)
 	}
-	if strings.TrimSpace(input.Name) == "" && strings.TrimSpace(input.Path) == "" {
-		return nil, fmt.Errorf("[%s] name or path is required", handler.ErrInvalidParam)
+	if strings.TrimSpace(input.Name) == "" && strings.TrimSpace(input.Path) == "" && strings.TrimSpace(input.Ref) == "" {
+		return nil, fmt.Errorf("[%s] name, path, or ref is required", handler.ErrInvalidParam)
 	}
 
 	args := []string{"--app", input.App}
@@ -215,8 +238,16 @@ func semanticQueryArgs(input desktopSemanticQueryInput) ([]string, error) {
 	if strings.TrimSpace(input.Role) != "" {
 		args = append(args, "--role", input.Role)
 	}
+	if strings.TrimSpace(input.Ref) != "" {
+		args = append(args, "--ref", input.Ref)
+	}
 	if strings.TrimSpace(input.Path) != "" {
 		args = append(args, "--path", input.Path)
+	}
+	for _, state := range input.States {
+		if strings.TrimSpace(state) != "" {
+			args = append(args, "--state", state)
+		}
 	}
 	if input.Exact {
 		args = append(args, "--exact")
@@ -274,7 +305,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 
 	find := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticElementOutput](
 		"desktop_find",
-		"Find a semantic element by app plus name, role, or a previously returned path.",
+		"Find a semantic element by app plus name, role, states, ref, or a previously returned path.",
 		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticElementOutput, error) {
 			args, err := semanticQueryArgs(input)
 			if err != nil {
@@ -296,11 +327,11 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		},
 	)
 	find.Category = "desktop"
-	find.SearchTerms = []string{"find semantic element", "find button", "accessibility search", "at-spi find"}
+	find.SearchTerms = []string{"find semantic element", "find button", "accessibility search", "at-spi find", "semantic ref"}
 
 	click := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticElementOutput](
 		"desktop_click",
-		"Click a semantic element by path or by app plus name and optional role.",
+		"Invoke the default clickable semantic action by ref, path, or by app plus name and optional role.",
 		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticElementOutput, error) {
 			args, err := semanticQueryArgs(input)
 			if err != nil {
@@ -318,6 +349,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 				Query:      input,
 				Matched:    result["matched"] == true,
 				Clicked:    result["clicked"] == true,
+				Invoked:    result["invoked"] == true,
 				Action:     action,
 				Element:    semanticMapValue(result["element"]),
 				Error:      semanticErrorValue(result),
@@ -325,18 +357,61 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		},
 	)
 	click.Category = "desktop"
-	click.SearchTerms = []string{"semantic click", "click button by label", "at-spi click"}
+	click.SearchTerms = []string{"semantic click", "click button by label", "at-spi click", "invoke default action"}
+
+	act := handler.TypedHandler[desktopSemanticActionInput, desktopSemanticElementOutput](
+		"desktop_act",
+		"Invoke a specific AT-SPI action on a semantic element, such as activate, press, select, or grab focus.",
+		func(ctx context.Context, input desktopSemanticActionInput) (desktopSemanticElementOutput, error) {
+			query := desktopSemanticQueryInput{
+				App:    input.App,
+				Name:   input.Name,
+				Role:   input.Role,
+				Ref:    input.Ref,
+				Path:   input.Path,
+				States: input.States,
+				Exact:  input.Exact,
+			}
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			if strings.TrimSpace(input.Action) != "" {
+				args = append(args, "--action", input.Action)
+			}
+			parsed, helperPath, err := runDesktopSemanticHelper(ctx, append([]string{"act"}, args...)...)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			action, _ := result["action"].(string)
+			return desktopSemanticElementOutput{
+				HelperPath: helperPath,
+				App:        input.App,
+				Query:      query,
+				Matched:    result["matched"] == true,
+				Invoked:    result["invoked"] == true,
+				Action:     action,
+				Element:    semanticMapValue(result["element"]),
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	act.Category = "desktop"
+	act.SearchTerms = []string{"semantic action", "invoke at-spi action", "focus widget", "activate widget"}
 
 	wait := handler.TypedHandler[desktopSemanticWaitInput, desktopSemanticElementOutput](
 		"desktop_wait_for_element",
-		"Wait for a semantic element to appear, then return its resolved element record.",
+		"Wait for a semantic element to appear or satisfy the requested states, then return its resolved element record.",
 		func(ctx context.Context, input desktopSemanticWaitInput) (desktopSemanticElementOutput, error) {
 			query := desktopSemanticQueryInput{
-				App:   input.App,
-				Name:  input.Name,
-				Role:  input.Role,
-				Path:  input.Path,
-				Exact: input.Exact,
+				App:    input.App,
+				Name:   input.Name,
+				Role:   input.Role,
+				Ref:    input.Ref,
+				Path:   input.Path,
+				States: input.States,
+				Exact:  input.Exact,
 			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
@@ -363,7 +438,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		},
 	)
 	wait.Category = "desktop"
-	wait.SearchTerms = []string{"wait for button", "wait for dialog", "wait semantic element"}
+	wait.SearchTerms = []string{"wait for button", "wait for dialog", "wait semantic element", "wait for state"}
 
 	typeText := handler.TypedHandler[TypeTextInput, string](
 		"desktop_type",
@@ -428,6 +503,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		targetWindows,
 		find,
 		click,
+		act,
 		wait,
 		typeText,
 		key,

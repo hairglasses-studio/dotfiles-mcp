@@ -213,12 +213,16 @@
       "description": "Write text to the Wayland clipboard. Uses wl-copy. Optionally specify a MIME type."
     },
     {
+      "name": "desktop_act",
+      "description": "Invoke a specific AT-SPI action on a semantic element, such as activate, press, select, or grab focus."
+    },
+    {
       "name": "desktop_capabilities",
       "description": "Check whether the embedded AT-SPI helper, python3, and pyatspi are available on this host."
     },
     {
       "name": "desktop_click",
-      "description": "Click a semantic element by path or by app plus name and optional role."
+      "description": "Invoke the default clickable semantic action by ref, path, or by app plus name and optional role."
     },
     {
       "name": "desktop_click_text",
@@ -226,7 +230,7 @@
     },
     {
       "name": "desktop_find",
-      "description": "Find a semantic element by app plus name, role, or a previously returned path."
+      "description": "Find a semantic element by app plus name, role, states, ref, or a previously returned path."
     },
     {
       "name": "desktop_find_text",
@@ -258,7 +262,7 @@
     },
     {
       "name": "desktop_wait_for_element",
-      "description": "Wait for a semantic element to appear, then return its resolved element record."
+      "description": "Wait for a semantic element to appear or satisfy the requested states, then return its resolved element record."
     },
     {
       "name": "desktop_wait_for_text",
@@ -1237,6 +1241,14 @@
       "description": "Take a screenshot and immediately open it in swappy for annotation. Composed: wayshot capture then swappy launch."
     },
     {
+      "name": "session_accessibility_tree",
+      "description": "Read the AT-SPI accessibility tree for one application inside a tracked session."
+    },
+    {
+      "name": "session_click_element",
+      "description": "Invoke the default clickable AT-SPI action for a semantic element inside a tracked session."
+    },
+    {
       "name": "session_clipboard_get",
       "description": "Read the clipboard for a tracked session using wl-paste."
     },
@@ -1249,8 +1261,20 @@
       "description": "Create or rehydrate a session handle for the current live Wayland desktop."
     },
     {
+      "name": "session_dbus_call",
+      "description": "Run a session-scoped dbus-send call for advanced KWin, portal, or app-specific automation."
+    },
+    {
+      "name": "session_find_ui_element",
+      "description": "Find a semantic UI element inside a tracked session by app plus name, role, states, ref, or path."
+    },
+    {
       "name": "session_focus_window",
       "description": "Focus a window inside a Hyprland-backed session by address, class, or title substring."
+    },
+    {
+      "name": "session_invoke_action",
+      "description": "Invoke a specific AT-SPI action for a semantic element inside a tracked session."
     },
     {
       "name": "session_launch_app",
@@ -1275,6 +1299,14 @@
     {
       "name": "session_stop",
       "description": "Stop a tracked desktop session. Live handles are marked stopped without killing the current compositor."
+    },
+    {
+      "name": "session_type_text",
+      "description": "Type text inside a tracked session using wtype against the session Wayland display."
+    },
+    {
+      "name": "session_wait_for_element",
+      "description": "Wait for a semantic element to appear or satisfy requested states inside a tracked session."
     },
     {
       "name": "session_wayland_info",
@@ -1484,7 +1516,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 362,
+  "tool_count": 370,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [
