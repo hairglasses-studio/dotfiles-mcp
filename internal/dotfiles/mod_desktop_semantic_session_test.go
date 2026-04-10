@@ -77,6 +77,80 @@ func unmarshalSessionWindowsResult(t *testing.T, result *registry.CallToolResult
 	return out
 }
 
+func callDesktopSemanticTool(t *testing.T, name string, args map[string]any) *registry.CallToolResult {
+	t.Helper()
+	td := findModuleTool(t, &DesktopSemanticModule{}, name)
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = args
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("%s handler error: %v", name, err)
+	}
+	return result
+}
+
+func writeSemanticFixturePython(t *testing.T, dir string) {
+	t.Helper()
+	writeTestExecutable(t, dir, "python3", `#!/bin/sh
+if [ "$1" = "-c" ]; then
+  exit 0
+fi
+cmd="$2"
+case "$cmd" in
+  list_apps)
+    printf '%s\n' '{"apps":[{"id":0,"name":"Fixture App","role":"application"}]}'
+    ;;
+  list_windows)
+    printf '%s\n' '{"windows":[{"name":"Fixture Window","ref":"ref_0","path":"0","bounds":{"x":10,"y":20,"width":800,"height":600},"app":{"name":"Fixture App"}}]}'
+    ;;
+  get_tree)
+    printf '%s\n' '{"tree":{"name":"Fixture Window","role":"frame","ref":"ref_0","path":"0","children":[{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"},{"name":"Name","role":"entry","ref":"ref_0_1","path":"0/1","value":"fixture-text","value_kind":"text"}]}}'
+    ;;
+  find)
+    printf '%s\n' '{"matched":true,"element":{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"}}'
+    ;;
+  find_all)
+    printf '%s\n' '{"matched":true,"count":2,"elements":[{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"},{"name":"Cancel","role":"push button","ref":"ref_0_2","path":"0/2"}]}'
+    ;;
+  focus)
+    printf '%s\n' '{"matched":true,"focused":true,"element":{"name":"Fixture Window","role":"frame","ref":"ref_0","path":"0"}}'
+    ;;
+  read_value)
+    printf '%s\n' '{"matched":true,"value":"fixture-text","value_kind":"text","element":{"name":"Name","role":"entry","ref":"ref_0_1","path":"0/1"}}'
+    ;;
+  set_text)
+    printf '%s\n' '{"matched":true,"updated":true,"value":"patched","value_kind":"text","element":{"name":"Name","role":"entry","ref":"ref_0_1","path":"0/1"}}'
+    ;;
+  set_value)
+    printf '%s\n' '{"matched":true,"updated":true,"value":42,"value_kind":"numeric","element":{"name":"Slider","role":"slider","ref":"ref_0_3","path":"0/3"}}'
+    ;;
+  click)
+    printf '%s\n' '{"matched":true,"clicked":true,"element":{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"}}'
+    ;;
+  act)
+    printf '%s\n' '{"matched":true,"invoked":true,"action":"press","element":{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"}}'
+    ;;
+  wait)
+    printf '%s\n' '{"matched":true,"focused":true,"element":{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"}}'
+    ;;
+  *)
+    printf '%s\n' '{"error":"unexpected semantic fixture command"}'
+    exit 1
+    ;;
+esac
+`)
+}
+
+func writeSessionCommandFixtures(t *testing.T, dir string) {
+	t.Helper()
+	writeTestExecutable(t, dir, "grim", "#!/bin/sh\nprintf 'PNG' >\"$1\"\n")
+	writeTestExecutable(t, dir, "wl-paste", "#!/bin/sh\nprintf '%s' 'fixture clipboard'\n")
+	writeTestExecutable(t, dir, "wl-copy", "#!/bin/sh\ncat >/dev/null\n")
+	writeTestExecutable(t, dir, "wayland-info", "#!/bin/sh\nprintf '%s\n' 'interface: wl_compositor'\n")
+	writeTestExecutable(t, dir, "wtype", "#!/bin/sh\nexit 0\n")
+	writeTestExecutable(t, dir, "dbus-send", "#!/bin/sh\nprintf '%s\n' 'method return time=0.0 sender=:1.2 -> destination=:1.3 serial=4 reply_serial=5'\n")
+}
+
 func TestDesktopSemanticCapabilities_MissingPython(t *testing.T) {
 	stateDir := t.TempDir()
 	emptyBin := t.TempDir()
@@ -375,5 +449,282 @@ func TestDesktopSessionListWindows_UnsupportedWithoutDBus(t *testing.T) {
 	}
 	if !strings.Contains(out.Unsupported, "DBUS_SESSION_BUS_ADDRESS") {
 		t.Fatalf("expected unsupported message to mention DBUS_SESSION_BUS_ADDRESS, got %q", out.Unsupported)
+	}
+}
+
+func TestDesktopSemanticFixtureFlows(t *testing.T) {
+	stateDir := t.TempDir()
+	binDir := t.TempDir()
+	origPath := os.Getenv("PATH")
+
+	writeSemanticFixturePython(t, binDir)
+
+	t.Setenv("XDG_STATE_HOME", stateDir)
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
+	t.Setenv("WAYLAND_DISPLAY", "wayland-fixture")
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/fixture-bus")
+
+	snapshotResult := callDesktopSemanticTool(t, "desktop_snapshot", map[string]any{})
+	if snapshotResult == nil || snapshotResult.IsError {
+		t.Fatalf("expected successful desktop_snapshot result, got %q", extractTextFromResult(t, snapshotResult))
+	}
+	var snapshot desktopSemanticSnapshotOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, snapshotResult)), &snapshot); err != nil {
+		t.Fatalf("unmarshal desktop snapshot output: %v", err)
+	}
+	if len(snapshot.Apps) != 1 || stringValue(snapshot.Apps[0]["name"]) != "Fixture App" {
+		t.Fatalf("unexpected snapshot apps: %#v", snapshot.Apps)
+	}
+
+	findResult := callDesktopSemanticTool(t, "desktop_find", map[string]any{
+		"app":  "Fixture App",
+		"name": "Save",
+	})
+	if findResult == nil || findResult.IsError {
+		t.Fatalf("expected successful desktop_find result, got %q", extractTextFromResult(t, findResult))
+	}
+	var found desktopSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, findResult)), &found); err != nil {
+		t.Fatalf("unmarshal desktop find output: %v", err)
+	}
+	if !found.Matched || stringValue(found.Element["name"]) != "Save" {
+		t.Fatalf("unexpected desktop_find output: %#v", found)
+	}
+
+	focusResult := callDesktopSemanticTool(t, "desktop_focus_window", map[string]any{
+		"title_contains": "Fixture",
+	})
+	if focusResult == nil || focusResult.IsError {
+		t.Fatalf("expected successful desktop_focus_window result, got %q", extractTextFromResult(t, focusResult))
+	}
+	var focused desktopSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, focusResult)), &focused); err != nil {
+		t.Fatalf("unmarshal desktop focus output: %v", err)
+	}
+	if !focused.Focused {
+		t.Fatalf("expected focused result, got %#v", focused)
+	}
+
+	readValueResult := callDesktopSemanticTool(t, "desktop_read_value", map[string]any{
+		"app":  "Fixture App",
+		"name": "Name",
+	})
+	if readValueResult == nil || readValueResult.IsError {
+		t.Fatalf("expected successful desktop_read_value result, got %q", extractTextFromResult(t, readValueResult))
+	}
+	var read desktopSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, readValueResult)), &read); err != nil {
+		t.Fatalf("unmarshal desktop read value output: %v", err)
+	}
+	if read.ValueKind != "text" || read.Value != "fixture-text" {
+		t.Fatalf("unexpected read value output: %#v", read)
+	}
+
+	setTextResult := callDesktopSemanticTool(t, "desktop_set_text", map[string]any{
+		"app":  "Fixture App",
+		"name": "Name",
+		"text": "patched",
+	})
+	if setTextResult == nil || setTextResult.IsError {
+		t.Fatalf("expected successful desktop_set_text result, got %q", extractTextFromResult(t, setTextResult))
+	}
+	var updated desktopSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, setTextResult)), &updated); err != nil {
+		t.Fatalf("unmarshal desktop set text output: %v", err)
+	}
+	if !updated.Updated || updated.Value != "patched" {
+		t.Fatalf("unexpected set text output: %#v", updated)
+	}
+}
+
+func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
+	stateDir := t.TempDir()
+	binDir := t.TempDir()
+	origPath := os.Getenv("PATH")
+
+	writeSemanticFixturePython(t, binDir)
+
+	t.Setenv("XDG_STATE_HOME", stateDir)
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
+
+	record := saveTestDesktopSessionRecord(t, desktopSessionRecord{
+		ID:                    "session-semantic-fixture",
+		Name:                  "Semantic Fixture Session",
+		Backend:               "live_wayland",
+		Status:                "connected",
+		WaylandDisplay:        "wayland-0",
+		XDGRuntimeDir:         t.TempDir(),
+		DBUSSessionBusAddress: "unix:path=/tmp/session-bus",
+	})
+
+	listWindowsResult := callDesktopSessionTool(t, "session_list_windows", map[string]any{
+		"session_id": record.ID,
+	})
+	if listWindowsResult == nil || listWindowsResult.IsError {
+		t.Fatalf("expected successful session_list_windows result, got %q", extractTextFromResult(t, listWindowsResult))
+	}
+	listed := unmarshalSessionWindowsResult(t, listWindowsResult)
+	if listed.Mode != "atspi" || listed.Count != 1 {
+		t.Fatalf("unexpected session window output: %#v", listed)
+	}
+
+	findResult := callDesktopSessionTool(t, "session_find_ui_element", map[string]any{
+		"session_id": record.ID,
+		"app":        "Fixture App",
+		"name":       "Save",
+	})
+	if findResult == nil || findResult.IsError {
+		t.Fatalf("expected successful session_find_ui_element result, got %q", extractTextFromResult(t, findResult))
+	}
+	var found SessionSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, findResult)), &found); err != nil {
+		t.Fatalf("unmarshal session find output: %v", err)
+	}
+	if !found.Matched || stringValue(found.Element["name"]) != "Save" {
+		t.Fatalf("unexpected session semantic find output: %#v", found)
+	}
+
+	setTextResult := callDesktopSessionTool(t, "session_set_text", map[string]any{
+		"session_id": record.ID,
+		"app":        "Fixture App",
+		"name":       "Name",
+		"text":       "patched",
+	})
+	if setTextResult == nil || setTextResult.IsError {
+		t.Fatalf("expected successful session_set_text result, got %q", extractTextFromResult(t, setTextResult))
+	}
+	var updated SessionSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, setTextResult)), &updated); err != nil {
+		t.Fatalf("unmarshal session set text output: %v", err)
+	}
+	if !updated.Updated || updated.Value != "patched" {
+		t.Fatalf("unexpected session set text output: %#v", updated)
+	}
+
+	clickResult := callDesktopSessionTool(t, "session_click_element", map[string]any{
+		"session_id": record.ID,
+		"app":        "Fixture App",
+		"name":       "Save",
+	})
+	if clickResult == nil || clickResult.IsError {
+		t.Fatalf("expected successful session_click_element result, got %q", extractTextFromResult(t, clickResult))
+	}
+	var clicked SessionSemanticElementOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, clickResult)), &clicked); err != nil {
+		t.Fatalf("unmarshal session click output: %v", err)
+	}
+	if !clicked.Clicked {
+		t.Fatalf("expected clicked result, got %#v", clicked)
+	}
+}
+
+func TestDesktopSessionCommandFixtureFlows(t *testing.T) {
+	stateDir := t.TempDir()
+	binDir := t.TempDir()
+	origPath := os.Getenv("PATH")
+
+	writeSessionCommandFixtures(t, binDir)
+
+	t.Setenv("XDG_STATE_HOME", stateDir)
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
+
+	record := saveTestDesktopSessionRecord(t, desktopSessionRecord{
+		ID:                    "session-command-fixture",
+		Name:                  "Command Fixture Session",
+		Backend:               "live_wayland",
+		Status:                "connected",
+		WaylandDisplay:        "wayland-0",
+		XDGRuntimeDir:         t.TempDir(),
+		DBUSSessionBusAddress: "unix:path=/tmp/session-bus",
+	})
+
+	screenshotResult := callDesktopSessionTool(t, "session_screenshot", map[string]any{
+		"session_id": record.ID,
+	})
+	if screenshotResult == nil || screenshotResult.IsError {
+		t.Fatalf("expected successful session_screenshot result, got %q", extractTextFromResult(t, screenshotResult))
+	}
+	var screenshotOut SessionScreenshotOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, screenshotResult)), &screenshotOut); err != nil {
+		t.Fatalf("unmarshal session screenshot output: %v", err)
+	}
+	if screenshotOut.Bytes <= 0 || !pathExists(screenshotOut.OutputPath) {
+		t.Fatalf("unexpected screenshot output: %#v", screenshotOut)
+	}
+
+	clipboardGetResult := callDesktopSessionTool(t, "session_clipboard_get", map[string]any{
+		"session_id": record.ID,
+	})
+	if clipboardGetResult == nil || clipboardGetResult.IsError {
+		t.Fatalf("expected successful session_clipboard_get result, got %q", extractTextFromResult(t, clipboardGetResult))
+	}
+	var clipboardOut SessionClipboardOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, clipboardGetResult)), &clipboardOut); err != nil {
+		t.Fatalf("unmarshal clipboard output: %v", err)
+	}
+	if clipboardOut.Text != "fixture clipboard" {
+		t.Fatalf("clipboard text = %q, want %q", clipboardOut.Text, "fixture clipboard")
+	}
+
+	clipboardSetResult := callDesktopSessionTool(t, "session_clipboard_set", map[string]any{
+		"session_id": record.ID,
+		"text":       "hello",
+	})
+	if clipboardSetResult == nil || clipboardSetResult.IsError {
+		t.Fatalf("expected successful session_clipboard_set result, got %q", extractTextFromResult(t, clipboardSetResult))
+	}
+	var clipboardSetOut SessionCommandOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, clipboardSetResult)), &clipboardSetOut); err != nil {
+		t.Fatalf("unmarshal clipboard set output: %v", err)
+	}
+	if !strings.Contains(clipboardSetOut.Output, "copied 5 bytes as text/plain") {
+		t.Fatalf("unexpected clipboard set output: %#v", clipboardSetOut)
+	}
+
+	waylandInfoResult := callDesktopSessionTool(t, "session_wayland_info", map[string]any{
+		"session_id": record.ID,
+	})
+	if waylandInfoResult == nil || waylandInfoResult.IsError {
+		t.Fatalf("expected successful session_wayland_info result, got %q", extractTextFromResult(t, waylandInfoResult))
+	}
+	var waylandInfoOut SessionCommandOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, waylandInfoResult)), &waylandInfoOut); err != nil {
+		t.Fatalf("unmarshal wayland info output: %v", err)
+	}
+	if !strings.Contains(waylandInfoOut.Output, "wl_compositor") {
+		t.Fatalf("unexpected wayland info output: %#v", waylandInfoOut)
+	}
+
+	typeTextResult := callDesktopSessionTool(t, "session_type_text", map[string]any{
+		"session_id": record.ID,
+		"text":       "fixture",
+	})
+	if typeTextResult == nil || typeTextResult.IsError {
+		t.Fatalf("expected successful session_type_text result, got %q", extractTextFromResult(t, typeTextResult))
+	}
+	var typeTextOut SessionCommandOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, typeTextResult)), &typeTextOut); err != nil {
+		t.Fatalf("unmarshal session type output: %v", err)
+	}
+	if typeTextOut.Mode != "wtype" || !strings.Contains(typeTextOut.Output, "typed 7 chars") {
+		t.Fatalf("unexpected type text output: %#v", typeTextOut)
+	}
+
+	dbusCallResult := callDesktopSessionTool(t, "session_dbus_call", map[string]any{
+		"session_id": record.ID,
+		"service":    "org.kde.KWin",
+		"path":       "/KWin",
+		"interface":  "org.kde.KWin",
+		"method":     "reconfigure",
+	})
+	if dbusCallResult == nil || dbusCallResult.IsError {
+		t.Fatalf("expected successful session_dbus_call result, got %q", extractTextFromResult(t, dbusCallResult))
+	}
+	var dbusOut SessionCommandOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, dbusCallResult)), &dbusOut); err != nil {
+		t.Fatalf("unmarshal dbus output: %v", err)
+	}
+	if dbusOut.Mode != "dbus-send" || !strings.Contains(dbusOut.Output, "method return") {
+		t.Fatalf("unexpected dbus output: %#v", dbusOut)
 	}
 }
