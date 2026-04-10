@@ -679,6 +679,19 @@
     "deferred": true
   },
   {
+    "name": "gh_stars_audit_markdown",
+    "description": "Audit markdown-derived GitHub repo lists against the matching live GitHub star folders without mutating anything.",
+    "category": "workflow",
+    "search_terms": [
+      "audit markdown stars",
+      "github-reference-repos audit",
+      "star list drift from markdown",
+      "check markdown star lists"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "gh_stars_bootstrap",
     "description": "Bootstrap the GitHub Stars workflow: star the researched MCP repos, create the MCP / Production|Experimental|Alpha folders, assign repos, and optionally install the Codex MCP entries. Dry-run by default.",
     "category": "workflow",
@@ -752,6 +765,19 @@
       "star statistics"
     ],
     "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "gh_stars_sync_markdown",
+    "description": "Parse markdown GitHub links into per-file star lists, then exactly reconcile those target lists while preserving unrelated list memberships. Dry-run by default.",
+    "category": "workflow",
+    "search_terms": [
+      "sync markdown stars",
+      "github-reference-repos",
+      "markdown star taxonomy",
+      "reconcile star lists from markdown"
+    ],
+    "is_write": true,
     "deferred": true
   },
   {
