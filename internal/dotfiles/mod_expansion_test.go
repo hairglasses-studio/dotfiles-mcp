@@ -10,8 +10,8 @@ import (
 func TestDesktopSemanticModuleRegistration(t *testing.T) {
 	m := &DesktopSemanticModule{}
 	tools := m.Tools()
-	if len(tools) != 10 {
-		t.Fatalf("expected 10 semantic tools, got %d", len(tools))
+	if len(tools) != 14 {
+		t.Fatalf("expected 14 semantic tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -23,6 +23,10 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 		"desktop_target_windows",
 		"desktop_find",
 		"desktop_find_all",
+		"desktop_focus",
+		"desktop_read_value",
+		"desktop_set_text",
+		"desktop_set_value",
 		"desktop_click",
 		"desktop_act",
 		"desktop_wait_for_element",
@@ -39,8 +43,8 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 func TestDesktopSessionModuleRegistration(t *testing.T) {
 	m := &DesktopSessionModule{}
 	tools := m.Tools()
-	if len(tools) != 19 {
-		t.Fatalf("expected 19 session tools, got %d", len(tools))
+	if len(tools) != 23 {
+		t.Fatalf("expected 23 session tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -62,6 +66,10 @@ func TestDesktopSessionModuleRegistration(t *testing.T) {
 		"session_accessibility_tree",
 		"session_find_ui_element",
 		"session_find_ui_elements",
+		"session_focus_element",
+		"session_read_value",
+		"session_set_text",
+		"session_set_value",
 		"session_wait_for_element",
 		"session_click_element",
 		"session_invoke_action",

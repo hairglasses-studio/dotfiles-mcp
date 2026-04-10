@@ -63,6 +63,28 @@ type desktopSemanticWaitInput struct {
 	Timeout int      `json:"timeout,omitempty" jsonschema:"description=Timeout in seconds (default 5)"`
 }
 
+type desktopSemanticTextInput struct {
+	App    string   `json:"app" jsonschema:"required,description=Application name or unique substring"`
+	Name   string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role   string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref    string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous semantic result"`
+	Path   string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
+	States []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Exact  bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+	Text   *string  `json:"text" jsonschema:"required,description=Text contents to set. Use an empty string to clear the field."`
+}
+
+type desktopSemanticValueInput struct {
+	App    string   `json:"app" jsonschema:"required,description=Application name or unique substring"`
+	Name   string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role   string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref    string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous semantic result"`
+	Path   string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
+	States []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Exact  bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+	Value  *float64 `json:"value" jsonschema:"required,description=Numeric value to set, such as a slider or spinbox value."`
+}
+
 type desktopSemanticCapabilitiesOutput struct {
 	Ready             bool     `json:"ready"`
 	PythonAvailable   bool     `json:"python_available"`
@@ -105,7 +127,11 @@ type desktopSemanticElementOutput struct {
 	Matched    bool                      `json:"matched"`
 	Clicked    bool                      `json:"clicked,omitempty"`
 	Invoked    bool                      `json:"invoked,omitempty"`
+	Focused    bool                      `json:"focused,omitempty"`
+	Updated    bool                      `json:"updated,omitempty"`
 	Action     string                    `json:"action,omitempty"`
+	Value      any                       `json:"value,omitempty"`
+	ValueKind  string                    `json:"value_kind,omitempty"`
 	Element    map[string]any            `json:"element,omitempty"`
 	Error      string                    `json:"error,omitempty"`
 }
@@ -269,6 +295,48 @@ func semanticQueryArgs(input desktopSemanticQueryInput) ([]string, error) {
 	return args, nil
 }
 
+func desktopSemanticQueryFromTextInput(input desktopSemanticTextInput) desktopSemanticQueryInput {
+	return desktopSemanticQueryInput{
+		App:    input.App,
+		Name:   input.Name,
+		Role:   input.Role,
+		Ref:    input.Ref,
+		Path:   input.Path,
+		States: input.States,
+		Exact:  input.Exact,
+	}
+}
+
+func desktopSemanticQueryFromValueInput(input desktopSemanticValueInput) desktopSemanticQueryInput {
+	return desktopSemanticQueryInput{
+		App:    input.App,
+		Name:   input.Name,
+		Role:   input.Role,
+		Ref:    input.Ref,
+		Path:   input.Path,
+		States: input.States,
+		Exact:  input.Exact,
+	}
+}
+
+func desktopSemanticElementFromResult(helperPath string, query desktopSemanticQueryInput, result map[string]any) desktopSemanticElementOutput {
+	return desktopSemanticElementOutput{
+		HelperPath: helperPath,
+		App:        query.App,
+		Query:      query,
+		Matched:    boolValue(result["matched"]),
+		Clicked:    boolValue(result["clicked"]),
+		Invoked:    boolValue(result["invoked"]),
+		Focused:    boolValue(result["focused"]),
+		Updated:    boolValue(result["updated"]),
+		Action:     stringValue(result["action"]),
+		Value:      result["value"],
+		ValueKind:  stringValue(result["value_kind"]),
+		Element:    semanticMapValue(result["element"]),
+		Error:      semanticErrorValue(result),
+	}
+}
+
 func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 	snapshot := handler.TypedHandler[EmptyInput, desktopSemanticSnapshotOutput](
 		"desktop_snapshot",
@@ -330,14 +398,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 				return desktopSemanticElementOutput{}, err
 			}
 			result := semanticMapValue(parsed)
-			return desktopSemanticElementOutput{
-				HelperPath: helperPath,
-				App:        input.App,
-				Query:      input,
-				Matched:    result["matched"] == true,
-				Element:    semanticMapValue(result["element"]),
-				Error:      semanticErrorValue(result),
-			}, nil
+			return desktopSemanticElementFromResult(helperPath, input, result), nil
 		},
 	)
 	find.Category = "desktop"
@@ -370,6 +431,88 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 	findAll.Category = "desktop"
 	findAll.SearchTerms = []string{"find all semantic elements", "list matching buttons", "at-spi multiple matches"}
 
+	focus := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticElementOutput](
+		"desktop_focus",
+		"Focus a semantic element by ref, path, or by app plus name and optional role, using AT-SPI component focus or a focus action fallback.",
+		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticElementOutput, error) {
+			args, err := semanticQueryArgs(input)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSemanticHelper(ctx, append([]string{"focus"}, args...)...)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			return desktopSemanticElementFromResult(helperPath, input, semanticMapValue(parsed)), nil
+		},
+	)
+	focus.Category = "desktop"
+	focus.SearchTerms = []string{"focus semantic element", "focus window control", "at-spi focus", "grab focus"}
+
+	readValue := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticElementOutput](
+		"desktop_read_value",
+		"Read the current text or numeric value from a semantic element, such as an entry, label, slider, or spinbox.",
+		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticElementOutput, error) {
+			args, err := semanticQueryArgs(input)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSemanticHelper(ctx, append([]string{"read_value"}, args...)...)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			return desktopSemanticElementFromResult(helperPath, input, semanticMapValue(parsed)), nil
+		},
+	)
+	readValue.Category = "desktop"
+	readValue.SearchTerms = []string{"read semantic value", "read text field", "read slider value", "at-spi value"}
+
+	setText := handler.TypedHandler[desktopSemanticTextInput, desktopSemanticElementOutput](
+		"desktop_set_text",
+		"Set the text contents of an editable semantic element. Pass an empty string to clear the field.",
+		func(ctx context.Context, input desktopSemanticTextInput) (desktopSemanticElementOutput, error) {
+			if input.Text == nil {
+				return desktopSemanticElementOutput{}, fmt.Errorf("[%s] text is required", handler.ErrInvalidParam)
+			}
+			query := desktopSemanticQueryFromTextInput(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			args = append(args, "--text", *input.Text)
+			parsed, helperPath, err := runDesktopSemanticHelper(ctx, append([]string{"set_text"}, args...)...)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			return desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed)), nil
+		},
+	)
+	setText.Category = "desktop"
+	setText.SearchTerms = []string{"set semantic text", "fill input field", "replace entry text", "clear text field"}
+
+	setValue := handler.TypedHandler[desktopSemanticValueInput, desktopSemanticElementOutput](
+		"desktop_set_value",
+		"Set the numeric value of a semantic element such as a slider, dial, or spinbox.",
+		func(ctx context.Context, input desktopSemanticValueInput) (desktopSemanticElementOutput, error) {
+			if input.Value == nil {
+				return desktopSemanticElementOutput{}, fmt.Errorf("[%s] value is required", handler.ErrInvalidParam)
+			}
+			query := desktopSemanticQueryFromValueInput(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			args = append(args, "--value", strconv.FormatFloat(*input.Value, 'f', -1, 64))
+			parsed, helperPath, err := runDesktopSemanticHelper(ctx, append([]string{"set_value"}, args...)...)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			return desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed)), nil
+		},
+	)
+	setValue.Category = "desktop"
+	setValue.SearchTerms = []string{"set semantic value", "set slider", "set spinbox", "adjust accessible value"}
+
 	click := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticElementOutput](
 		"desktop_click",
 		"Invoke the default clickable semantic action by ref, path, or by app plus name and optional role.",
@@ -382,19 +525,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			result := semanticMapValue(parsed)
-			action, _ := result["action"].(string)
-			return desktopSemanticElementOutput{
-				HelperPath: helperPath,
-				App:        input.App,
-				Query:      input,
-				Matched:    result["matched"] == true,
-				Clicked:    result["clicked"] == true,
-				Invoked:    result["invoked"] == true,
-				Action:     action,
-				Element:    semanticMapValue(result["element"]),
-				Error:      semanticErrorValue(result),
-			}, nil
+			return desktopSemanticElementFromResult(helperPath, input, semanticMapValue(parsed)), nil
 		},
 	)
 	click.Category = "desktop"
@@ -424,18 +555,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			result := semanticMapValue(parsed)
-			action, _ := result["action"].(string)
-			return desktopSemanticElementOutput{
-				HelperPath: helperPath,
-				App:        input.App,
-				Query:      query,
-				Matched:    result["matched"] == true,
-				Invoked:    result["invoked"] == true,
-				Action:     action,
-				Element:    semanticMapValue(result["element"]),
-				Error:      semanticErrorValue(result),
-			}, nil
+			return desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	act.Category = "desktop"
@@ -467,15 +587,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			result := semanticMapValue(parsed)
-			return desktopSemanticElementOutput{
-				HelperPath: helperPath,
-				App:        input.App,
-				Query:      query,
-				Matched:    result["matched"] == true,
-				Element:    semanticMapValue(result["element"]),
-				Error:      semanticErrorValue(result),
-			}, nil
+			return desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	wait.Category = "desktop"
@@ -544,6 +656,10 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		targetWindows,
 		find,
 		findAll,
+		focus,
+		readValue,
+		setText,
+		setValue,
 		click,
 		act,
 		wait,

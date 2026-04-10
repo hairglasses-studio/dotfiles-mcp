@@ -82,6 +82,9 @@ type SessionWindowInput struct {
 	Address       string `json:"address,omitempty" jsonschema:"description=Hyprland window address when using a Hyprland-backed session"`
 	Class         string `json:"class,omitempty" jsonschema:"description=Window class when using a Hyprland-backed session"`
 	TitleContains string `json:"title_contains,omitempty" jsonschema:"description=Window title substring when using a Hyprland-backed session"`
+	App           string `json:"app,omitempty" jsonschema:"description=AT-SPI application name when focusing a non-Hyprland session window by semantic ref or path"`
+	Ref           string `json:"ref,omitempty" jsonschema:"description=AT-SPI semantic window reference when focusing a non-Hyprland session window"`
+	Path          string `json:"path,omitempty" jsonschema:"description=AT-SPI child-index path when focusing a non-Hyprland session window"`
 }
 
 type SessionClipboardSetInput struct {
@@ -136,6 +139,30 @@ type SessionSemanticWaitInput struct {
 	States    []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
 	Exact     bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
 	Timeout   int      `json:"timeout,omitempty" jsonschema:"description=Timeout in seconds (default 5)"`
+}
+
+type SessionSemanticTextInput struct {
+	SessionID string   `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	App       string   `json:"app" jsonschema:"required,description=Application name or unique substring inside the session"`
+	Name      string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role      string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref       string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous session semantic result"`
+	Path      string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous session semantic result"`
+	States    []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Exact     bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+	Text      *string  `json:"text" jsonschema:"required,description=Text contents to set. Use an empty string to clear the field."`
+}
+
+type SessionSemanticValueInput struct {
+	SessionID string   `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	App       string   `json:"app" jsonschema:"required,description=Application name or unique substring inside the session"`
+	Name      string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
+	Role      string   `json:"role,omitempty" jsonschema:"description=Optional exact role filter"`
+	Ref       string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous session semantic result"`
+	Path      string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous session semantic result"`
+	States    []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Exact     bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
+	Value     *float64 `json:"value" jsonschema:"required,description=Numeric value to set, such as a slider or spinbox value."`
 }
 
 type SessionTypeTextInput struct {
@@ -205,7 +232,11 @@ type SessionSemanticElementOutput struct {
 	Matched    bool                      `json:"matched"`
 	Clicked    bool                      `json:"clicked,omitempty"`
 	Invoked    bool                      `json:"invoked,omitempty"`
+	Focused    bool                      `json:"focused,omitempty"`
+	Updated    bool                      `json:"updated,omitempty"`
 	Action     string                    `json:"action,omitempty"`
+	Value      any                       `json:"value,omitempty"`
+	ValueKind  string                    `json:"value_kind,omitempty"`
 	Element    map[string]any            `json:"element,omitempty"`
 	Error      string                    `json:"error,omitempty"`
 }
@@ -526,6 +557,98 @@ func sessionSemanticQuery(input SessionSemanticQueryInput) desktopSemanticQueryI
 	}
 }
 
+func sessionSemanticQueryFromTextInput(input SessionSemanticTextInput) desktopSemanticQueryInput {
+	return desktopSemanticQueryInput{
+		App:    input.App,
+		Name:   input.Name,
+		Role:   input.Role,
+		Ref:    input.Ref,
+		Path:   input.Path,
+		States: input.States,
+		Exact:  input.Exact,
+	}
+}
+
+func sessionSemanticQueryFromValueInput(input SessionSemanticValueInput) desktopSemanticQueryInput {
+	return desktopSemanticQueryInput{
+		App:    input.App,
+		Name:   input.Name,
+		Role:   input.Role,
+		Ref:    input.Ref,
+		Path:   input.Path,
+		States: input.States,
+		Exact:  input.Exact,
+	}
+}
+
+func sessionSemanticElementFromResult(record desktopSessionRecord, helperPath string, query desktopSemanticQueryInput, result map[string]any) SessionSemanticElementOutput {
+	return SessionSemanticElementOutput{
+		Session:    record,
+		HelperPath: helperPath,
+		App:        query.App,
+		Query:      query,
+		Matched:    boolValue(result["matched"]),
+		Clicked:    boolValue(result["clicked"]),
+		Invoked:    boolValue(result["invoked"]),
+		Focused:    boolValue(result["focused"]),
+		Updated:    boolValue(result["updated"]),
+		Action:     stringValue(result["action"]),
+		Value:      result["value"],
+		ValueKind:  stringValue(result["value_kind"]),
+		Element:    semanticMapValue(result["element"]),
+		Error:      semanticErrorValue(result),
+	}
+}
+
+func sessionResolveSemanticWindow(ctx context.Context, record desktopSessionRecord, input SessionWindowInput) (desktopSemanticQueryInput, string, error) {
+	appName := strings.TrimSpace(input.App)
+	if appName != "" && (strings.TrimSpace(input.Ref) != "" || strings.TrimSpace(input.Path) != "") {
+		return desktopSemanticQueryInput{
+			App:  appName,
+			Ref:  strings.TrimSpace(input.Ref),
+			Path: strings.TrimSpace(input.Path),
+		}, "", nil
+	}
+
+	parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, "list_windows")
+	if err != nil {
+		return desktopSemanticQueryInput{}, helperPath, err
+	}
+
+	result := semanticMapValue(parsed)
+	windows := semanticMapSliceValue(result["windows"])
+	for _, window := range windows {
+		app := semanticMapValue(window["app"])
+		windowTitle := strings.ToLower(stringValue(window["name"]))
+		windowApp := strings.ToLower(stringValue(app["name"]))
+		if title := strings.TrimSpace(strings.ToLower(input.TitleContains)); title != "" && strings.Contains(windowTitle, title) {
+			return desktopSemanticQueryInput{
+				App:  stringValue(app["name"]),
+				Ref:  stringValue(window["ref"]),
+				Path: stringValue(window["path"]),
+			}, helperPath, nil
+		}
+		if class := strings.TrimSpace(strings.ToLower(input.Class)); class != "" && strings.Contains(windowApp, class) {
+			return desktopSemanticQueryInput{
+				App:  stringValue(app["name"]),
+				Ref:  stringValue(window["ref"]),
+				Path: stringValue(window["path"]),
+			}, helperPath, nil
+		}
+	}
+
+	if strings.TrimSpace(input.TitleContains) != "" {
+		return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("no semantic window title matched %q", input.TitleContains)
+	}
+	if strings.TrimSpace(input.Class) != "" {
+		return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("no semantic window app matched %q", input.Class)
+	}
+	if strings.TrimSpace(appName) != "" {
+		return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("app %q requires a semantic ref or path", appName)
+	}
+	return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("[%s] title_contains, class, or app+ref/path is required for non-Hyprland sessions", handler.ErrInvalidParam)
+}
+
 func (m *DesktopSessionModule) Tools() []registry.ToolDefinition {
 	start := handler.TypedHandler[SessionStartInput, desktopSessionRecord](
 		"session_start",
@@ -742,17 +865,47 @@ exec kwin_wayland --virtual --no-lockscreen
 
 	focusWindow := handler.TypedHandler[SessionWindowInput, SessionCommandOutput](
 		"session_focus_window",
-		"Focus a window inside a Hyprland-backed session by address, class, or title substring.",
-		func(_ context.Context, input SessionWindowInput) (SessionCommandOutput, error) {
+		"Focus a window inside a tracked session by Hyprland address/class/title or by semantic AT-SPI window targeting for non-Hyprland sessions.",
+		func(ctx context.Context, input SessionWindowInput) (SessionCommandOutput, error) {
 			record, err := resolveDesktopSession(input.SessionID)
 			if err != nil {
 				return SessionCommandOutput{}, err
 			}
 			if strings.TrimSpace(record.HyprlandInstanceSignature) == "" {
+				query, helperPath, err := sessionResolveSemanticWindow(ctx, record, input)
+				if err != nil {
+					return SessionCommandOutput{}, err
+				}
+				args, err := semanticQueryArgs(query)
+				if err != nil {
+					return SessionCommandOutput{}, err
+				}
+				parsed, _, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"focus"}, args...)...)
+				if err != nil {
+					return SessionCommandOutput{}, err
+				}
+				result := semanticMapValue(parsed)
+				mode := "atspi"
+				if helperPath != "" {
+					mode = "atspi@" + filepath.Base(helperPath)
+				}
+				out := fmt.Sprintf("focused semantic window %q via %s", query.App, mode)
+				if !boolValue(result["focused"]) {
+					if errText := semanticErrorValue(result); errText != "" {
+						out = errText
+					} else {
+						out = fmt.Sprintf("semantic window focus did not report success for %q", query.App)
+					}
+				}
+				targetPath := query.Ref
+				if targetPath == "" {
+					targetPath = query.Path
+				}
 				return SessionCommandOutput{
 					Session: record,
-					Mode:    "unsupported",
-					Output:  "focus is currently supported for Hyprland-backed sessions only",
+					Mode:    "atspi",
+					Path:    targetPath,
+					Output:  out,
 				}, nil
 			}
 			selector, err := sessionFindHyprWindow(record, input)
@@ -986,16 +1139,7 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			result := semanticMapValue(parsed)
-			return SessionSemanticElementOutput{
-				Session:    record,
-				HelperPath: helperPath,
-				App:        input.App,
-				Query:      query,
-				Matched:    result["matched"] == true,
-				Element:    semanticMapValue(result["element"]),
-				Error:      semanticErrorValue(result),
-			}, nil
+			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	findUIElement.Category = "desktop"
@@ -1034,6 +1178,106 @@ exec kwin_wayland --virtual --no-lockscreen
 	findUIElements.Category = "desktop"
 	findUIElements.SearchTerms = []string{"session find elements", "session multi match", "session at-spi matches"}
 
+	focusElement := handler.TypedHandler[SessionSemanticQueryInput, SessionSemanticElementOutput](
+		"session_focus_element",
+		"Focus a semantic element inside a tracked session using AT-SPI component focus or a focus action fallback.",
+		func(ctx context.Context, input SessionSemanticQueryInput) (SessionSemanticElementOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			query := sessionSemanticQuery(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"focus"}, args...)...)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+		},
+	)
+	focusElement.Category = "desktop"
+	focusElement.SearchTerms = []string{"session focus element", "session at-spi focus", "session grab focus"}
+
+	readValue := handler.TypedHandler[SessionSemanticQueryInput, SessionSemanticElementOutput](
+		"session_read_value",
+		"Read the current text or numeric value from a semantic element inside a tracked session.",
+		func(ctx context.Context, input SessionSemanticQueryInput) (SessionSemanticElementOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			query := sessionSemanticQuery(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"read_value"}, args...)...)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+		},
+	)
+	readValue.Category = "desktop"
+	readValue.SearchTerms = []string{"session read value", "session read field", "session slider value"}
+
+	setText := handler.TypedHandler[SessionSemanticTextInput, SessionSemanticElementOutput](
+		"session_set_text",
+		"Set the text contents of an editable semantic element inside a tracked session. Pass an empty string to clear the field.",
+		func(ctx context.Context, input SessionSemanticTextInput) (SessionSemanticElementOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			if input.Text == nil {
+				return SessionSemanticElementOutput{}, fmt.Errorf("[%s] text is required", handler.ErrInvalidParam)
+			}
+			query := sessionSemanticQueryFromTextInput(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			args = append(args, "--text", *input.Text)
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"set_text"}, args...)...)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+		},
+	)
+	setText.Category = "desktop"
+	setText.SearchTerms = []string{"session set text", "session fill field", "session clear field"}
+
+	setValue := handler.TypedHandler[SessionSemanticValueInput, SessionSemanticElementOutput](
+		"session_set_value",
+		"Set the numeric value of a semantic element inside a tracked session, such as a slider or spinbox.",
+		func(ctx context.Context, input SessionSemanticValueInput) (SessionSemanticElementOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			if input.Value == nil {
+				return SessionSemanticElementOutput{}, fmt.Errorf("[%s] value is required", handler.ErrInvalidParam)
+			}
+			query := sessionSemanticQueryFromValueInput(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			args = append(args, "--value", fmt.Sprintf("%g", *input.Value))
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"set_value"}, args...)...)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
+			}
+			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+		},
+	)
+	setValue.Category = "desktop"
+	setValue.SearchTerms = []string{"session set value", "session slider set", "session spinbox set"}
+
 	waitForElement := handler.TypedHandler[SessionSemanticWaitInput, SessionSemanticElementOutput](
 		"session_wait_for_element",
 		"Wait for a semantic element to appear or satisfy requested states inside a tracked session.",
@@ -1064,16 +1308,7 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			result := semanticMapValue(parsed)
-			return SessionSemanticElementOutput{
-				Session:    record,
-				HelperPath: helperPath,
-				App:        input.App,
-				Query:      query,
-				Matched:    result["matched"] == true,
-				Element:    semanticMapValue(result["element"]),
-				Error:      semanticErrorValue(result),
-			}, nil
+			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	waitForElement.Category = "desktop"
@@ -1096,20 +1331,7 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			result := semanticMapValue(parsed)
-			action, _ := result["action"].(string)
-			return SessionSemanticElementOutput{
-				Session:    record,
-				HelperPath: helperPath,
-				App:        input.App,
-				Query:      query,
-				Matched:    result["matched"] == true,
-				Clicked:    result["clicked"] == true,
-				Invoked:    result["invoked"] == true,
-				Action:     action,
-				Element:    semanticMapValue(result["element"]),
-				Error:      semanticErrorValue(result),
-			}, nil
+			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	clickElement.Category = "desktop"
@@ -1143,19 +1365,7 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			result := semanticMapValue(parsed)
-			action, _ := result["action"].(string)
-			return SessionSemanticElementOutput{
-				Session:    record,
-				HelperPath: helperPath,
-				App:        input.App,
-				Query:      query,
-				Matched:    result["matched"] == true,
-				Invoked:    result["invoked"] == true,
-				Action:     action,
-				Element:    semanticMapValue(result["element"]),
-				Error:      semanticErrorValue(result),
-			}, nil
+			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	invokeAction.Category = "desktop"
@@ -1242,6 +1452,10 @@ exec kwin_wayland --virtual --no-lockscreen
 		accessibilityTree,
 		findUIElement,
 		findUIElements,
+		focusElement,
+		readValue,
+		setText,
+		setValue,
 		waitForElement,
 		clickElement,
 		invokeAction,
