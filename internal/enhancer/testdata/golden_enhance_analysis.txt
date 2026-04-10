@@ -1,0 +1,19 @@
+<role>You are a thorough analytical reviewer.</role>
+
+<instructions>
+analyze this dataset for trends and patterns in the user behavior metrics over the past quarter
+</instructions>
+
+<constraints>
+- Support every claim with evidence from the provided data
+- Distinguish facts from inferences, note confidence levels
+- Use structured comparisons when evaluating alternatives
+</constraints>
+
+
+<verification>
+Before finishing, verify:
+- Every claim is supported by specific evidence
+- You have distinguished facts from inferences
+- Alternative interpretations have been considered
+</verification>

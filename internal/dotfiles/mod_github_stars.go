@@ -569,7 +569,6 @@ func (m *GitHubStarsModule) Tools() []registry.ToolDefinition {
 	)
 	auditMarkdown.Category = "workflow"
 	auditMarkdown.SearchTerms = []string{"audit markdown stars", "github-reference-repos audit", "star list drift from markdown", "check markdown star lists"}
-
 	syncMarkdown := handler.TypedHandler[githubStarsMarkdownSyncInput, githubStarsMarkdownSyncOutput](
 		"gh_stars_sync_markdown",
 		"Parse markdown GitHub links into per-file star lists, then exactly reconcile those target lists while preserving unrelated list memberships. Dry-run by default.",

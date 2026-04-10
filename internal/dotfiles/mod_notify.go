@@ -80,6 +80,13 @@ func (m *NotifyModule) Tools() []registry.ToolDefinition {
 				if urgencyStr == "" {
 					urgencyStr = "normal"
 				}
+				_ = appendNotificationHistoryEntry(notificationHistoryEntry{
+					App:     "notify_send",
+					Summary: input.Title,
+					Body:    input.Body,
+					Urgency: urgencyStr,
+					Source:  "notify_send",
+				})
 
 				return fmt.Sprintf("Notification sent: %q (urgency: %s)", input.Title, urgencyStr), nil
 			},
