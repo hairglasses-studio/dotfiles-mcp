@@ -207,25 +207,29 @@ type SessionAppLogStatus struct {
 }
 
 type SessionListEntry struct {
-	SessionID       string   `json:"session_id"`
-	Name            string   `json:"name"`
-	Backend         string   `json:"backend"`
-	Status          string   `json:"status"`
-	ResolvedStatus  string   `json:"resolved_status"`
-	StartedAt       string   `json:"started_at"`
-	StoppedAt       string   `json:"stopped_at,omitempty"`
-	PID             int      `json:"pid,omitempty"`
-	ProcessManaged  bool     `json:"process_managed"`
-	ProcessAlive    bool     `json:"process_alive"`
-	HyprlandBacked  bool     `json:"hyprland_backed"`
-	SocketPath      string   `json:"socket_path,omitempty"`
-	SocketPresent   bool     `json:"socket_present"`
-	DBUSReady       bool     `json:"dbus_ready"`
-	ATSPIReady      bool     `json:"at_spi_ready"`
-	EnvPathPresent  bool     `json:"env_path_present"`
-	LogPathPresent  bool     `json:"log_path_present"`
-	AppLogCount     int      `json:"app_log_count"`
-	Recommendations []string `json:"recommendations,omitempty"`
+	SessionID          string   `json:"session_id"`
+	Name               string   `json:"name"`
+	Backend            string   `json:"backend"`
+	Status             string   `json:"status"`
+	ResolvedStatus     string   `json:"resolved_status"`
+	StartedAt          string   `json:"started_at"`
+	StoppedAt          string   `json:"stopped_at,omitempty"`
+	PID                int      `json:"pid,omitempty"`
+	ProcessManaged     bool     `json:"process_managed"`
+	ProcessAlive       bool     `json:"process_alive"`
+	HyprlandBacked     bool     `json:"hyprland_backed"`
+	SocketPath         string   `json:"socket_path,omitempty"`
+	SocketPresent      bool     `json:"socket_present"`
+	DBUSReady          bool     `json:"dbus_ready"`
+	ATSPIReady         bool     `json:"at_spi_ready"`
+	SemanticProbeReady bool     `json:"semantic_probe_ready"`
+	SemanticAppCount   int      `json:"semantic_app_count"`
+	SemanticHelperPath string   `json:"semantic_helper_path,omitempty"`
+	SemanticProbeError string   `json:"semantic_probe_error,omitempty"`
+	EnvPathPresent     bool     `json:"env_path_present"`
+	LogPathPresent     bool     `json:"log_path_present"`
+	AppLogCount        int      `json:"app_log_count"`
+	Recommendations    []string `json:"recommendations,omitempty"`
 }
 
 type SessionListOutput struct {
@@ -242,20 +246,24 @@ type SessionAppsOutput struct {
 }
 
 type SessionStatusOutput struct {
-	Session         desktopSessionRecord  `json:"session"`
-	ResolvedStatus  string                `json:"resolved_status"`
-	ProcessManaged  bool                  `json:"process_managed"`
-	ProcessAlive    bool                  `json:"process_alive"`
-	HyprlandBacked  bool                  `json:"hyprland_backed"`
-	SocketPath      string                `json:"socket_path,omitempty"`
-	SocketPresent   bool                  `json:"socket_present"`
-	DBUSReady       bool                  `json:"dbus_ready"`
-	ATSPIReady      bool                  `json:"at_spi_ready"`
-	EnvPathPresent  bool                  `json:"env_path_present"`
-	LogPathPresent  bool                  `json:"log_path_present"`
-	AppLogCount     int                   `json:"app_log_count"`
-	AppLogs         []SessionAppLogStatus `json:"app_logs,omitempty"`
-	Recommendations []string              `json:"recommendations,omitempty"`
+	Session            desktopSessionRecord  `json:"session"`
+	ResolvedStatus     string                `json:"resolved_status"`
+	ProcessManaged     bool                  `json:"process_managed"`
+	ProcessAlive       bool                  `json:"process_alive"`
+	HyprlandBacked     bool                  `json:"hyprland_backed"`
+	SocketPath         string                `json:"socket_path,omitempty"`
+	SocketPresent      bool                  `json:"socket_present"`
+	DBUSReady          bool                  `json:"dbus_ready"`
+	ATSPIReady         bool                  `json:"at_spi_ready"`
+	SemanticProbeReady bool                  `json:"semantic_probe_ready"`
+	SemanticAppCount   int                   `json:"semantic_app_count"`
+	SemanticHelperPath string                `json:"semantic_helper_path,omitempty"`
+	SemanticProbeError string                `json:"semantic_probe_error,omitempty"`
+	EnvPathPresent     bool                  `json:"env_path_present"`
+	LogPathPresent     bool                  `json:"log_path_present"`
+	AppLogCount        int                   `json:"app_log_count"`
+	AppLogs            []SessionAppLogStatus `json:"app_logs,omitempty"`
+	Recommendations    []string              `json:"recommendations,omitempty"`
 }
 
 type SessionWaitReadyOutput struct {
@@ -717,6 +725,23 @@ func desktopSessionRecommendations(record desktopSessionRecord, resolvedStatus s
 	return recommendations
 }
 
+func desktopSessionSemanticProbe(record desktopSessionRecord) (bool, int, string, string) {
+	if strings.TrimSpace(record.DBUSSessionBusAddress) == "" {
+		return false, 0, "", ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, "list_apps")
+	if err != nil {
+		return false, 0, helperPath, err.Error()
+	}
+	result := semanticMapValue(parsed)
+	if errText := semanticErrorValue(result); errText != "" {
+		return false, 0, helperPath, errText
+	}
+	return true, len(semanticMapSliceValue(result["apps"])), helperPath, ""
+}
+
 func desktopSessionStatusOutput(record desktopSessionRecord) SessionStatusOutput {
 	hydrateDesktopSessionRecord(&record)
 	processManaged := record.PID > 0
@@ -730,46 +755,59 @@ func desktopSessionStatusOutput(record desktopSessionRecord) SessionStatusOutput
 	logPathPresent := strings.TrimSpace(record.LogPath) != "" && pathExists(record.LogPath)
 	appLogs := desktopSessionAppLogStatuses(record)
 	resolvedStatus := desktopSessionResolvedStatus(record, processManaged, processAlive, socketPresent, dbusReady)
+	semanticProbeReady, semanticAppCount, semanticHelperPath, semanticProbeError := desktopSessionSemanticProbe(record)
+	recommendations := desktopSessionRecommendations(record, resolvedStatus, hyprlandBacked, socketPresent, dbusReady, logPathPresent, len(appLogs))
+	if dbusReady && !semanticProbeReady && strings.TrimSpace(semanticProbeError) != "" {
+		recommendations = append(recommendations, "Semantic inspection is not yet targetable; use session_list_apps or session_read_log to inspect the session bus and AT-SPI state.")
+	}
 	return SessionStatusOutput{
-		Session:         record,
-		ResolvedStatus:  resolvedStatus,
-		ProcessManaged:  processManaged,
-		ProcessAlive:    processAlive,
-		HyprlandBacked:  hyprlandBacked,
-		SocketPath:      socketPath,
-		SocketPresent:   socketPresent,
-		DBUSReady:       dbusReady,
-		ATSPIReady:      atspiReady,
-		EnvPathPresent:  envPathPresent,
-		LogPathPresent:  logPathPresent,
-		AppLogCount:     len(appLogs),
-		AppLogs:         appLogs,
-		Recommendations: desktopSessionRecommendations(record, resolvedStatus, hyprlandBacked, socketPresent, dbusReady, logPathPresent, len(appLogs)),
+		Session:            record,
+		ResolvedStatus:     resolvedStatus,
+		ProcessManaged:     processManaged,
+		ProcessAlive:       processAlive,
+		HyprlandBacked:     hyprlandBacked,
+		SocketPath:         socketPath,
+		SocketPresent:      socketPresent,
+		DBUSReady:          dbusReady,
+		ATSPIReady:         atspiReady,
+		SemanticProbeReady: semanticProbeReady,
+		SemanticAppCount:   semanticAppCount,
+		SemanticHelperPath: semanticHelperPath,
+		SemanticProbeError: semanticProbeError,
+		EnvPathPresent:     envPathPresent,
+		LogPathPresent:     logPathPresent,
+		AppLogCount:        len(appLogs),
+		AppLogs:            appLogs,
+		Recommendations:    recommendations,
 	}
 }
 
 func desktopSessionListEntry(record desktopSessionRecord) SessionListEntry {
 	status := desktopSessionStatusOutput(record)
 	return SessionListEntry{
-		SessionID:       status.Session.ID,
-		Name:            status.Session.Name,
-		Backend:         status.Session.Backend,
-		Status:          status.Session.Status,
-		ResolvedStatus:  status.ResolvedStatus,
-		StartedAt:       status.Session.StartedAt,
-		StoppedAt:       status.Session.StoppedAt,
-		PID:             status.Session.PID,
-		ProcessManaged:  status.ProcessManaged,
-		ProcessAlive:    status.ProcessAlive,
-		HyprlandBacked:  status.HyprlandBacked,
-		SocketPath:      status.SocketPath,
-		SocketPresent:   status.SocketPresent,
-		DBUSReady:       status.DBUSReady,
-		ATSPIReady:      status.ATSPIReady,
-		EnvPathPresent:  status.EnvPathPresent,
-		LogPathPresent:  status.LogPathPresent,
-		AppLogCount:     status.AppLogCount,
-		Recommendations: status.Recommendations,
+		SessionID:          status.Session.ID,
+		Name:               status.Session.Name,
+		Backend:            status.Session.Backend,
+		Status:             status.Session.Status,
+		ResolvedStatus:     status.ResolvedStatus,
+		StartedAt:          status.Session.StartedAt,
+		StoppedAt:          status.Session.StoppedAt,
+		PID:                status.Session.PID,
+		ProcessManaged:     status.ProcessManaged,
+		ProcessAlive:       status.ProcessAlive,
+		HyprlandBacked:     status.HyprlandBacked,
+		SocketPath:         status.SocketPath,
+		SocketPresent:      status.SocketPresent,
+		DBUSReady:          status.DBUSReady,
+		ATSPIReady:         status.ATSPIReady,
+		SemanticProbeReady: status.SemanticProbeReady,
+		SemanticAppCount:   status.SemanticAppCount,
+		SemanticHelperPath: status.SemanticHelperPath,
+		SemanticProbeError: status.SemanticProbeError,
+		EnvPathPresent:     status.EnvPathPresent,
+		LogPathPresent:     status.LogPathPresent,
+		AppLogCount:        status.AppLogCount,
+		Recommendations:    status.Recommendations,
 	}
 }
 
