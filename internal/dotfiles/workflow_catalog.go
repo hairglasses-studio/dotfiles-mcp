@@ -86,7 +86,7 @@ func dotfilesWorkflowCatalog() []dotfilesWorkflowCatalogEntry {
 			PrimarySkill: "dotfiles_ops",
 			ResourceURI:  "dotfiles://workflows/workstation-diagnose",
 			PromptName:   "dotfiles_diagnose_workstation",
-			KeyTools:     []string{"system_health_check", "system_info", "system_updates", "system_disk", "systemd_failed", "dotfiles_rice_check"},
+			KeyTools:     []string{"dotfiles_workstation_diagnostics", "system_health_check", "dotfiles_desktop_status", "system_info", "system_updates", "system_disk", "systemd_failed", "dotfiles_rice_check"},
 		},
 		{
 			Name:         "repo_validate",

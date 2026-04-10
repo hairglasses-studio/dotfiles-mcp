@@ -725,7 +725,9 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 		"terminal shader",
 	}
 
-	return []registry.ToolDefinition{search, schema, catalog, stats, serverHealth, desktopStatus}
+	workstationDiagnostics := m.workstationDiagnosticsTool()
+
+	return []registry.ToolDefinition{search, schema, catalog, stats, serverHealth, desktopStatus, workstationDiagnostics}
 }
 
 // annotatedModule wraps a ToolModule to apply MCP annotations and circuit breaker groups.
@@ -843,6 +845,7 @@ func dotfilesDiscoveryToolNames() []string {
 		"dotfiles_tool_stats",
 		"dotfiles_server_health",
 		"dotfiles_desktop_status",
+		"dotfiles_workstation_diagnostics",
 	}
 }
 

@@ -37,6 +37,7 @@ By default, `dotfiles-mcp` marks its non-discovery tools as `defer_loading` and 
 - `dotfiles_tool_catalog`
 - `dotfiles_tool_stats`
 - `dotfiles_server_health`
+- `dotfiles_workstation_diagnostics`
 
 Use `DOTFILES_MCP_PROFILE=desktop` for workstation desktop control, or `DOTFILES_MCP_PROFILE=full` if you explicitly want the full catalog treated as eager.
 
@@ -49,7 +50,7 @@ The server also exposes read-first workflow resources and prompt entrypoints for
 
 The canonical module now commits public contract snapshots under [`snapshots/contract`](./snapshots/contract) and regenerates the public server card at [`.well-known/mcp.json`](./.well-known/mcp.json). Current canonical snapshot counts:
 
-- `396` tools
+- `397` tools
 - `37` registered modules
 - `24` resources
 - `12` prompts
@@ -73,6 +74,9 @@ claude mcp read dotfiles dotfiles://catalog/workflows
 
 # Check desktop runtime readiness
 claude mcp call dotfiles dotfiles_desktop_status '{}'
+
+# Capture a publishable workstation diagnostics snapshot
+claude mcp call dotfiles dotfiles_workstation_diagnostics '{"symptom":"desktop bar missing after login"}'
 
 # Check desktop rice health
 claude mcp call dotfiles dotfiles_rice_check '{}'
