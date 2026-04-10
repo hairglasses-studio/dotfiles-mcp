@@ -1401,6 +1401,10 @@
       "description": "List tracked desktop session handles with readiness and attachment summaries."
     },
     {
+      "name": "session_list_apps",
+      "description": "List AT-SPI applications visible inside a tracked session before choosing one for semantic targeting."
+    },
+    {
       "name": "session_list_windows",
       "description": "List windows for a tracked session. Hyprland-backed sessions use hyprctl; other sessions fall back to AT-SPI window discovery."
     },
@@ -1447,6 +1451,10 @@
     {
       "name": "session_wait_for_element",
       "description": "Wait for a semantic element to appear or satisfy requested states inside a tracked session."
+    },
+    {
+      "name": "session_wait_ready",
+      "description": "Wait for a tracked session to expose its Wayland socket and D-Bus bus before driving semantic or input tools."
     },
     {
       "name": "session_wayland_info",
@@ -1656,7 +1664,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 405,
+  "tool_count": 407,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [

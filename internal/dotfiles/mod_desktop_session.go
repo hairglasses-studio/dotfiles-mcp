@@ -71,6 +71,11 @@ type SessionListInput struct {
 	Limit int `json:"limit,omitempty" jsonschema:"description=Optional max sessions to return. Defaults to all known sessions."`
 }
 
+type SessionWaitReadyInput struct {
+	SessionID string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	Timeout   int    `json:"timeout,omitempty" jsonschema:"description=Max seconds to wait for the session Wayland socket and D-Bus bus (default 5)"`
+}
+
 type SessionScreenshotInput struct {
 	SessionID  string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
 	OutputPath string `json:"output_path,omitempty" jsonschema:"description=Explicit PNG path. Defaults to the session state directory."`
@@ -228,6 +233,14 @@ type SessionListOutput struct {
 	Sessions []SessionListEntry `json:"sessions"`
 }
 
+type SessionAppsOutput struct {
+	Session    desktopSessionRecord `json:"session"`
+	HelperPath string               `json:"helper_path,omitempty"`
+	Count      int                  `json:"count"`
+	Apps       []map[string]any     `json:"apps,omitempty"`
+	Error      string               `json:"error,omitempty"`
+}
+
 type SessionStatusOutput struct {
 	Session         desktopSessionRecord  `json:"session"`
 	ResolvedStatus  string                `json:"resolved_status"`
@@ -243,6 +256,13 @@ type SessionStatusOutput struct {
 	AppLogCount     int                   `json:"app_log_count"`
 	AppLogs         []SessionAppLogStatus `json:"app_logs,omitempty"`
 	Recommendations []string              `json:"recommendations,omitempty"`
+}
+
+type SessionWaitReadyOutput struct {
+	Status  SessionStatusOutput `json:"status"`
+	Timeout int                 `json:"timeout"`
+	Ready   bool                `json:"ready"`
+	Error   string              `json:"error,omitempty"`
 }
 
 type SessionScreenshotOutput struct {
@@ -1027,6 +1047,41 @@ exec kwin_wayland --virtual --no-lockscreen
 	connect.Category = "desktop"
 	connect.SearchTerms = []string{"connect session", "live wayland session", "session handle"}
 
+	waitReady := handler.TypedHandler[SessionWaitReadyInput, SessionWaitReadyOutput](
+		"session_wait_ready",
+		"Wait for a tracked session to expose its Wayland socket and D-Bus bus before driving semantic or input tools.",
+		func(_ context.Context, input SessionWaitReadyInput) (SessionWaitReadyOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionWaitReadyOutput{}, err
+			}
+			timeout := input.Timeout
+			if timeout <= 0 {
+				timeout = 5
+			}
+			waitErr := waitForDesktopSessionReady(&record, time.Duration(timeout)*time.Second)
+			if waitErr != nil {
+				record.Notes = append(record.Notes, waitErr.Error())
+			}
+			if saveErr := saveDesktopSessionRecord(record); saveErr != nil {
+				return SessionWaitReadyOutput{}, saveErr
+			}
+			status := desktopSessionStatusOutput(record)
+			errText := ""
+			if waitErr != nil {
+				errText = waitErr.Error()
+			}
+			return SessionWaitReadyOutput{
+				Status:  status,
+				Timeout: timeout,
+				Ready:   status.ResolvedStatus == "connected",
+				Error:   errText,
+			}, nil
+		},
+	)
+	waitReady.Category = "desktop"
+	waitReady.SearchTerms = []string{"wait for session", "session ready", "kwin ready", "wayland session ready"}
+
 	status := handler.TypedHandler[SessionRefInput, SessionStatusOutput](
 		"session_status",
 		"Inspect one tracked desktop session handle, including readiness, process, and log hints.",
@@ -1153,6 +1208,35 @@ exec kwin_wayland --virtual --no-lockscreen
 	)
 	listWindows.Category = "desktop"
 	listWindows.SearchTerms = []string{"session windows", "list windows in session", "hypr session clients"}
+
+	listApps := handler.TypedHandler[SessionRefInput, SessionAppsOutput](
+		"session_list_apps",
+		"List AT-SPI applications visible inside a tracked session before choosing one for semantic targeting.",
+		func(ctx context.Context, input SessionRefInput) (SessionAppsOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionAppsOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, "list_apps")
+			if err != nil {
+				return SessionAppsOutput{
+					Session: record,
+					Error:   err.Error(),
+				}, nil
+			}
+			result := semanticMapValue(parsed)
+			apps := semanticMapSliceValue(result["apps"])
+			return SessionAppsOutput{
+				Session:    record,
+				HelperPath: helperPath,
+				Count:      len(apps),
+				Apps:       apps,
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	listApps.Category = "desktop"
+	listApps.SearchTerms = []string{"session apps", "at-spi apps in session", "semantic session snapshot", "session app inventory"}
 
 	focusWindow := handler.TypedHandler[SessionWindowInput, SessionCommandOutput](
 		"session_focus_window",
@@ -1830,9 +1914,11 @@ exec kwin_wayland --virtual --no-lockscreen
 		list,
 		start,
 		connect,
+		waitReady,
 		status,
 		stop,
 		screenshot,
+		listApps,
 		listWindows,
 		focusWindow,
 		launchApp,

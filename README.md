@@ -51,7 +51,7 @@ The server also exposes read-first workflow resources and prompt entrypoints for
 
 The canonical module now commits public contract snapshots under [`snapshots/contract`](./snapshots/contract) and regenerates the public server card at [`.well-known/mcp.json`](./.well-known/mcp.json). Current canonical snapshot counts:
 
-- `405` tools
+- `407` tools
 - `37` registered modules
 - `24` resources
 - `12` prompts
@@ -88,7 +88,9 @@ claude mcp call dotfiles desktop_fill_form '{"app":"Firefox","preview":true,"fie
 
 # Enumerate tracked session handles and inspect one session before driving it
 claude mcp call dotfiles session_list '{}'
+claude mcp call dotfiles session_wait_ready '{"session_id":"session-123","timeout":5}'
 claude mcp call dotfiles session_status '{"session_id":"session-123"}'
+claude mcp call dotfiles session_list_apps '{"session_id":"session-123"}'
 claude mcp call dotfiles session_read_log '{"session_id":"session-123","lines":40}'
 
 # Check desktop rice health
