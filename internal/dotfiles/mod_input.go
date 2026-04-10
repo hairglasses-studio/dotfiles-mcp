@@ -309,7 +309,7 @@ func btListPaired() ([]btDevice, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bluetoothctl devices: %w", err)
 	}
-	devices := make([]btDevice, 0)
+	var devices []btDevice
 	for _, line := range strings.Split(out, "\n") {
 		m := deviceRe.FindStringSubmatch(strings.TrimSpace(line))
 		if m == nil {
@@ -1592,7 +1592,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 					cmd.Wait()
 
 					out, _, _ := inputRunCmd("bluetoothctl", "devices")
-					devices := make([]btDevice, 0)
+					var devices []btDevice
 					for _, line := range strings.Split(out, "\n") {
 						dm := deviceRe.FindStringSubmatch(strings.TrimSpace(line))
 						if dm != nil {
@@ -1607,7 +1607,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 
 				case "list":
 					out, _, _ := inputRunCmd("bluetoothctl", "devices")
-					devices := make([]btDevice, 0)
+					var devices []btDevice
 					for _, line := range strings.Split(out, "\n") {
 						dm := deviceRe.FindStringSubmatch(strings.TrimSpace(line))
 						if dm != nil {

@@ -799,7 +799,7 @@ func sandboxTest(_ context.Context, input SandboxTestInput) (SandboxTestOutput, 
 
 	// Shader compilation (GPU-accelerated)
 	if suite == "shaders" || suite == "all" {
-		runTest("shader-compile", "cd "+sandboxDotfilesRO+" && bash ghostty/shaders/bin/shader-test.sh 2>&1")
+		runTest("shader-compile", "cd "+sandboxDotfilesRO+" && bash kitty/shaders/bin/shader-test.sh 2>&1")
 	}
 
 	// Rice selftest

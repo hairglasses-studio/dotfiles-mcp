@@ -3,6 +3,7 @@ package dotfiles
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -66,6 +67,79 @@ type fleetHealthWorkflowOutput struct {
 	RecommendedTools      []string `json:"recommended_tools"`
 }
 
+type repoGitHygieneWorkflowInput struct {
+	RepoPath            string   `json:"repo_path" jsonschema:"required,description=Repo path to scan or clean"`
+	Execute             bool     `json:"execute,omitempty" jsonschema:"description=When false, only plan cleanup. When true, apply the selected cleanup actions."`
+	Fetch               bool     `json:"fetch,omitempty" jsonschema:"description=Refresh origin refs with git fetch --prune before scanning"`
+	PruneAdmin          bool     `json:"prune_admin,omitempty" jsonschema:"description=Run git worktree prune after cleanup when execute=true"`
+	CleanupLocalMerged  bool     `json:"cleanup_local_merged,omitempty" jsonschema:"description=Delete merged local branches other than the default/current branch"`
+	CleanupRemoteMerged bool     `json:"cleanup_remote_merged,omitempty" jsonschema:"description=Delete merged origin branches other than the default branch"`
+	CleanupWorktrees    bool     `json:"cleanup_worktrees,omitempty" jsonschema:"description=Remove extra clean worktrees whose branch tip is merged into the default branch"`
+	PruneManagedState   bool     `json:"prune_managed_state,omitempty" jsonschema:"description=Also prune Codex-managed worktree metadata via hg-codex-worktree-prune.sh"`
+	BranchPrefixes      []string `json:"branch_prefixes,omitempty" jsonschema:"description=Optional branch prefixes that limit cleanup candidates"`
+}
+
+type repoGitHygieneBranch struct {
+	Name                 string `json:"name"`
+	DefaultBranch        string `json:"default_branch,omitempty"`
+	Current              bool   `json:"current"`
+	MergedIntoDefault    bool   `json:"merged_into_default"`
+	EligibleForCleanup   bool   `json:"eligible_for_cleanup"`
+	CheckedOutInWorktree bool   `json:"checked_out_in_worktree,omitempty"`
+	Ahead                int    `json:"ahead,omitempty"`
+	Behind               int    `json:"behind,omitempty"`
+}
+
+type repoGitHygieneWorktree struct {
+	Path               string `json:"path"`
+	Branch             string `json:"branch,omitempty"`
+	Current            bool   `json:"current"`
+	Missing            bool   `json:"missing"`
+	Dirty              bool   `json:"dirty"`
+	MergedIntoDefault  bool   `json:"merged_into_default"`
+	EligibleForCleanup bool   `json:"eligible_for_cleanup"`
+	Prunable           bool   `json:"prunable"`
+}
+
+type repoGitHygieneAction struct {
+	Kind    string `json:"kind"`
+	Target  string `json:"target"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
+type repoGitHygieneSummary struct {
+	LocalBranchCount            int `json:"local_branch_count"`
+	LocalMergedCount            int `json:"local_merged_count"`
+	LocalCleanupCandidateCount  int `json:"local_cleanup_candidate_count"`
+	RemoteBranchCount           int `json:"remote_branch_count"`
+	RemoteMergedCount           int `json:"remote_merged_count"`
+	RemoteCleanupCandidateCount int `json:"remote_cleanup_candidate_count"`
+	ExtraWorktreeCount          int `json:"extra_worktree_count"`
+	CleanMergedWorktreeCount    int `json:"clean_merged_worktree_count"`
+	DirtyWorktreeCount          int `json:"dirty_worktree_count"`
+	BlockedWorktreeCount        int `json:"blocked_worktree_count"`
+	ActionCount                 int `json:"action_count"`
+	CompletedActionCount        int `json:"completed_action_count"`
+	PlannedActionCount          int `json:"planned_action_count"`
+	FailedActionCount           int `json:"failed_action_count"`
+}
+
+type repoGitHygieneWorkflowOutput struct {
+	Repo                string                   `json:"repo"`
+	DefaultBranch       string                   `json:"default_branch"`
+	CurrentBranch       string                   `json:"current_branch"`
+	Mode                string                   `json:"mode"`
+	Summary             repoGitHygieneSummary    `json:"summary"`
+	LocalBranches       []repoGitHygieneBranch   `json:"local_branches"`
+	RemoteBranches      []repoGitHygieneBranch   `json:"remote_branches"`
+	Worktrees           []repoGitHygieneWorktree `json:"worktrees"`
+	Actions             []repoGitHygieneAction   `json:"actions"`
+	ManagedStatePreview []string                 `json:"managed_state_preview,omitempty"`
+	Command             []string                 `json:"command"`
+	RecommendedTools    []string                 `json:"recommended_tools"`
+}
+
 type FleetWorkflowSurfaceModule struct{}
 
 func (m *FleetWorkflowSurfaceModule) Name() string { return "fleet_workflows" }
@@ -74,6 +148,17 @@ func (m *FleetWorkflowSurfaceModule) Description() string {
 }
 
 func (m *FleetWorkflowSurfaceModule) Tools() []registry.ToolDefinition {
+	repoGitHygiene := handler.TypedHandler[repoGitHygieneWorkflowInput, repoGitHygieneWorkflowOutput](
+		"dotfiles_repo_git_hygiene",
+		"Scan or safely clean merged branches, extra worktrees, and managed worktree residue for one repo with dry-run-first output.",
+		func(_ context.Context, input repoGitHygieneWorkflowInput) (repoGitHygieneWorkflowOutput, error) {
+			return runRepoGitHygieneWorkflow(input)
+		},
+	)
+	repoGitHygiene.Category = "workflow"
+	repoGitHygiene.SearchTerms = []string{"repo hygiene", "branch cleanup", "worktree cleanup", "git cleanup", "merged branches"}
+	repoGitHygiene.IsWrite = true
+
 	repoBootstrap := handler.TypedHandler[repoBootstrapWorkflowInput, repoBootstrapWorkflowOutput](
 		"dotfiles_repo_bootstrap",
 		"Create or onboard a repo through the standard studio scripts, returning a short summary plus the next recommended Codex tools.",
@@ -266,7 +351,7 @@ func (m *FleetWorkflowSurfaceModule) Tools() []registry.ToolDefinition {
 	fleetHealth.Category = "workflow"
 	fleetHealth.SearchTerms = []string{"fleet health", "dependency skew", "dep audit", "repo health"}
 
-	return []registry.ToolDefinition{repoBootstrap, repoSync, codexAudit, fleetHealth}
+	return []registry.ToolDefinition{repoGitHygiene, repoBootstrap, repoSync, codexAudit, fleetHealth}
 }
 
 func summarizeWorkflow(status, stdout, stderr, label string) string {
@@ -316,4 +401,94 @@ func firstLine(text string) string {
 		}
 	}
 	return ""
+}
+
+func runRepoGitHygieneWorkflow(input repoGitHygieneWorkflowInput) (repoGitHygieneWorkflowOutput, error) {
+	repoPath := strings.TrimSpace(input.RepoPath)
+	if repoPath == "" {
+		return repoGitHygieneWorkflowOutput{}, fmt.Errorf("[%s] repo_path is required", handler.ErrInvalidParam)
+	}
+
+	cleanupLocalMerged := input.CleanupLocalMerged
+	cleanupWorktrees := input.CleanupWorktrees
+	if !cleanupLocalMerged && !cleanupWorktrees && !input.CleanupRemoteMerged && !input.PruneAdmin && !input.PruneManagedState {
+		cleanupLocalMerged = true
+		cleanupWorktrees = true
+	}
+
+	script := filepath.Join(dotfilesDir(), "scripts", "hg-git-hygiene.sh")
+	args := []string{"--repo", repoPath, "--json"}
+	if input.Fetch {
+		args = append(args, "--fetch")
+	}
+	if input.PruneAdmin {
+		args = append(args, "--prune-admin")
+	}
+	if cleanupLocalMerged {
+		args = append(args, "--delete-merged-local")
+	}
+	if input.CleanupRemoteMerged {
+		args = append(args, "--delete-merged-remote")
+	}
+	if cleanupWorktrees {
+		args = append(args, "--delete-clean-worktrees")
+	}
+	if input.PruneManagedState {
+		args = append(args, "--prune-managed-state")
+	}
+	for _, prefix := range input.BranchPrefixes {
+		prefix = strings.TrimSpace(prefix)
+		if prefix != "" {
+			args = append(args, "--branch-prefix", prefix)
+		}
+	}
+	if input.Execute {
+		args = append(args, "--execute")
+	}
+
+	cmd := exec.Command(script, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		errText := strings.TrimSpace(stderr.String())
+		if errText == "" {
+			errText = strings.TrimSpace(stdout.String())
+		}
+		if errText == "" {
+			errText = err.Error()
+		}
+		return repoGitHygieneWorkflowOutput{}, fmt.Errorf("repo git hygiene: %s", errText)
+	}
+
+	var raw struct {
+		Repo                string                   `json:"repo"`
+		DefaultBranch       string                   `json:"default_branch"`
+		CurrentBranch       string                   `json:"current_branch"`
+		Mode                string                   `json:"mode"`
+		Summary             repoGitHygieneSummary    `json:"summary"`
+		LocalBranches       []repoGitHygieneBranch   `json:"local_branches"`
+		RemoteBranches      []repoGitHygieneBranch   `json:"remote_branches"`
+		Worktrees           []repoGitHygieneWorktree `json:"worktrees"`
+		Actions             []repoGitHygieneAction   `json:"actions"`
+		ManagedStatePreview []string                 `json:"managed_state_preview"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &raw); err != nil {
+		return repoGitHygieneWorkflowOutput{}, fmt.Errorf("parse repo git hygiene output: %w", err)
+	}
+
+	return repoGitHygieneWorkflowOutput{
+		Repo:                raw.Repo,
+		DefaultBranch:       raw.DefaultBranch,
+		CurrentBranch:       raw.CurrentBranch,
+		Mode:                raw.Mode,
+		Summary:             raw.Summary,
+		LocalBranches:       raw.LocalBranches,
+		RemoteBranches:      raw.RemoteBranches,
+		Worktrees:           raw.Worktrees,
+		Actions:             raw.Actions,
+		ManagedStatePreview: raw.ManagedStatePreview,
+		Command:             append([]string{script}, args...),
+		RecommendedTools:    []string{"dotfiles_pipeline_run", "dotfiles_gh_local_sync_audit", "dotfiles_repo_sync_summary"},
+	}, nil
 }

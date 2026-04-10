@@ -1,4 +1,4 @@
-// mapping_helpers.go — Local wrappers around the shared mapping module.
+// mapping_helpers.go — Local wrappers around the in-tree mapping module.
 package dotfiles
 
 import "github.com/hairglasses-studio/dotfiles-mcp/internal/mapping"

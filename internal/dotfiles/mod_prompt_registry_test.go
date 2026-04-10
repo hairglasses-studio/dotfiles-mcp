@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hairglasses-studio/dotfiles-mcp/internal/enhancer"
 	"github.com/hairglasses-studio/mcpkit/mcptest"
 	"github.com/hairglasses-studio/mcpkit/registry"
-	"github.com/hairglasses-studio/prompt-improver/pkg/enhancer"
 )
 
 func TestPromptRegistryModuleRegistration(t *testing.T) {

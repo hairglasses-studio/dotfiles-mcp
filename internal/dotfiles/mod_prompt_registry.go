@@ -1,6 +1,6 @@
 // mod_prompt_registry.go — Prompt capture, search, scoring, tagging, and improvement MCP tools.
 // Stores prompts in ~/hairglasses-studio/docs/prompts/ with TOML frontmatter.
-// Uses the prompt-improver enhancer for analysis and improvement.
+// Uses the in-tree enhancer for analysis and improvement.
 package dotfiles
 
 import (
@@ -17,9 +17,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hairglasses-studio/dotfiles-mcp/internal/enhancer"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
-	"github.com/hairglasses-studio/prompt-improver/pkg/enhancer"
 )
 
 // ---------------------------------------------------------------------------

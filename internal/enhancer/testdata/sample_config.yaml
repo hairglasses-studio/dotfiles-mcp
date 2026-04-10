@@ -1,0 +1,15 @@
+preamble: "This is the test project, a Go CLI tool."
+rules:
+  - match: "add tool"
+    append: "Follow the existing tool registration pattern."
+  - match: "fix"
+    prepend: "Include a test that reproduces the bug."
+    append: "Verify the fix with existing tests."
+block_patterns:
+  - "drop table"
+  - "rm -rf /"
+disabled_stages:
+  - tone_downgrade
+  - preamble_suppression
+default_task_type: code
+default_effort: medium
