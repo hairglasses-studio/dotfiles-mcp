@@ -77,6 +77,33 @@ func unmarshalSessionWindowsResult(t *testing.T, result *registry.CallToolResult
 	return out
 }
 
+func unmarshalSessionListResult(t *testing.T, result *registry.CallToolResult) SessionListOutput {
+	t.Helper()
+	var out SessionListOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
+		t.Fatalf("unmarshal session list output: %v", err)
+	}
+	return out
+}
+
+func unmarshalSessionStatusResult(t *testing.T, result *registry.CallToolResult) SessionStatusOutput {
+	t.Helper()
+	var out SessionStatusOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
+		t.Fatalf("unmarshal session status output: %v", err)
+	}
+	return out
+}
+
+func unmarshalSessionLogResult(t *testing.T, result *registry.CallToolResult) SessionLogOutput {
+	t.Helper()
+	var out SessionLogOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
+		t.Fatalf("unmarshal session log output: %v", err)
+	}
+	return out
+}
+
 func callDesktopSemanticTool(t *testing.T, name string, args map[string]any) *registry.CallToolResult {
 	t.Helper()
 	td := findModuleTool(t, &DesktopSemanticModule{}, name)
@@ -862,5 +889,102 @@ func TestDesktopSessionCommandFixtureFlows(t *testing.T) {
 	}
 	if dbusOut.Mode != "dbus-send" || !strings.Contains(dbusOut.Output, "method return") {
 		t.Fatalf("unexpected dbus output: %#v", dbusOut)
+	}
+}
+
+func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
+	stateDir := t.TempDir()
+	logDir := t.TempDir()
+	runtimeDir := t.TempDir()
+	socketPath := filepath.Join(runtimeDir, "wayland-0")
+	envPath := filepath.Join(logDir, "session.env")
+	logPath := filepath.Join(logDir, "kwin.log")
+	appLogPath := filepath.Join(logDir, "app.log")
+
+	if err := os.WriteFile(socketPath, []byte("socket"), 0o600); err != nil {
+		t.Fatalf("write socket fixture: %v", err)
+	}
+	if err := os.WriteFile(envPath, []byte("DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/test-bus\nAT_SPI_BUS_ADDRESS=unix:path=/tmp/test-atspi\n"), 0o644); err != nil {
+		t.Fatalf("write env fixture: %v", err)
+	}
+	if err := os.WriteFile(logPath, []byte("line 1\nline 2\nline 3\nline 4\n"), 0o644); err != nil {
+		t.Fatalf("write log fixture: %v", err)
+	}
+	if err := os.WriteFile(appLogPath, []byte("app output\n"), 0o644); err != nil {
+		t.Fatalf("write app log fixture: %v", err)
+	}
+
+	t.Setenv("XDG_STATE_HOME", stateDir)
+
+	newest := saveTestDesktopSessionRecord(t, desktopSessionRecord{
+		ID:                        "session-inspect-newest",
+		Name:                      "Newest Session",
+		Backend:                   "live_hyprland",
+		Status:                    "connected",
+		WaylandDisplay:            "wayland-0",
+		XDGRuntimeDir:             runtimeDir,
+		HyprlandInstanceSignature: "hypr-fixture",
+		DBUSSessionBusAddress:     "unix:path=/tmp/test-bus",
+		ATSPIBusAddress:           "unix:path=/tmp/test-atspi",
+		EnvPath:                   envPath,
+		LogPath:                   logPath,
+		StartedAt:                 "2026-04-10T12:00:00Z",
+		AppLogs: []desktopSessionAppLog{
+			{App: "fixture-app", Path: appLogPath, StartedAt: "2026-04-10T12:05:00Z"},
+		},
+	})
+	saveTestDesktopSessionRecord(t, desktopSessionRecord{
+		ID:        "session-inspect-older",
+		Name:      "Older Session",
+		Backend:   "kwin_virtual",
+		Status:    "stopped",
+		StartedAt: "2026-04-10T10:00:00Z",
+		StoppedAt: "2026-04-10T10:30:00Z",
+	})
+
+	listResult := callDesktopSessionTool(t, "session_list", map[string]any{
+		"limit": 1,
+	})
+	if listResult == nil || listResult.IsError {
+		t.Fatalf("expected successful session_list result, got %q", extractTextFromResult(t, listResult))
+	}
+	listed := unmarshalSessionListResult(t, listResult)
+	if listed.Count != 1 || len(listed.Sessions) != 1 {
+		t.Fatalf("unexpected session list output: %#v", listed)
+	}
+	if listed.Sessions[0].SessionID != newest.ID || listed.Sessions[0].ResolvedStatus != "connected" {
+		t.Fatalf("unexpected first session list entry: %#v", listed.Sessions[0])
+	}
+
+	statusResult := callDesktopSessionTool(t, "session_status", map[string]any{
+		"session_id": newest.ID,
+	})
+	if statusResult == nil || statusResult.IsError {
+		t.Fatalf("expected successful session_status result, got %q", extractTextFromResult(t, statusResult))
+	}
+	status := unmarshalSessionStatusResult(t, statusResult)
+	if status.Session.ID != newest.ID || status.ResolvedStatus != "connected" {
+		t.Fatalf("unexpected session status output: %#v", status)
+	}
+	if !status.HyprlandBacked || !status.SocketPresent || !status.DBUSReady || !status.ATSPIReady {
+		t.Fatalf("expected ready session status, got %#v", status)
+	}
+	if status.AppLogCount != 1 || len(status.AppLogs) != 1 {
+		t.Fatalf("expected one app log in status output, got %#v", status)
+	}
+	if !containsString(status.Recommendations, "Use session_read_app_log to inspect the newest launched application output.") {
+		t.Fatalf("expected app log recommendation, got %#v", status.Recommendations)
+	}
+
+	logResult := callDesktopSessionTool(t, "session_read_log", map[string]any{
+		"session_id": newest.ID,
+		"lines":      2,
+	})
+	if logResult == nil || logResult.IsError {
+		t.Fatalf("expected successful session_read_log result, got %q", extractTextFromResult(t, logResult))
+	}
+	logOut := unmarshalSessionLogResult(t, logResult)
+	if logOut.Path != logPath || strings.TrimSpace(logOut.Output) != "line 3\nline 4" {
+		t.Fatalf("unexpected session log output: %#v", logOut)
 	}
 }

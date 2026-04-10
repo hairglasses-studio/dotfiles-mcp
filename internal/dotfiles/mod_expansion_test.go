@@ -47,8 +47,8 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 func TestDesktopSessionModuleRegistration(t *testing.T) {
 	m := &DesktopSessionModule{}
 	tools := m.Tools()
-	if len(tools) != 25 {
-		t.Fatalf("expected 25 session tools, got %d", len(tools))
+	if len(tools) != 28 {
+		t.Fatalf("expected 28 session tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -56,8 +56,10 @@ func TestDesktopSessionModuleRegistration(t *testing.T) {
 	srv := mcptest.NewServer(t, reg)
 
 	for _, want := range []string{
+		"session_list",
 		"session_start",
 		"session_connect",
+		"session_status",
 		"session_stop",
 		"session_screenshot",
 		"session_list_windows",
@@ -66,6 +68,7 @@ func TestDesktopSessionModuleRegistration(t *testing.T) {
 		"session_clipboard_get",
 		"session_clipboard_set",
 		"session_wayland_info",
+		"session_read_log",
 		"session_read_app_log",
 		"session_accessibility_tree",
 		"session_find_ui_element",

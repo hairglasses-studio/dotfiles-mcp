@@ -67,6 +67,10 @@ type SessionRefInput struct {
 	SessionID string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
 }
 
+type SessionListInput struct {
+	Limit int `json:"limit,omitempty" jsonschema:"description=Optional max sessions to return. Defaults to all known sessions."`
+}
+
 type SessionScreenshotInput struct {
 	SessionID  string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
 	OutputPath string `json:"output_path,omitempty" jsonschema:"description=Explicit PNG path. Defaults to the session state directory."`
@@ -186,6 +190,59 @@ type SessionWindowsOutput struct {
 	Windows         []hyprClient         `json:"windows,omitempty"`
 	SemanticWindows []map[string]any     `json:"semantic_windows,omitempty"`
 	Unsupported     string               `json:"unsupported,omitempty"`
+}
+
+type SessionAppLogStatus struct {
+	App            string `json:"app"`
+	Path           string `json:"path"`
+	PID            int    `json:"pid,omitempty"`
+	ProcessManaged bool   `json:"process_managed"`
+	ProcessAlive   bool   `json:"process_alive"`
+	StartedAt      string `json:"started_at"`
+}
+
+type SessionListEntry struct {
+	SessionID       string   `json:"session_id"`
+	Name            string   `json:"name"`
+	Backend         string   `json:"backend"`
+	Status          string   `json:"status"`
+	ResolvedStatus  string   `json:"resolved_status"`
+	StartedAt       string   `json:"started_at"`
+	StoppedAt       string   `json:"stopped_at,omitempty"`
+	PID             int      `json:"pid,omitempty"`
+	ProcessManaged  bool     `json:"process_managed"`
+	ProcessAlive    bool     `json:"process_alive"`
+	HyprlandBacked  bool     `json:"hyprland_backed"`
+	SocketPath      string   `json:"socket_path,omitempty"`
+	SocketPresent   bool     `json:"socket_present"`
+	DBUSReady       bool     `json:"dbus_ready"`
+	ATSPIReady      bool     `json:"at_spi_ready"`
+	EnvPathPresent  bool     `json:"env_path_present"`
+	LogPathPresent  bool     `json:"log_path_present"`
+	AppLogCount     int      `json:"app_log_count"`
+	Recommendations []string `json:"recommendations,omitempty"`
+}
+
+type SessionListOutput struct {
+	Count    int                `json:"count"`
+	Sessions []SessionListEntry `json:"sessions"`
+}
+
+type SessionStatusOutput struct {
+	Session         desktopSessionRecord  `json:"session"`
+	ResolvedStatus  string                `json:"resolved_status"`
+	ProcessManaged  bool                  `json:"process_managed"`
+	ProcessAlive    bool                  `json:"process_alive"`
+	HyprlandBacked  bool                  `json:"hyprland_backed"`
+	SocketPath      string                `json:"socket_path,omitempty"`
+	SocketPresent   bool                  `json:"socket_present"`
+	DBUSReady       bool                  `json:"dbus_ready"`
+	ATSPIReady      bool                  `json:"at_spi_ready"`
+	EnvPathPresent  bool                  `json:"env_path_present"`
+	LogPathPresent  bool                  `json:"log_path_present"`
+	AppLogCount     int                   `json:"app_log_count"`
+	AppLogs         []SessionAppLogStatus `json:"app_logs,omitempty"`
+	Recommendations []string              `json:"recommendations,omitempty"`
 }
 
 type SessionScreenshotOutput struct {
@@ -575,6 +632,127 @@ func latestSessionAppLog(record desktopSessionRecord, app string) *desktopSessio
 	return nil
 }
 
+func desktopSessionSocketPath(record desktopSessionRecord) string {
+	if strings.TrimSpace(record.XDGRuntimeDir) == "" || strings.TrimSpace(record.WaylandDisplay) == "" {
+		return ""
+	}
+	return filepath.Join(record.XDGRuntimeDir, record.WaylandDisplay)
+}
+
+func desktopSessionAppLogStatuses(record desktopSessionRecord) []SessionAppLogStatus {
+	if len(record.AppLogs) == 0 {
+		return nil
+	}
+	out := make([]SessionAppLogStatus, 0, len(record.AppLogs))
+	for _, entry := range record.AppLogs {
+		processManaged := entry.PID > 0
+		out = append(out, SessionAppLogStatus{
+			App:            entry.App,
+			Path:           entry.Path,
+			PID:            entry.PID,
+			ProcessManaged: processManaged,
+			ProcessAlive:   processManaged && desktopSessionAlive(entry.PID),
+			StartedAt:      entry.StartedAt,
+		})
+	}
+	return out
+}
+
+func desktopSessionResolvedStatus(record desktopSessionRecord, processManaged, processAlive, socketPresent, dbusReady bool) string {
+	if strings.TrimSpace(record.StoppedAt) != "" || strings.EqualFold(strings.TrimSpace(record.Status), "stopped") {
+		return "stopped"
+	}
+	if processManaged && !processAlive {
+		return "exited"
+	}
+	if dbusReady && socketPresent {
+		return "connected"
+	}
+	if dbusReady || socketPresent {
+		return "degraded"
+	}
+	if status := strings.TrimSpace(record.Status); status != "" {
+		return status
+	}
+	return "unknown"
+}
+
+func desktopSessionRecommendations(record desktopSessionRecord, resolvedStatus string, hyprlandBacked, socketPresent, dbusReady, logPathPresent bool, appLogCount int) []string {
+	recommendations := make([]string, 0, 4)
+	if !hyprlandBacked {
+		recommendations = append(recommendations, "Prefer session accessibility and D-Bus tools over Hyprland-specific targeting for this session.")
+	}
+	if !socketPresent {
+		recommendations = append(recommendations, "Wayland socket is missing; screenshot, clipboard, and typed-input helpers may fail until the session is ready.")
+	}
+	if !dbusReady {
+		recommendations = append(recommendations, "D-Bus is not ready; semantic accessibility helpers may not work until the session bus is available.")
+	}
+	if logPathPresent && resolvedStatus != "connected" {
+		recommendations = append(recommendations, "Use session_read_log for compositor startup diagnostics.")
+	}
+	if appLogCount > 0 {
+		recommendations = append(recommendations, "Use session_read_app_log to inspect the newest launched application output.")
+	}
+	return recommendations
+}
+
+func desktopSessionStatusOutput(record desktopSessionRecord) SessionStatusOutput {
+	hydrateDesktopSessionRecord(&record)
+	processManaged := record.PID > 0
+	processAlive := processManaged && desktopSessionAlive(record.PID)
+	socketPath := desktopSessionSocketPath(record)
+	socketPresent := pathExists(socketPath)
+	dbusReady := strings.TrimSpace(record.DBUSSessionBusAddress) != ""
+	atspiReady := strings.TrimSpace(record.ATSPIBusAddress) != ""
+	hyprlandBacked := strings.TrimSpace(record.HyprlandInstanceSignature) != ""
+	envPathPresent := strings.TrimSpace(record.EnvPath) != "" && pathExists(record.EnvPath)
+	logPathPresent := strings.TrimSpace(record.LogPath) != "" && pathExists(record.LogPath)
+	appLogs := desktopSessionAppLogStatuses(record)
+	resolvedStatus := desktopSessionResolvedStatus(record, processManaged, processAlive, socketPresent, dbusReady)
+	return SessionStatusOutput{
+		Session:         record,
+		ResolvedStatus:  resolvedStatus,
+		ProcessManaged:  processManaged,
+		ProcessAlive:    processAlive,
+		HyprlandBacked:  hyprlandBacked,
+		SocketPath:      socketPath,
+		SocketPresent:   socketPresent,
+		DBUSReady:       dbusReady,
+		ATSPIReady:      atspiReady,
+		EnvPathPresent:  envPathPresent,
+		LogPathPresent:  logPathPresent,
+		AppLogCount:     len(appLogs),
+		AppLogs:         appLogs,
+		Recommendations: desktopSessionRecommendations(record, resolvedStatus, hyprlandBacked, socketPresent, dbusReady, logPathPresent, len(appLogs)),
+	}
+}
+
+func desktopSessionListEntry(record desktopSessionRecord) SessionListEntry {
+	status := desktopSessionStatusOutput(record)
+	return SessionListEntry{
+		SessionID:       status.Session.ID,
+		Name:            status.Session.Name,
+		Backend:         status.Session.Backend,
+		Status:          status.Session.Status,
+		ResolvedStatus:  status.ResolvedStatus,
+		StartedAt:       status.Session.StartedAt,
+		StoppedAt:       status.Session.StoppedAt,
+		PID:             status.Session.PID,
+		ProcessManaged:  status.ProcessManaged,
+		ProcessAlive:    status.ProcessAlive,
+		HyprlandBacked:  status.HyprlandBacked,
+		SocketPath:      status.SocketPath,
+		SocketPresent:   status.SocketPresent,
+		DBUSReady:       status.DBUSReady,
+		ATSPIReady:      status.ATSPIReady,
+		EnvPathPresent:  status.EnvPathPresent,
+		LogPathPresent:  status.LogPathPresent,
+		AppLogCount:     status.AppLogCount,
+		Recommendations: status.Recommendations,
+	}
+}
+
 func sessionFindHyprWindow(record desktopSessionRecord, input SessionWindowInput) (string, error) {
 	clientsJSON, err := runDesktopSessionHyprctl(record, "clients", "-j")
 	if err != nil {
@@ -724,6 +902,31 @@ func sessionResolveSemanticWindow(ctx context.Context, record desktopSessionReco
 }
 
 func (m *DesktopSessionModule) Tools() []registry.ToolDefinition {
+	list := handler.TypedHandler[SessionListInput, SessionListOutput](
+		"session_list",
+		"List tracked desktop session handles with readiness and attachment summaries.",
+		func(_ context.Context, input SessionListInput) (SessionListOutput, error) {
+			records, err := listDesktopSessionRecords()
+			if err != nil {
+				return SessionListOutput{}, err
+			}
+			limit := input.Limit
+			if limit > 0 && len(records) > limit {
+				records = records[:limit]
+			}
+			out := make([]SessionListEntry, 0, len(records))
+			for _, record := range records {
+				out = append(out, desktopSessionListEntry(record))
+			}
+			return SessionListOutput{
+				Count:    len(out),
+				Sessions: out,
+			}, nil
+		},
+	)
+	list.Category = "desktop"
+	list.SearchTerms = []string{"list sessions", "desktop session handles", "tracked sessions", "session inventory"}
+
 	start := handler.TypedHandler[SessionStartInput, desktopSessionRecord](
 		"session_start",
 		"Start and persist a desktop session handle. Supports a live handle or an optional KWin virtual backend.",
@@ -823,6 +1026,20 @@ exec kwin_wayland --virtual --no-lockscreen
 	)
 	connect.Category = "desktop"
 	connect.SearchTerms = []string{"connect session", "live wayland session", "session handle"}
+
+	status := handler.TypedHandler[SessionRefInput, SessionStatusOutput](
+		"session_status",
+		"Inspect one tracked desktop session handle, including readiness, process, and log hints.",
+		func(_ context.Context, input SessionRefInput) (SessionStatusOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionStatusOutput{}, err
+			}
+			return desktopSessionStatusOutput(record), nil
+		},
+	)
+	status.Category = "desktop"
+	status.SearchTerms = []string{"session status", "session readiness", "kwin session health", "session inspect"}
 
 	stop := handler.TypedHandler[SessionRefInput, desktopSessionRecord](
 		"session_stop",
@@ -1129,6 +1346,36 @@ exec kwin_wayland --virtual --no-lockscreen
 	)
 	waylandInfo.Category = "desktop"
 	waylandInfo.SearchTerms = []string{"wayland info", "session wayland", "wayland capabilities"}
+
+	readLog := handler.TypedHandler[SessionLogInput, SessionLogOutput](
+		"session_read_log",
+		"Read the compositor or session log for a tracked desktop session.",
+		func(_ context.Context, input SessionLogInput) (SessionLogOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionLogOutput{}, err
+			}
+			lines := input.Lines
+			if lines <= 0 {
+				lines = 80
+			}
+			if strings.TrimSpace(record.LogPath) == "" || !pathExists(record.LogPath) {
+				return SessionLogOutput{Session: record, Path: record.LogPath, Lines: lines}, nil
+			}
+			data, err := os.ReadFile(record.LogPath)
+			if err != nil {
+				return SessionLogOutput{}, fmt.Errorf("read session log: %w", err)
+			}
+			return SessionLogOutput{
+				Session: record,
+				Path:    record.LogPath,
+				Lines:   lines,
+				Output:  trimTailLines(string(data), lines),
+			}, nil
+		},
+	)
+	readLog.Category = "desktop"
+	readLog.SearchTerms = []string{"session log", "read compositor log", "kwin virtual log", "session startup log"}
 
 	readAppLog := handler.TypedHandler[SessionLogInput, SessionLogOutput](
 		"session_read_app_log",
@@ -1580,8 +1827,10 @@ exec kwin_wayland --virtual --no-lockscreen
 	dbusCall.SearchTerms = []string{"session dbus", "kwin dbus", "dbus-send session"}
 
 	return []registry.ToolDefinition{
+		list,
 		start,
 		connect,
+		status,
 		stop,
 		screenshot,
 		listWindows,
@@ -1590,6 +1839,7 @@ exec kwin_wayland --virtual --no-lockscreen
 		clipboardGet,
 		clipboardSet,
 		waylandInfo,
+		readLog,
 		readAppLog,
 		accessibilityTree,
 		findUIElement,
