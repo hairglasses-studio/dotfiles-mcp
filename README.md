@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
-MCP server for desktop environment management -- Hyprland, Ghostty shaders, Bluetooth, MIDI, input devices, GitHub org lifecycle, GitHub Stars taxonomy workflows, fleet auditing, and open-source readiness scoring.
+MCP server for desktop environment management, repo ops, GitHub org lifecycle, fleet auditing, and open-source readiness scoring.
 
 Canonical development lives in [`hairglasses-studio/dotfiles`](https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp) under `dotfiles/mcp/dotfiles-mcp`. The standalone [`dotfiles-mcp`](https://github.com/hairglasses-studio/dotfiles-mcp) repo is a publish mirror kept in parity for installation and discovery.
 
@@ -43,8 +43,15 @@ By default, `dotfiles-mcp` marks its non-discovery tools as `defer_loading` and 
 - `dotfiles_tool_schema`
 - `dotfiles_tool_catalog`
 - `dotfiles_tool_stats`
+- `dotfiles_server_health`
 
-Use `DOTFILES_MCP_PROFILE=full` if you explicitly want the full catalog treated as eager.
+It also ships discovery-adjacent resources and prompts for workflow entrypoints:
+
+- `dotfiles://catalog/workflows`
+- `dotfiles://catalog/prompts`
+- prompt entrypoints for fleet, repo, and desktop flows
+
+Use `DOTFILES_MCP_PROFILE=desktop` for a practical workstation-first eager set, or `full` if you explicitly want the full catalog treated as eager.
 
 ## Quick Start
 
@@ -57,8 +64,14 @@ claude mcp call dotfiles dotfiles_tool_search '{"query": "bluetooth"}'
 # Get full tool catalog
 claude mcp call dotfiles dotfiles_tool_catalog '{}'
 
+# Browse workflow resources
+claude mcp resources read dotfiles dotfiles://catalog/workflows
+
 # Check desktop rice health
 claude mcp call dotfiles dotfiles_rice_check '{}'
+
+# Inspect desktop service health
+claude mcp call dotfiles dotfiles_server_health '{}'
 ```
 
 GitHub Stars workflow examples:
@@ -69,6 +82,12 @@ claude mcp call dotfiles dotfiles_gh_stars_summary '{"managed_list_prefix":"MCP 
 
 # List current GitHub star folders with items
 claude mcp call dotfiles dotfiles_gh_star_lists_list '{"include_items":true}'
+
+# Bootstrap Codex MCP config from managed GitHub Stars lists
+~/hairglasses-studio/dotfiles/scripts/hg-gh-stars-codex-mcp-bootstrap.sh --dry-run
+
+# Bootstrap Claude MCP config from managed GitHub Stars lists
+~/hairglasses-studio/dotfiles/scripts/hg-gh-stars-claude-mcp-bootstrap.sh --dry-run
 ```
 
 ## Loading Profiles
@@ -78,6 +97,7 @@ Control how many tools load at startup via `DOTFILES_MCP_PROFILE`:
 | Profile | Behavior | Context Cost |
 |---------|----------|-------------|
 | `default` | Discovery tools loaded, rest deferred on demand | ~2K tokens |
+| `desktop` | Desktop/operator subset loaded eagerly | ~8K tokens |
 | `ops` | Operational subset (config, desktop, fleet) loaded eagerly | ~15K tokens |
 | `full` | All tools loaded immediately | ~40K tokens |
 
@@ -88,7 +108,7 @@ Set in your MCP config:
   "mcpServers": {
     "dotfiles": {
       "command": "dotfiles-mcp",
-      "env": { "DOTFILES_MCP_PROFILE": "ops" }
+      "env": { "DOTFILES_MCP_PROFILE": "desktop" }
     }
   }
 }
@@ -105,11 +125,11 @@ Set in your MCP config:
 | Build & Sync | 5 | Multi-language build pipeline, Go version sync, repo scaffolding |
 | Hyprland Desktop | 12 | Window/workspace management, screenshots, monitor config, input simulation |
 | Desktop Services | 6 | Cascade reload, rice check, eww bar management |
-| Shader Pipeline | 13 | GLSL shader lifecycle for Ghostty and wallpapers -- list, set, cycle, test, build |
+| Shader Pipeline | 13 | GLSL shader lifecycle for kitty write-target configs and Ghostty companion wallpapers -- list, set, cycle, test, build |
 | Bluetooth | 9 | Device discovery, pairing (BLE-safe), connect/disconnect, battery, trust |
 | Input Devices | 14 | juhradial-mx config, MX battery, and gamepad profiles (makima) |
 | MIDI | 4 | USB MIDI controller detection and mapping config |
-| Composed Workflows | 2 | Multi-step automations: BT discover-and-connect, controller auto-setup |
+| Composed Workflows | 3 | Multi-step automations: BT discover-and-connect, controller auto-setup, repo onboarding |
 | Open-Source Readiness | 2 | Score repos 0-100 across 8 categories with actionable suggestions |
 
 ## Key Patterns
@@ -134,6 +154,7 @@ Runtime tools vary by category. Missing tools are detected gracefully -- unused 
 | Shaders | `glslangValidator` (optional, for compile-testing) |
 | Input / Mouse | `juhradial-mx`, `ydotool`, `makima` |
 | Desktop | `eww`, `makoctl`, `pgrep` |
+| Screenshot / OCR | `grim`, `slurp`, `tesseract` (optional, for capture/vision flows) |
 | GitHub Org | `gh` (GitHub CLI) |
 | MIDI | ALSA (`aconnect`, `amidi`) |
 

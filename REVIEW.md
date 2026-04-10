@@ -7,4 +7,4 @@ Inherits from org-wide [REVIEW.md](https://github.com/hairglasses-studio/.github
 - **Shader file I/O**: Validate paths before read/write, prevent path traversal outside shader directories
 - **Bluetooth/MIDI**: Handle device disconnect gracefully, don't panic on missing devices
 - **Atomic config writes**: Use `mktemp + mv` pattern for Ghostty configs (prevents partial reads)
-- **86 tools**: Keep tool names action-oriented, one clear intent per tool
+- **Large tool surface**: Keep tool names action-oriented, one clear intent per tool, and preserve discovery-first usability as the contract grows

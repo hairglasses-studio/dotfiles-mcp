@@ -12,7 +12,7 @@ go test ./... -count=1
 go install .
 ```
 
-## Tools (99)
+## Tools (use discovery for live counts)
 
 ### Config Management (4)
 - `dotfiles_list_configs` — List dotfiles config directories with symlink health and format
