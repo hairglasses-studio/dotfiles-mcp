@@ -1592,7 +1592,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 					cmd.Wait()
 
 					out, _, _ := inputRunCmd("bluetoothctl", "devices")
-					var devices []btDevice
+					devices := make([]btDevice, 0)
 					for _, line := range strings.Split(out, "\n") {
 						dm := deviceRe.FindStringSubmatch(strings.TrimSpace(line))
 						if dm != nil {
@@ -1607,7 +1607,7 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 
 				case "list":
 					out, _, _ := inputRunCmd("bluetoothctl", "devices")
-					var devices []btDevice
+					devices := make([]btDevice, 0)
 					for _, line := range strings.Split(out, "\n") {
 						dm := deviceRe.FindStringSubmatch(strings.TrimSpace(line))
 						if dm != nil {
