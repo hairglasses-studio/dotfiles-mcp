@@ -1536,6 +1536,28 @@ exec kwin_wayland --virtual --no-lockscreen
 				return SessionSemanticElementOutput{}, err
 			}
 			query := sessionSemanticQuery(input)
+			if semanticQueryNeedsTreeLookup(query) {
+				matches, helperPath, err := semanticFindMatchesWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query)
+				if err != nil {
+					return SessionSemanticElementOutput{}, err
+				}
+				out := SessionSemanticElementOutput{
+					Session:    record,
+					HelperPath: helperPath,
+					App:        query.App,
+					Query:      query,
+					Matched:    len(matches) > 0,
+				}
+				if len(matches) == 0 {
+					out.Error = fmt.Sprintf("Element not found in %s", query.App)
+					return out, nil
+				}
+				out.Query = semanticResolvedQueryForElement(query, matches[0])
+				out.Element = matches[0]
+				return out, nil
+			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
@@ -1559,6 +1581,23 @@ exec kwin_wayland --virtual --no-lockscreen
 				return SessionSemanticMatchesOutput{}, err
 			}
 			query := sessionSemanticQuery(input)
+			if semanticQueryNeedsTreeLookup(query) {
+				matches, helperPath, err := semanticFindMatchesWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query)
+				if err != nil {
+					return SessionSemanticMatchesOutput{}, err
+				}
+				return SessionSemanticMatchesOutput{
+					Session:    record,
+					HelperPath: helperPath,
+					App:        input.App,
+					Query:      query,
+					Matched:    len(matches) > 0,
+					Count:      len(matches),
+					Matches:    matches,
+				}, nil
+			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return SessionSemanticMatchesOutput{}, err
@@ -1592,6 +1631,25 @@ exec kwin_wayland --virtual --no-lockscreen
 				return SessionSemanticElementOutput{}, err
 			}
 			query := sessionSemanticQuery(input)
+			var matchedElement map[string]any
+			resolvedHelperPath := ""
+			if semanticQueryNeedsTreeLookup(query) {
+				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query)
+				if err != nil {
+					return SessionSemanticElementOutput{}, err
+				}
+				if matchedElement == nil {
+					return SessionSemanticElementOutput{
+						Session:    record,
+						HelperPath: resolvedHelperPath,
+						App:        input.App,
+						Query:      sessionSemanticQuery(input),
+						Error:      fmt.Sprintf("Element not found in %s", input.App),
+					}, nil
+				}
+			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
@@ -1600,7 +1658,11 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+			out := sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed))
+			if out.Element == nil && matchedElement != nil {
+				out.Element = matchedElement
+			}
+			return out, nil
 		},
 	)
 	focusElement.Category = "desktop"
@@ -1615,6 +1677,25 @@ exec kwin_wayland --virtual --no-lockscreen
 				return SessionSemanticElementOutput{}, err
 			}
 			query := sessionSemanticQuery(input)
+			var matchedElement map[string]any
+			resolvedHelperPath := ""
+			if semanticQueryNeedsTreeLookup(query) {
+				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query)
+				if err != nil {
+					return SessionSemanticElementOutput{}, err
+				}
+				if matchedElement == nil {
+					return SessionSemanticElementOutput{
+						Session:    record,
+						HelperPath: resolvedHelperPath,
+						App:        input.App,
+						Query:      sessionSemanticQuery(input),
+						Error:      fmt.Sprintf("Element not found in %s", input.App),
+					}, nil
+				}
+			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
@@ -1623,7 +1704,11 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+			out := sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed))
+			if out.Element == nil && matchedElement != nil {
+				out.Element = matchedElement
+			}
+			return out, nil
 		},
 	)
 	readValue.Category = "desktop"
@@ -1641,6 +1726,25 @@ exec kwin_wayland --virtual --no-lockscreen
 				return SessionSemanticElementOutput{}, fmt.Errorf("[%s] text is required", handler.ErrInvalidParam)
 			}
 			query := sessionSemanticQueryFromTextInput(input)
+			var matchedElement map[string]any
+			resolvedHelperPath := ""
+			if semanticQueryNeedsTreeLookup(query) {
+				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query)
+				if err != nil {
+					return SessionSemanticElementOutput{}, err
+				}
+				if matchedElement == nil {
+					return SessionSemanticElementOutput{
+						Session:    record,
+						HelperPath: resolvedHelperPath,
+						App:        input.App,
+						Query:      sessionSemanticQueryFromTextInput(input),
+						Error:      fmt.Sprintf("Element not found in %s", input.App),
+					}, nil
+				}
+			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
@@ -1650,7 +1754,11 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+			out := sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed))
+			if out.Element == nil && matchedElement != nil {
+				out.Element = matchedElement
+			}
+			return out, nil
 		},
 	)
 	setText.Category = "desktop"
@@ -1668,6 +1776,25 @@ exec kwin_wayland --virtual --no-lockscreen
 				return SessionSemanticElementOutput{}, fmt.Errorf("[%s] value is required", handler.ErrInvalidParam)
 			}
 			query := sessionSemanticQueryFromValueInput(input)
+			var matchedElement map[string]any
+			resolvedHelperPath := ""
+			if semanticQueryNeedsTreeLookup(query) {
+				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query)
+				if err != nil {
+					return SessionSemanticElementOutput{}, err
+				}
+				if matchedElement == nil {
+					return SessionSemanticElementOutput{
+						Session:    record,
+						HelperPath: resolvedHelperPath,
+						App:        input.App,
+						Query:      sessionSemanticQueryFromValueInput(input),
+						Error:      fmt.Sprintf("Element not found in %s", input.App),
+					}, nil
+				}
+			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
@@ -1677,7 +1804,11 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+			out := sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed))
+			if out.Element == nil && matchedElement != nil {
+				out.Element = matchedElement
+			}
+			return out, nil
 		},
 	)
 	setValue.Category = "desktop"
@@ -1768,13 +1899,30 @@ exec kwin_wayland --virtual --no-lockscreen
 				States: input.States,
 				Exact:  input.Exact,
 			}
-			args, err := semanticQueryArgs(query)
-			if err != nil {
-				return SessionSemanticElementOutput{}, err
-			}
 			timeout := input.Timeout
 			if timeout <= 0 {
 				timeout = 5
+			}
+			if semanticQueryNeedsTreeLookup(query) {
+				resolvedQuery, matchedElement, helperPath, errorText, err := semanticWaitForQueryWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query, timeout)
+				if err != nil {
+					return SessionSemanticElementOutput{}, err
+				}
+				return SessionSemanticElementOutput{
+					Session:    record,
+					HelperPath: helperPath,
+					App:        query.App,
+					Query:      resolvedQuery,
+					Matched:    matchedElement != nil,
+					Element:    matchedElement,
+					Error:      errorText,
+				}, nil
+			}
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticElementOutput{}, err
 			}
 			args = append(args, "--timeout", fmt.Sprintf("%d", timeout))
 			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"wait"}, args...)...)
@@ -1796,6 +1944,25 @@ exec kwin_wayland --virtual --no-lockscreen
 				return SessionSemanticElementOutput{}, err
 			}
 			query := sessionSemanticQuery(input)
+			var matchedElement map[string]any
+			resolvedHelperPath := ""
+			if semanticQueryNeedsTreeLookup(query) {
+				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query)
+				if err != nil {
+					return SessionSemanticElementOutput{}, err
+				}
+				if matchedElement == nil {
+					return SessionSemanticElementOutput{
+						Session:    record,
+						HelperPath: resolvedHelperPath,
+						App:        input.App,
+						Query:      sessionSemanticQuery(input),
+						Error:      fmt.Sprintf("Element not found in %s", input.App),
+					}, nil
+				}
+			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
@@ -1804,7 +1971,11 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+			out := sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed))
+			if out.Element == nil && matchedElement != nil {
+				out.Element = matchedElement
+			}
+			return out, nil
 		},
 	)
 	clickElement.Category = "desktop"
@@ -1827,6 +1998,33 @@ exec kwin_wayland --virtual --no-lockscreen
 				States: input.States,
 				Exact:  input.Exact,
 			}
+			var matchedElement map[string]any
+			resolvedHelperPath := ""
+			if semanticQueryNeedsTreeLookup(query) {
+				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, func(ctx context.Context, args ...string) (any, string, error) {
+					return runDesktopSessionSemanticHelper(ctx, record, args...)
+				}, query)
+				if err != nil {
+					return SessionSemanticElementOutput{}, err
+				}
+				if matchedElement == nil {
+					return SessionSemanticElementOutput{
+						Session:    record,
+						HelperPath: resolvedHelperPath,
+						App:        input.App,
+						Query: desktopSemanticQueryInput{
+							App:    input.App,
+							Name:   input.Name,
+							Role:   input.Role,
+							Ref:    input.Ref,
+							Path:   input.Path,
+							States: input.States,
+							Exact:  input.Exact,
+						},
+						Error: fmt.Sprintf("Element not found in %s", input.App),
+					}, nil
+				}
+			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
@@ -1838,7 +2036,11 @@ exec kwin_wayland --virtual --no-lockscreen
 			if err != nil {
 				return SessionSemanticElementOutput{}, err
 			}
-			return sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed)), nil
+			out := sessionSemanticElementFromResult(record, helperPath, query, semanticMapValue(parsed))
+			if out.Element == nil && matchedElement != nil {
+				out.Element = matchedElement
+			}
+			return out, nil
 		},
 	)
 	invokeAction.Category = "desktop"

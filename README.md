@@ -85,6 +85,8 @@ claude mcp call dotfiles dotfiles_workspace_scene '{}'
 # Derive semantic form fields and preview a batch fill plan
 claude mcp call dotfiles desktop_form_fields '{"app":"Firefox","include_actions":true}'
 claude mcp call dotfiles desktop_fill_form '{"app":"Firefox","preview":true,"fields":[{"name":"Email","text":"user@example.com"}]}'
+claude mcp call dotfiles desktop_find '{"app":"Firefox","name":"Email","role":"entry"}'
+claude mcp call dotfiles session_wait_for_element '{"session_id":"session-123","app":"Firefox","name":"Email","role":"entry","timeout":5}'
 
 # Enumerate tracked session handles and inspect one session before driving it
 claude mcp call dotfiles session_list '{}'

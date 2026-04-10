@@ -22,6 +22,8 @@ Semantic desktop workflows now have dedicated form surfaces in `desktop_form_fie
 
 Tracked-session workflows now expose `session_list`, `session_wait_ready`, `session_status`, `session_list_apps`, and `session_read_log`, so saved handles can be enumerated, readiness can be proven before interaction, visible AT-SPI targets can be discovered without shell reconstruction, and compositor logs can be tailed directly before escalating to semantic or input automation.
 
+Name-based semantic targeting now resolves relation labels, placeholder text, descriptions, and common ARIA/accessible attributes before falling back to raw AT-SPI names, which materially improves Electron/Chromium-heavy surfaces without changing the public tool inventory.
+
 ## Planned
 
 ### Phase 2 — Product Expansion
