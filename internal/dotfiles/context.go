@@ -209,10 +209,10 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 						URI:      "dotfiles://workflows/workstation-diagnose",
 						MIMEType: "text/markdown",
 						Text: strings.Join([]string{
-							"1. Start with `system_health_check` to establish whether the symptom is machine-wide.",
-							"2. Use targeted reads such as `system_info`, `system_updates`, `system_disk`, or `system_memory` to isolate the failing subsystem.",
+							"1. Start with `dotfiles_workstation_diagnostics` to capture a publishable machine, desktop, and rice snapshot in one pass.",
+							"2. Use `system_health_check` plus targeted reads such as `system_info`, `system_updates`, `system_disk`, or `system_memory` to isolate machine-wide pressure.",
 							"3. Use `systemd_failed` when background services may be the cause.",
-							"4. Use `dotfiles_rice_check` only when the failure looks desktop-specific rather than machine-wide.",
+							"4. Use `dotfiles_desktop_status` or `dotfiles_rice_check` only when the failure looks desktop-specific rather than machine-wide.",
 						}, "\n"),
 					},
 				}, nil
@@ -565,7 +565,7 @@ func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
 				}
 				return mcp.NewGetPromptResult("Diagnose workstation issue", []mcp.PromptMessage{
 					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
-						"Diagnose this workstation issue: %q. Start with `system_health_check` to classify whether the problem is machine-wide. Use targeted reads such as `system_info`, `system_updates`, `system_disk`, or `system_memory` to isolate the subsystem. Use `systemd_failed` if background services may be involved, and only then narrow to desktop-specific reads like `dotfiles_rice_check` if needed.",
+						"Diagnose this workstation issue: %q. Start with `dotfiles_workstation_diagnostics` to capture a publishable machine, desktop, and rice snapshot. Use `system_health_check` plus targeted reads such as `system_info`, `system_updates`, `system_disk`, or `system_memory` to isolate the subsystem. Use `systemd_failed` if background services may be involved, and only then narrow to desktop-specific reads like `dotfiles_desktop_status` or `dotfiles_rice_check` if needed.",
 						symptom,
 					))),
 				}), nil
