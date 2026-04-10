@@ -124,6 +124,8 @@ The canonical source treats the committed snapshot bundle as the public surface 
 - `make contract-check` verifies the checked-in artifacts match the live registry
 - `make contract-diff` summarizes surface deltas against a base ref
 - `make publish-check` runs vet, tests, contract validation, and release-parity checks together
+- `make host-smoke` checks Hyprland, semantic AT-SPI, session clipboard/screenshot/runtime prerequisites, device basics, and GitHub CLI availability; `make host-smoke-strict` turns missing and skipped checks into failures for prepared runners
+- The publish-guard and release workflows emit `make contract-diff` summaries into CI step summaries and uploaded artifacts; the release workflow also appends the diff into the GitHub release body
 
 Exact per-tool counts should come from the snapshot bundle rather than prose. The current surface domains include:
 

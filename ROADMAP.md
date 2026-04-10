@@ -6,18 +6,20 @@ dotfiles-mcp is now a discovery-first workstation MCP surface with committed con
 
 The server remains stdio-first, built on mcpkit, and defaults to deferred loading outside the discovery surface. Batch workflows still default to dry-run where live mutation would be risky.
 
+Publish guard and release automation now emit contract-diff summaries into CI artifacts and step summaries, and the release flow appends the same diff into the GitHub release body so public surface changes stay visible at publish time.
+
+Host smoke now covers Hyprland, semantic AT-SPI import readiness, session clipboard and screenshot prerequisites, and strict skip handling so prepared runners can turn missing runtime context into hard failures when needed.
+
 ## Planned
 
 ### Phase 1 — Publish And Mirror Hygiene
 - Automate canonical-to-standalone carry-forward for the embedded `dotfiles/mcp/dotfiles-mcp` module so publish-mirror updates stop depending on manual drift cleanup
-- Publish contract diff summaries into release notes and docs whenever `snapshots/contract/` changes
-- Promote the committed `publish-check`, `host-smoke`, and release-parity workflows into the standalone mirror so GitHub releases enforce the same gate set
 
 ### Phase 2 — Surface Quality And Verification
 - Add targeted integration tests for Bluetooth, juhradial-mx, and desktop-control readiness paths that currently depend on workstation state
 - Expand resource and prompt coverage tests so the contract bundle fails loudly when workflow catalogs drift
 - Add higher-signal validation for profile-specific eager/deferred loading behavior, especially `desktop` and `ops`
-- Add AT-SPI host smoke and richer semantic desktop fixtures so `desktop_snapshot`, `desktop_find`, `desktop_focus`, `desktop_read_value`, and `desktop_set_text` can be exercised outside the main workstation
+- Add richer semantic desktop fixtures so `desktop_snapshot`, `desktop_find`, `desktop_focus`, `desktop_read_value`, and `desktop_set_text` can be exercised outside the main workstation
 - Add stronger session-fixture coverage for live handles and KWin virtual-session startup, semantic inspection/action/value flows, screenshots, and clipboard flows
 
 ### Phase 3 — Product Expansion

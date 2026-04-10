@@ -28,12 +28,84 @@ declare -a lines=()
 failures=0
 missing=0
 
+sanitize_detail() {
+  local path="$1"
+  local text=""
+  if [[ -f "$path" ]]; then
+    text="$(tr '\n' ' ' <"$path" | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')"
+  fi
+  printf '%.160s' "$text"
+}
+
+check_help_line() {
+  local cmd="$1"
+  local tmp="/tmp/dotfiles-mcp-help.$$"
+  "$cmd" --help >"$tmp" 2>&1 || "$cmd" -h >"$tmp" 2>&1 || true
+  head -n 1 "$tmp" || true
+  rm -f "$tmp"
+}
+
+check_wtype_help() {
+  local tmp="/tmp/dotfiles-mcp-wtype.$$"
+  wtype --help >"$tmp" 2>&1 || true
+  head -n 1 "$tmp" || true
+  rm -f "$tmp"
+}
+
+check_juhradial_config() {
+  local base
+  for base in "${DOTFILES_DIR:-}" "$HOME/hairglasses-studio/dotfiles" "/home/hg/hairglasses-studio/dotfiles"; do
+    if [[ -n "$base" && -f "$base/juhradial/config.json" ]]; then
+      echo "present:$base/juhradial/config.json"
+      return 0
+    fi
+  done
+  echo "SKIP: juhradial config path not found"
+}
+
+check_dbus_session() {
+  if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    echo "DBUS_SESSION_BUS_ADDRESS present"
+    return 0
+  fi
+  echo "SKIP: DBUS_SESSION_BUS_ADDRESS not detected"
+}
+
+check_wayland_display() {
+  if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY}"
+    return 0
+  fi
+  echo "SKIP: WAYLAND_DISPLAY not detected"
+}
+
+check_hyprctl_session() {
+  if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    echo "SKIP: hyprland session not active"
+    return 0
+  fi
+  hyprctl version
+}
+
+check_pyatspi() {
+  local tmp="/tmp/dotfiles-mcp-pyatspi.$$"
+  if python3 -c "import pyatspi; print('pyatspi import ok')" >"$tmp" 2>&1; then
+    head -n 1 "$tmp" || true
+  else
+    local detail
+    detail="$(sanitize_detail "$tmp")"
+    echo "SKIP: pyatspi import failed: ${detail:-unknown}"
+  fi
+  rm -f "$tmp"
+}
+
 run_check() {
   local group="$1"
   local name="$2"
   local probe="$3"
   local binary="${4:-}"
   local status detail
+  local tmp="/tmp/dotfiles-mcp-host-smoke.$$"
 
   if [[ -n "$binary" ]] && ! command -v "$binary" >/dev/null 2>&1; then
     status="missing"
@@ -42,35 +114,43 @@ run_check() {
     if [[ $strict_missing -eq 1 ]]; then
       ((failures+=1))
     fi
-  elif eval "$probe" >/tmp/dotfiles-mcp-host-smoke.$$ 2>&1; then
-    detail="$(tr '\n' ' ' </tmp/dotfiles-mcp-host-smoke.$$ | sed 's/[[:space:]]\\+/ /g' | sed 's/^ //; s/ $//')"
-      detail="${detail:0:160}"
-      if [[ "$detail" == SKIP:* ]]; then
-        status="skip"
-        detail="${detail#SKIP: }"
-        if [[ $strict_skip -eq 1 ]]; then
-          ((failures+=1))
-        fi
-      else
-        status="ok"
+  elif eval "$probe" >"$tmp" 2>&1; then
+    detail="$(sanitize_detail "$tmp")"
+    if [[ "$detail" == SKIP:* ]]; then
+      status="skip"
+      detail="${detail#SKIP: }"
+      if [[ $strict_skip -eq 1 ]]; then
+        ((failures+=1))
       fi
+    else
+      status="ok"
+    fi
   else
     status="fail"
-    detail="$(tr '\n' ' ' </tmp/dotfiles-mcp-host-smoke.$$ | sed 's/[[:space:]]\\+/ /g' | sed 's/^ //; s/ $//')"
-    detail="${detail:0:160}"
+    detail="$(sanitize_detail "$tmp")"
     ((failures+=1))
   fi
 
   lines+=("$group|$name|$status|$detail")
-  rm -f /tmp/dotfiles-mcp-host-smoke.$$ || true
+  rm -f "$tmp" || true
 }
 
-run_check "hyprland" "hyprctl" "[ -n \"${HYPRLAND_INSTANCE_SIGNATURE:-}\" ] || { echo 'SKIP: hyprland session not active'; exit 0; }; hyprctl version" "hyprctl"
+run_check "hyprland" "hyprctl" "check_hyprctl_session" "hyprctl"
 run_check "hyprland" "ydotool" "ydotool --help | head -n 1" "ydotool"
-run_check "hyprland" "wtype" "wtype --help >/tmp/dotfiles-mcp-wtype.$$ 2>&1 || true; head -n 1 /tmp/dotfiles-mcp-wtype.$$; rm -f /tmp/dotfiles-mcp-wtype.$$; exit 0" "wtype"
+run_check "hyprland" "wtype" "check_wtype_help" "wtype"
+run_check "semantic" "python3" "python3 --version | head -n 1" "python3"
+run_check "semantic" "pyatspi" "check_pyatspi" "python3"
+run_check "semantic" "session bus" "check_dbus_session"
+run_check "session" "dbus-run-session" "check_help_line dbus-run-session" "dbus-run-session"
+run_check "session" "wayland-info" "check_help_line wayland-info" "wayland-info"
+run_check "session" "grim" "check_help_line grim" "grim"
+run_check "session" "wl-copy" "check_help_line wl-copy" "wl-copy"
+run_check "session" "wl-paste" "check_help_line wl-paste" "wl-paste"
+run_check "session" "kwin_wayland" "check_help_line kwin_wayland" "kwin_wayland"
+run_check "session" "wayland display" "check_wayland_display"
 run_check "bluetooth" "bluetoothctl" "bluetoothctl --version" "bluetoothctl"
 run_check "input" "busctl" "busctl --version | head -n 1" "busctl"
-run_check "input" "juhradial config" "for base in \"${DOTFILES_DIR:-}\" \"$HOME/hairglasses-studio/dotfiles\" \"/home/hg/hairglasses-studio/dotfiles\"; do if [[ -n \"$base\" && -f \"$base/juhradial/config.json\" ]]; then echo present:\"$base/juhradial/config.json\"; exit 0; fi; done; echo 'SKIP: juhradial config path not found'; exit 0"
+run_check "input" "juhradial config" "check_juhradial_config"
 run_check "github" "gh" "gh --version | head -n 1" "gh"
 run_check "github" "git" "git --version" "git"
 
