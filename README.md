@@ -1,4 +1,4 @@
-> **Consolidated** — This repo has been merged into [hairglasses-studio/dotfiles](https://github.com/hairglasses-studio/dotfiles) at `mcp/dotfiles-mcp/`. The dotfiles version has 99 tools (vs 82 here) and is actively maintained. For new development, use the consolidated version.
+> **Consolidated** — This repo has been merged into [hairglasses-studio/dotfiles](https://github.com/hairglasses-studio/dotfiles) at `mcp/dotfiles-mcp/`. The dotfiles version remains the canonical source of truth and is actively maintained. For new development, use the consolidated version.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/hairglasses-studio/dotfiles-mcp.svg)](https://pkg.go.dev/github.com/hairglasses-studio/dotfiles-mcp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/hairglasses-studio/dotfiles-mcp)](https://goreportcard.com/report/github.com/hairglasses-studio/dotfiles-mcp)
@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
-MCP server for desktop environment management -- Hyprland, Ghostty shaders, Bluetooth, MIDI, input devices, GitHub org lifecycle, fleet auditing, and open-source readiness scoring. 90 tools across 15 modules.
+MCP server for desktop environment management -- Hyprland, Ghostty shaders, Bluetooth, MIDI, input devices, GitHub org lifecycle, GitHub Stars taxonomy workflows, fleet auditing, and open-source readiness scoring.
 
 Canonical development lives in [`hairglasses-studio/dotfiles`](https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp) under `dotfiles/mcp/dotfiles-mcp`. The standalone [`dotfiles-mcp`](https://github.com/hairglasses-studio/dotfiles-mcp) repo is a publish mirror kept in parity for installation and discovery.
 
@@ -61,6 +61,16 @@ claude mcp call dotfiles dotfiles_tool_catalog '{}'
 claude mcp call dotfiles dotfiles_rice_check '{}'
 ```
 
+GitHub Stars workflow examples:
+
+```bash
+# Summarize managed GitHub Stars coverage
+claude mcp call dotfiles dotfiles_gh_stars_summary '{"managed_list_prefix":"MCP / "}'
+
+# List current GitHub star folders with items
+claude mcp call dotfiles dotfiles_gh_star_lists_list '{"include_items":true}'
+```
+
 ## Loading Profiles
 
 Control how many tools load at startup via `DOTFILES_MCP_PROFILE`:
@@ -105,6 +115,7 @@ Set in your MCP config:
 
 - All batch tools use **dry-run by default** -- pass `execute: true` for live mode
 - Composed "tool-of-tools" (`full_sync`, `fleet_audit`, `cascade_reload`, `rice_check`, `bulk_pipeline`) eliminate multi-step token waste
+- GitHub Stars helpers prefer `GITHUB_PAT` from `~/.env`, then existing shell env, then `gh auth token`
 - `clean_stale` checks for uncommitted/unpushed work before deletion
 - `pull_all` detects dirty repos and detached HEAD, skips safely
 
