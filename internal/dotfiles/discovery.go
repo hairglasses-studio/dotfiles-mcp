@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -133,6 +134,8 @@ type dotfilesDesktopStatusOutput struct {
 	Screenshot      dotfilesDesktopCapability `json:"screenshot"`
 	OCR             dotfilesDesktopCapability `json:"ocr"`
 	Input           dotfilesDesktopCapability `json:"input"`
+	Accessibility   dotfilesDesktopCapability `json:"accessibility"`
+	DesktopSession  dotfilesDesktopCapability `json:"desktop_session"`
 	Eww             dotfilesDesktopCapability `json:"eww"`
 	Notifications   dotfilesDesktopCapability `json:"notifications"`
 	Terminal        dotfilesDesktopCapability `json:"terminal"`
@@ -336,7 +339,7 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 
 	desktopStatus := handler.TypedHandler[dotfilesDesktopStatusInput, dotfilesDesktopStatusOutput](
 		"dotfiles_desktop_status",
-		"Report desktop control readiness, including Hyprland, screenshot/OCR, input injection, and the kitty-to-ghostty terminal shader pipeline.",
+		"Report desktop control readiness, including Hyprland, AT-SPI semantic targeting, session helpers, screenshot/OCR, input injection, and the kitty-to-ghostty terminal shader pipeline.",
 		func(_ context.Context, _ dotfilesDesktopStatusInput) (dotfilesDesktopStatusOutput, error) {
 			runtimeDir := dotfilesRuntimeDir()
 			waylandDisplay := dotfilesWaylandDisplay(runtimeDir)
@@ -456,6 +459,72 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 			} else {
 				inputMissing = append(inputMissing, "wtype")
 				missingCommands = append(missingCommands, "wtype")
+			}
+
+			accessibilityMissing := make([]string, 0)
+			accessibilityDetails := make([]string, 0)
+			if hasCmd("python3") {
+				accessibilityDetails = append(accessibilityDetails, "python3 available")
+			} else {
+				accessibilityMissing = append(accessibilityMissing, "python3")
+				missingCommands = append(missingCommands, "python3")
+			}
+			if helperPath, err := dotfilesSemanticHelperPath(); err == nil {
+				accessibilityDetails = append(accessibilityDetails, "embedded AT-SPI helper present at "+helperPath)
+			} else {
+				accessibilityMissing = append(accessibilityMissing, "embedded AT-SPI helper")
+				accessibilityDetails = append(accessibilityDetails, err.Error())
+			}
+			if hasCmd("python3") {
+				cmd := exec.Command("python3", "-c", "import pyatspi")
+				if out, err := cmd.CombinedOutput(); err == nil {
+					accessibilityDetails = append(accessibilityDetails, "pyatspi import succeeded")
+				} else {
+					accessibilityMissing = append(accessibilityMissing, "pyatspi")
+					accessibilityDetails = append(accessibilityDetails, "pyatspi import failed: "+strings.TrimSpace(string(out)))
+				}
+			}
+			if os.Getenv("DBUS_SESSION_BUS_ADDRESS") != "" {
+				accessibilityDetails = append(accessibilityDetails, "DBUS_SESSION_BUS_ADDRESS present")
+			} else {
+				accessibilityDetails = append(accessibilityDetails, "DBUS_SESSION_BUS_ADDRESS not detected")
+			}
+
+			sessionMissing := make([]string, 0)
+			sessionDetails := make([]string, 0)
+			if hasCmd("wayland-info") {
+				sessionDetails = append(sessionDetails, "wayland-info available")
+			} else {
+				sessionMissing = append(sessionMissing, "wayland-info")
+				missingCommands = append(missingCommands, "wayland-info")
+			}
+			if hasCmd("grim") {
+				sessionDetails = append(sessionDetails, "grim available for session screenshots")
+			} else {
+				sessionMissing = append(sessionMissing, "grim")
+				missingCommands = append(missingCommands, "grim")
+			}
+			if hasCmd("wl-copy") {
+				sessionDetails = append(sessionDetails, "wl-copy available for session clipboard writes")
+			} else {
+				sessionMissing = append(sessionMissing, "wl-copy")
+				missingCommands = append(missingCommands, "wl-copy")
+			}
+			if hasCmd("wl-paste") {
+				sessionDetails = append(sessionDetails, "wl-paste available for session clipboard reads")
+			} else {
+				sessionMissing = append(sessionMissing, "wl-paste")
+				missingCommands = append(missingCommands, "wl-paste")
+			}
+			if hasCmd("kwin_wayland") {
+				sessionDetails = append(sessionDetails, "kwin_wayland available for virtual sessions")
+			} else {
+				sessionDetails = append(sessionDetails, "kwin_wayland not detected; virtual sessions unavailable")
+			}
+			if waylandDisplay != "" {
+				sessionDetails = append(sessionDetails, "live Wayland session detected via "+waylandDisplay)
+			} else {
+				sessionDetails = append(sessionDetails, "live Wayland session not detected")
 			}
 
 			ewwStatus := currentEwwStatus()
@@ -597,6 +666,16 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 					Details: inputDetails,
 					Missing: uniqueSortedStrings(inputMissing),
 				},
+				Accessibility: dotfilesDesktopCapability{
+					Ready:   len(accessibilityMissing) == 0,
+					Details: accessibilityDetails,
+					Missing: uniqueSortedStrings(accessibilityMissing),
+				},
+				DesktopSession: dotfilesDesktopCapability{
+					Ready:   (waylandDisplay != "" || hasCmd("kwin_wayland")) && hasCmd("wayland-info"),
+					Details: sessionDetails,
+					Missing: uniqueSortedStrings(sessionMissing),
+				},
 				Eww: dotfilesDesktopCapability{
 					Ready:   len(ewwMissing) == 0,
 					Details: ewwDetails,
@@ -619,7 +698,7 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				},
 				MissingCommands: uniqueSortedStrings(missingCommands),
 			}
-			if !(output.Hyprland.Ready && output.Shell.Ready && output.Screenshot.Ready && output.OCR.Ready && output.Input.Ready && output.Eww.Ready && output.Notifications.Ready && output.Terminal.Ready && output.Shader.Ready) {
+			if !(output.Hyprland.Ready && output.Shell.Ready && output.Screenshot.Ready && output.OCR.Ready && output.Input.Ready && output.Accessibility.Ready && output.DesktopSession.Ready && output.Eww.Ready && output.Notifications.Ready && output.Terminal.Ready && output.Shader.Ready) {
 				output.Status = "degraded"
 			}
 			return output, nil
@@ -706,6 +785,8 @@ func dotfilesModules() []registry.ToolModule {
 		&EwwDesktopModule{},
 		&InputSimulateModule{},
 		&DesktopInteractModule{},
+		&DesktopSemanticModule{},
+		&DesktopSessionModule{},
 		&ClaudeSessionModule{},
 		&PromptRegistryModule{},
 		&SandboxModule{},
@@ -768,6 +849,7 @@ func isDesktopProfileTool(name string) bool {
 		strings.HasPrefix(name, "kitty_"),
 		strings.HasPrefix(name, "screen_"),
 		strings.HasPrefix(name, "desktop_"),
+		strings.HasPrefix(name, "session_"),
 		strings.HasPrefix(name, "shader_"),
 		strings.HasPrefix(name, "clipboard_"),
 		strings.HasPrefix(name, "notify_"),

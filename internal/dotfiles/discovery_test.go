@@ -64,13 +64,20 @@ func TestShouldDeferDotfilesTool(t *testing.T) {
 
 		// desktop profile: desktop control surfaces eager, non-desktop deferred
 		{"desktop", "hypr_list_windows", false},
+		{"desktop", "screen_screenshot", false},
+		{"desktop", "desktop_find_text", false},
+		{"desktop", "desktop_snapshot", false},
+		{"desktop", "desktop_project_open", false},
+		{"desktop", "session_connect", false},
 		{"desktop", "shader_status", false},
+		{"desktop", "input_type_text", false},
 		{"desktop", "dotfiles_rice_check", false},
-		{"desktop", "dotfiles_eww_status", false},
-		{"desktop", "input_status", false},
+		{"desktop", "hypr_monitor_preset_list", false},
+		{"desktop", "dotfiles_eww_inspect", false},
+		{"desktop", "dotfiles_fleet_audit", true},
 		{"desktop", "bt_connect", true},
 		{"desktop", "midi_list_devices", true},
-		{"desktop", "dotfiles_fleet_audit", true},
+		{"desktop", "system_info", true},
 
 		// ops profile: dotfiles_, workflow_, oss_ are NOT deferred
 		{"ops", "dotfiles_validate_config", false},
@@ -167,10 +174,16 @@ func TestRegisterDotfilesModules_DesktopProfile(t *testing.T) {
 
 	for _, toolName := range []string{
 		"hypr_list_windows",
+		"screen_screenshot",
+		"desktop_find_text",
+		"desktop_snapshot",
+		"desktop_project_open",
+		"session_connect",
 		"shader_status",
+		"input_type_text",
 		"dotfiles_rice_check",
-		"dotfiles_eww_status",
-		"input_status",
+		"hypr_monitor_preset_list",
+		"dotfiles_eww_inspect",
 	} {
 		if reg.IsDeferred(toolName) {
 			t.Fatalf("%s should NOT be deferred in desktop profile", toolName)
@@ -180,6 +193,7 @@ func TestRegisterDotfilesModules_DesktopProfile(t *testing.T) {
 		"dotfiles_fleet_audit",
 		"bt_connect",
 		"midi_list_devices",
+		"system_info",
 	} {
 		if !reg.IsDeferred(toolName) {
 			t.Fatalf("%s should be deferred in desktop profile", toolName)
@@ -355,6 +369,19 @@ func TestServerHealth_WithSurfaceRegistries(t *testing.T) {
 	}
 	if out.PromptCount == 0 {
 		t.Fatal("expected non-zero prompt count")
+	}
+	if out.WorkflowCount != 9 {
+		t.Fatalf("expected 9 workflows, got %d", out.WorkflowCount)
+	}
+	if out.SkillCount != 5 {
+		t.Fatalf("expected 5 skills, got %d", out.SkillCount)
+	}
+	prioritySummary, ok := out.PrioritySummary.(map[string]any)
+	if !ok {
+		t.Fatalf("expected priority summary map, got %T", out.PrioritySummary)
+	}
+	if got, ok := prioritySummary["missing_front_door_count"].(float64); !ok || int(got) != 0 {
+		t.Fatalf("expected zero missing front doors in priority summary, got %#v", prioritySummary["missing_front_door_count"])
 	}
 	if len(out.DiscoveryTools) != 6 {
 		t.Fatalf("expected 6 discovery tools, got %d", len(out.DiscoveryTools))
