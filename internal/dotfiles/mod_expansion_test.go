@@ -10,8 +10,8 @@ import (
 func TestDesktopSemanticModuleRegistration(t *testing.T) {
 	m := &DesktopSemanticModule{}
 	tools := m.Tools()
-	if len(tools) != 8 {
-		t.Fatalf("expected 8 semantic tools, got %d", len(tools))
+	if len(tools) != 9 {
+		t.Fatalf("expected 9 semantic tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -23,6 +23,7 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 		"desktop_target_windows",
 		"desktop_find",
 		"desktop_click",
+		"desktop_act",
 		"desktop_wait_for_element",
 		"desktop_type",
 		"desktop_key",
@@ -37,8 +38,8 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 func TestDesktopSessionModuleRegistration(t *testing.T) {
 	m := &DesktopSessionModule{}
 	tools := m.Tools()
-	if len(tools) != 11 {
-		t.Fatalf("expected 11 session tools, got %d", len(tools))
+	if len(tools) != 18 {
+		t.Fatalf("expected 18 session tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -57,6 +58,13 @@ func TestDesktopSessionModuleRegistration(t *testing.T) {
 		"session_clipboard_set",
 		"session_wayland_info",
 		"session_read_app_log",
+		"session_accessibility_tree",
+		"session_find_ui_element",
+		"session_wait_for_element",
+		"session_click_element",
+		"session_invoke_action",
+		"session_type_text",
+		"session_dbus_call",
 	} {
 		if !srv.HasTool(want) {
 			t.Errorf("missing tool: %s", want)
