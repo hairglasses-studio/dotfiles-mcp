@@ -233,6 +233,10 @@
       "description": "Find a semantic element by app plus name, role, states, ref, or a previously returned path."
     },
     {
+      "name": "desktop_find_all",
+      "description": "Find all semantic elements matching an app plus name, role, states, ref, or path."
+    },
+    {
       "name": "desktop_find_text",
       "description": "Screenshot + OCR + locate text on screen. Returns bounding box coordinates in desktop space suitable for ydotool. Use to find where a button or label appears before clicking."
     },
@@ -1269,6 +1273,10 @@
       "description": "Find a semantic UI element inside a tracked session by app plus name, role, states, ref, or path."
     },
     {
+      "name": "session_find_ui_elements",
+      "description": "Find all semantic UI elements inside a tracked session that match the app plus name, role, states, ref, or path query."
+    },
+    {
       "name": "session_focus_window",
       "description": "Focus a window inside a Hyprland-backed session by address, class, or title substring."
     },
@@ -1282,7 +1290,7 @@
     },
     {
       "name": "session_list_windows",
-      "description": "List windows for a Hyprland-backed session. Returns an unsupported note for non-Hyprland sessions."
+      "description": "List windows for a tracked session. Hyprland-backed sessions use hyprctl; other sessions fall back to AT-SPI window discovery."
     },
     {
       "name": "session_read_app_log",
@@ -1516,7 +1524,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 370,
+  "tool_count": 372,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [

@@ -402,6 +402,18 @@
     "deferred": true
   },
   {
+    "name": "desktop_find_all",
+    "description": "Find all semantic elements matching an app plus name, role, states, ref, or path.",
+    "category": "desktop",
+    "search_terms": [
+      "find all semantic elements",
+      "list matching buttons",
+      "at-spi multiple matches"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "desktop_find_text",
     "description": "Screenshot + OCR + locate text on screen. Returns bounding box coordinates in desktop space suitable for ydotool. Use to find where a button or label appears before clicking.",
     "category": "desktop_interact",
@@ -2567,6 +2579,18 @@
     "deferred": true
   },
   {
+    "name": "session_find_ui_elements",
+    "description": "Find all semantic UI elements inside a tracked session that match the app plus name, role, states, ref, or path query.",
+    "category": "desktop",
+    "search_terms": [
+      "session find elements",
+      "session multi match",
+      "session at-spi matches"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "session_focus_window",
     "description": "Focus a window inside a Hyprland-backed session by address, class, or title substring.",
     "category": "desktop",
@@ -2604,7 +2628,7 @@
   },
   {
     "name": "session_list_windows",
-    "description": "List windows for a Hyprland-backed session. Returns an unsupported note for non-Hyprland sessions.",
+    "description": "List windows for a tracked session. Hyprland-backed sessions use hyprctl; other sessions fall back to AT-SPI window discovery.",
     "category": "desktop",
     "search_terms": [
       "session windows",
