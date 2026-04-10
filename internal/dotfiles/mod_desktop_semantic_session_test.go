@@ -104,7 +104,7 @@ case "$cmd" in
     printf '%s\n' '{"windows":[{"name":"Fixture Window","ref":"ref_0","path":"0","bounds":{"x":10,"y":20,"width":800,"height":600},"app":{"name":"Fixture App"}}]}'
     ;;
   get_tree)
-    printf '%s\n' '{"tree":{"name":"Fixture Window","role":"frame","ref":"ref_0","path":"0","children":[{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"},{"name":"Name","role":"entry","ref":"ref_0_1","path":"0/1","value":"fixture-text","value_kind":"text"}]}}'
+    printf '%s\n' '{"tree":{"name":"Fixture Window","role":"frame","ref":"ref_0","path":"0","children":[{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0","actions":["press"]},{"name":"","role":"entry","ref":"ref_0_1","path":"0/1","value":"fixture-text","value_kind":"text","relations":{"labelled by":["Full Name"]},"attributes":{"placeholder":"Type full name"}},{"name":"Volume","role":"slider","ref":"ref_0_2","path":"0/2","value":5,"value_kind":"numeric"},{"name":"Accept Terms","role":"check box","ref":"ref_0_3","path":"0/3"},{"name":"Submit","role":"push button","ref":"ref_0_4","path":"0/4","actions":["press"]}]}}'
     ;;
   find)
     printf '%s\n' '{"matched":true,"element":{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"}}'
@@ -537,6 +537,84 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 	}
 }
 
+func TestDesktopSemanticFormTools(t *testing.T) {
+	stateDir := t.TempDir()
+	binDir := t.TempDir()
+	origPath := os.Getenv("PATH")
+
+	writeSemanticFixturePython(t, binDir)
+
+	t.Setenv("XDG_STATE_HOME", stateDir)
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
+	t.Setenv("WAYLAND_DISPLAY", "wayland-fixture")
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/fixture-bus")
+
+	formFieldsResult := callDesktopSemanticTool(t, "desktop_form_fields", map[string]any{
+		"app":             "Fixture App",
+		"include_actions": true,
+	})
+	if formFieldsResult == nil || formFieldsResult.IsError {
+		t.Fatalf("expected successful desktop_form_fields result, got %q", extractTextFromResult(t, formFieldsResult))
+	}
+	var fieldsOut desktopSemanticFormFieldsOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, formFieldsResult)), &fieldsOut); err != nil {
+		t.Fatalf("unmarshal desktop form fields output: %v", err)
+	}
+	if fieldsOut.Count < 5 {
+		t.Fatalf("expected at least 5 semantic form fields, got %#v", fieldsOut)
+	}
+	foundLabeledEntry := false
+	for _, field := range fieldsOut.Fields {
+		if field.FieldType == "text" && containsString(field.Labels, "Full Name") {
+			foundLabeledEntry = true
+		}
+	}
+	if !foundLabeledEntry {
+		t.Fatalf("expected labelled text field in semantic form fields, got %#v", fieldsOut.Fields)
+	}
+
+	previewResult := callDesktopSemanticTool(t, "desktop_fill_form", map[string]any{
+		"app":     "Fixture App",
+		"preview": true,
+		"fields": []map[string]any{
+			{"name": "Full Name", "text": "patched"},
+			{"name": "Volume", "number": 42},
+			{"name": "Accept Terms", "checked": true},
+			{"name": "Submit", "action": "press"},
+		},
+	})
+	if previewResult == nil || previewResult.IsError {
+		t.Fatalf("expected successful desktop_fill_form preview result, got %q", extractTextFromResult(t, previewResult))
+	}
+	var previewOut desktopSemanticFormFillOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, previewResult)), &previewOut); err != nil {
+		t.Fatalf("unmarshal desktop fill form preview output: %v", err)
+	}
+	if !previewOut.Preview || previewOut.Planned != 4 || previewOut.Applied != 0 {
+		t.Fatalf("unexpected desktop fill form preview output: %#v", previewOut)
+	}
+
+	fillResult := callDesktopSemanticTool(t, "desktop_fill_form", map[string]any{
+		"app": "Fixture App",
+		"fields": []map[string]any{
+			{"name": "Full Name", "text": "patched"},
+			{"name": "Volume", "number": 42},
+			{"name": "Accept Terms", "checked": true},
+			{"name": "Submit", "action": "press"},
+		},
+	})
+	if fillResult == nil || fillResult.IsError {
+		t.Fatalf("expected successful desktop_fill_form result, got %q", extractTextFromResult(t, fillResult))
+	}
+	var fillOut desktopSemanticFormFillOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, fillResult)), &fillOut); err != nil {
+		t.Fatalf("unmarshal desktop fill form output: %v", err)
+	}
+	if fillOut.Matched != 4 || fillOut.Applied != 4 {
+		t.Fatalf("unexpected desktop fill form output: %#v", fillOut)
+	}
+}
+
 func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 	stateDir := t.TempDir()
 	binDir := t.TempDir()
@@ -615,6 +693,64 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 	}
 	if !clicked.Clicked {
 		t.Fatalf("expected clicked result, got %#v", clicked)
+	}
+}
+
+func TestDesktopSessionFormTools(t *testing.T) {
+	stateDir := t.TempDir()
+	binDir := t.TempDir()
+	origPath := os.Getenv("PATH")
+
+	writeSemanticFixturePython(t, binDir)
+
+	t.Setenv("XDG_STATE_HOME", stateDir)
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
+
+	record := saveTestDesktopSessionRecord(t, desktopSessionRecord{
+		ID:                    "session-form-fixture",
+		Name:                  "Form Fixture Session",
+		Backend:               "live_wayland",
+		Status:                "connected",
+		WaylandDisplay:        "wayland-0",
+		XDGRuntimeDir:         t.TempDir(),
+		DBUSSessionBusAddress: "unix:path=/tmp/session-bus",
+	})
+
+	formFieldsResult := callDesktopSessionTool(t, "session_form_fields", map[string]any{
+		"session_id":      record.ID,
+		"app":             "Fixture App",
+		"include_actions": true,
+	})
+	if formFieldsResult == nil || formFieldsResult.IsError {
+		t.Fatalf("expected successful session_form_fields result, got %q", extractTextFromResult(t, formFieldsResult))
+	}
+	var fieldsOut SessionSemanticFormFieldsOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, formFieldsResult)), &fieldsOut); err != nil {
+		t.Fatalf("unmarshal session form fields output: %v", err)
+	}
+	if fieldsOut.Session.ID != record.ID || fieldsOut.Count < 5 {
+		t.Fatalf("unexpected session form fields output: %#v", fieldsOut)
+	}
+
+	fillResult := callDesktopSessionTool(t, "session_fill_form", map[string]any{
+		"session_id": record.ID,
+		"app":        "Fixture App",
+		"fields": []map[string]any{
+			{"name": "Full Name", "text": "patched"},
+			{"name": "Volume", "number": 42},
+			{"name": "Accept Terms", "checked": true},
+			{"name": "Submit", "action": "press"},
+		},
+	})
+	if fillResult == nil || fillResult.IsError {
+		t.Fatalf("expected successful session_fill_form result, got %q", extractTextFromResult(t, fillResult))
+	}
+	var fillOut SessionSemanticFormFillOutput
+	if err := json.Unmarshal([]byte(extractTextFromResult(t, fillResult)), &fillOut); err != nil {
+		t.Fatalf("unmarshal session fill form output: %v", err)
+	}
+	if fillOut.Session.ID != record.ID || fillOut.Matched != 4 || fillOut.Applied != 4 {
+		t.Fatalf("unexpected session fill form output: %#v", fillOut)
 	}
 }
 

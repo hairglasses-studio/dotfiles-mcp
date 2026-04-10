@@ -81,6 +81,69 @@ def safe_bounds(obj):
         return None
 
 
+def safe_attributes(obj):
+    out = {}
+    try:
+        attrs = obj.getAttributes() or []
+    except Exception:
+        return out
+    for raw in attrs:
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if not text:
+            continue
+        for separator in (":", "="):
+            if separator in text:
+                key, value = text.split(separator, 1)
+                key = key.strip()
+                if key:
+                    out[key] = value.strip()
+                break
+        else:
+            out[text] = ""
+    return out
+
+
+def safe_relation_type_name(rel):
+    try:
+        return pyatspi.relation_to_name(rel.getRelationType())
+    except Exception:
+        pass
+    try:
+        return str(rel.getRelationType())
+    except Exception:
+        return "unknown"
+
+
+def safe_relations(obj):
+    out = {}
+    try:
+        relation_set = obj.getRelationSet()
+    except Exception:
+        return out
+    if relation_set is None:
+        return out
+    for rel in relation_set:
+        try:
+            rel_name = safe_relation_type_name(rel)
+            if not rel_name:
+                continue
+            targets = []
+            for idx in range(rel.getNTargets()):
+                target = rel.getTarget(idx)
+                if target is None:
+                    continue
+                name = (getattr(target, "name", None) or "").strip()
+                if name:
+                    targets.append(name)
+            if targets:
+                out[rel_name] = targets
+        except Exception:
+            continue
+    return out
+
+
 def safe_text_interface(obj):
     try:
         return obj.queryText()
@@ -191,6 +254,14 @@ def element_to_dict(obj, path="", depth=0, max_depth=5):
     bounds = safe_bounds(obj)
     if bounds is not None:
         res["bounds"] = bounds
+
+    attributes = safe_attributes(obj)
+    if attributes:
+        res["attributes"] = attributes
+
+    relations = safe_relations(obj)
+    if relations:
+        res["relations"] = relations
 
     res.update(safe_value_fields(obj))
 
