@@ -21,6 +21,16 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev jq
       - name: Validate publish surface
         run: make publish-check
+      - name: Summarize contract diff
+        run: |
+          make contract-diff > .contract-diff.md
+          cat .contract-diff.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload contract diff
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-diff-${{ github.ref_name }}
+          path: .contract-diff.md
+          retention-days: 30
       - name: Run workstation host smoke
         run: make host-smoke
       - uses: goreleaser/goreleaser-action@v6

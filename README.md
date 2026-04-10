@@ -131,6 +131,12 @@ make host-smoke
 # Verify mirror docs + manifest parity for publish
 make release-parity
 
+# Summarize the committed public-surface delta vs the previous ref
+make contract-diff
+
+# Compare the committed mirror bundle against canonical dotfiles/mcp/dotfiles-mcp
+make canonical-drift
+
 # Full publish guard: vet + test + contract + manifest parity
 make publish-check
 ```
@@ -139,15 +145,15 @@ Generated artifacts live under `snapshots/contract/` and `.well-known/mcp.json`.
 
 ## Current Surface
 
-The authoritative publish-mirror contract is generated into `snapshots/contract/` and `.well-known/mcp.json`. The current exported surface is:
+The authoritative publish-mirror contract is generated into `snapshots/contract/` and `.well-known/mcp.json`. Treat those committed artifacts as the source of truth for the live tool, resource, and prompt counts. The current exported surface is:
 
-- 340 tools across 35 modules
-- 24 resources, including 5 resource templates
-- 12 prompt entrypoints
+- a canonical-superset mirror with zero missing canonical tools
+- a small set of standalone-only Arch, Hyprland, and Kitty extensions
 - discovery-first profiles: `default`, `desktop`, `ops`, `full`
 
 High-value additions in the current surface include:
 
+- Canonical carry-forward fixes for notification history entry/clear tools, fleet baseline refresh parity, updated fleet audit semantics, and Kitty-aligned shader helpers
 - Expanded Hyprland IPC coverage: active window/workspace, binds, devices, layers, layouts, config errors, cursor position, option reads, keyword writes, dispatch, notify, property control, and socket2 event capture/wait helpers
 - Kitty runtime control: status, tab/window inventory, config reload, font size, opacity, themes, layouts, titles, send-text, image overlays, and generic remote subcommands
 - Arch Linux research-first operations: ArchWiki search/page reads, official package search/info, AUR search, PKGBUILD auditing, Arch news review, mirror status, update dry runs, pacman log reads, orphan detection, and file-owner inspection

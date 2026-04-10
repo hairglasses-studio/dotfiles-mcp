@@ -52,6 +52,29 @@ type NotifyHistoryInput struct {
 	Limit int `json:"limit,omitempty" jsonschema:"description=Maximum number of notifications to return (0 or omit for all)"`
 }
 
+type NotifyHistoryEntriesInput struct {
+	Limit            int  `json:"limit,omitempty" jsonschema:"description=Maximum number of entries to return. Defaults to 25."`
+	IncludeDismissed bool `json:"include_dismissed,omitempty" jsonschema:"description=Include entries that have already been dismissed or cleared."`
+}
+
+type NotifyHistoryEntriesOutput struct {
+	Entries       []notificationHistoryEntry `json:"entries"`
+	Total         int                        `json:"total"`
+	Visible       int                        `json:"visible"`
+	BackendReady  bool                       `json:"backend_ready"`
+	LogPath       string                     `json:"log_path"`
+	ListenerAlive bool                       `json:"listener_alive"`
+}
+
+type NotifyHistoryClearInput struct {
+	Purge bool `json:"purge,omitempty" jsonschema:"description=When true, remove the stored history entirely instead of marking entries dismissed."`
+}
+
+type NotifyHistoryClearOutput struct {
+	Cleared int  `json:"cleared"`
+	Purged  bool `json:"purged"`
+}
+
 // NotifyDNDInput defines the input for the notify_dnd tool.
 type NotifyDNDInput struct {
 	Action string `json:"action" jsonschema:"required,description=DND action: get (query state) / toggle / on / off,enum=get,enum=toggle,enum=on,enum=off"`
@@ -107,13 +130,83 @@ func (m *NotificationModule) Tools() []registry.ToolDefinition {
 				fmt.Sscanf(countRaw, "%d", &count)
 			}
 
+			entries, _ := readNotificationHistoryEntries()
+			tracked := len(entries)
+			visible := 0
+			for _, entry := range entries {
+				if entry.Visible && !entry.Dismissed {
+					visible++
+				}
+			}
+
 			return map[string]any{
-				"count": count,
-				"dnd":   strings.TrimSpace(dndRaw) == "true",
-				"note":  "swaync does not expose individual notification history via CLI; use notify_count for count and notify_dnd for DND state",
+				"count":                  count,
+				"dnd":                    strings.TrimSpace(dndRaw) == "true",
+				"tracked_entries":        tracked,
+				"tracked_visible":        visible,
+				"history_log_path":       dotfilesNotificationHistoryLogPath(),
+				"history_listener_alive": notificationHistoryListenerRunning(),
+				"note":                   "swaync does not expose individual notification history via CLI; detailed history is provided by the local desktop-control log",
 			}, nil
 		},
 	)
+
+	notifyHistoryEntries := handler.TypedHandler[NotifyHistoryEntriesInput, NotifyHistoryEntriesOutput](
+		"notify_history_entries",
+		"Get the locally logged notification history entries with app, summary, body, urgency, timestamp, and dismissal state.",
+		func(_ context.Context, input NotifyHistoryEntriesInput) (NotifyHistoryEntriesOutput, error) {
+			entries, err := readNotificationHistoryEntries()
+			if err != nil {
+				return NotifyHistoryEntriesOutput{}, err
+			}
+
+			visible := 0
+			filtered := make([]notificationHistoryEntry, 0, len(entries))
+			for i := len(entries) - 1; i >= 0; i-- {
+				entry := entries[i]
+				if entry.Visible && !entry.Dismissed {
+					visible++
+				}
+				if !input.IncludeDismissed && (entry.Dismissed || !entry.Visible) {
+					continue
+				}
+				filtered = append(filtered, entry)
+			}
+
+			limit := input.Limit
+			if limit <= 0 {
+				limit = 25
+			}
+			if len(filtered) > limit {
+				filtered = filtered[:limit]
+			}
+
+			return NotifyHistoryEntriesOutput{
+				Entries:       filtered,
+				Total:         len(entries),
+				Visible:       visible,
+				BackendReady:  pathExists(dotfilesNotificationHistoryListenerPath()) && hasCmd("python3") && hasCmd("dbus-monitor"),
+				LogPath:       dotfilesNotificationHistoryLogPath(),
+				ListenerAlive: notificationHistoryListenerRunning(),
+			}, nil
+		},
+	)
+
+	notifyHistoryClear := handler.TypedHandler[NotifyHistoryClearInput, NotifyHistoryClearOutput](
+		"notify_history_clear",
+		"DESTRUCTIVE: Clear the locally logged notification history. By default entries are marked dismissed; set purge=true to remove them entirely.",
+		func(_ context.Context, input NotifyHistoryClearInput) (NotifyHistoryClearOutput, error) {
+			cleared, err := clearNotificationHistory(input.Purge)
+			if err != nil {
+				return NotifyHistoryClearOutput{}, err
+			}
+			return NotifyHistoryClearOutput{
+				Cleared: cleared,
+				Purged:  input.Purge,
+			}, nil
+		},
+	)
+	notifyHistoryClear.IsWrite = true
 
 	// ── notify_dnd ─────────────────────────────────────────
 	notifyDND := handler.TypedHandler[NotifyDNDInput, NotifyResult](
@@ -176,12 +269,14 @@ func (m *NotificationModule) Tools() []registry.ToolDefinition {
 				if _, err := swayncRunCmd("-C"); err != nil {
 					return NotifyResult{}, fmt.Errorf("failed to dismiss all notifications: %w", err)
 				}
+				_, _ = markNotificationHistoryDismissed(0)
 				return NotifyResult{Result: "All notifications dismissed"}, nil
 
 			case "latest":
 				if _, err := swayncRunCmd("--close-latest"); err != nil {
 					return NotifyResult{}, fmt.Errorf("failed to dismiss latest notification: %w", err)
 				}
+				_, _ = markNotificationHistoryDismissed(1)
 				return NotifyResult{Result: "Latest notification dismissed"}, nil
 
 			default:
@@ -252,6 +347,8 @@ func (m *NotificationModule) Tools() []registry.ToolDefinition {
 
 	return []registry.ToolDefinition{
 		notifyHistory,
+		notifyHistoryEntries,
+		notifyHistoryClear,
 		notifyDND,
 		notifyDismiss,
 		notifyCount,

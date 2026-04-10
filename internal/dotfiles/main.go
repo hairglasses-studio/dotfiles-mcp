@@ -486,28 +486,68 @@ type CreateRepoOutput struct {
 
 // Tool 18: dotfiles_fleet_audit
 
+type FleetBaselineRefreshInput struct {
+	LocalDir string   `json:"local_dir,omitempty" jsonschema:"description=Local directory (default: ~/hairglasses-studio)"`
+	Repos    []string `json:"repos,omitempty" jsonschema:"description=Optional repo names to refresh instead of scanning the whole workspace"`
+}
+
+type RepoBaselineSnapshot struct {
+	Repo                string `json:"repo"`
+	BaselineProfile     string `json:"baseline_profile"`
+	WorkflowPolicy      string `json:"workflow_policy"`
+	WorkflowFamily      string `json:"workflow_family,omitempty"`
+	WorkflowStatus      string `json:"workflow_status,omitempty"`
+	CurrentBranch       string `json:"current_branch,omitempty"`
+	LocalBaselineStatus string `json:"local_baseline_status"`
+	BaselineCheckedAt   string `json:"baseline_checked_at,omitempty"`
+	BaselineCommit      string `json:"baseline_commit,omitempty"`
+	BaselineCommand     string `json:"baseline_command,omitempty"`
+}
+
+type FleetBaselineRefreshOutput struct {
+	Checked   int                    `json:"checked"`
+	Updated   int                    `json:"updated"`
+	CachePath string                 `json:"cache_path"`
+	Repos     []RepoBaselineSnapshot `json:"repos"`
+}
+
 type FleetAuditInput struct {
 	LocalDir string `json:"local_dir,omitempty" jsonschema:"description=Local directory (default: ~/hairglasses-studio)"`
 }
 
 type RepoAuditInfo struct {
-	Name           string `json:"name"`
-	Language       string `json:"language"`
-	GoVersion      string `json:"go_version,omitempty"`
-	CIStatus       string `json:"ci_status"` // pass, fail, running, none
-	TestCount      int    `json:"test_count"`
-	LastCommitDays int    `json:"last_commit_days"`
-	HasPipelineMk  bool   `json:"has_pipeline_mk"`
-	HasCLAUDEmd    bool   `json:"has_claude_md"`
-	HasCI          bool   `json:"has_ci"`
+	Name                string `json:"name"`
+	Language            string `json:"language"`
+	GoVersion           string `json:"go_version,omitempty"`
+	CIStatus            string `json:"ci_status,omitempty"` // compatibility alias for remote_ci_status
+	RemoteCIStatus      string `json:"remote_ci_status"`
+	RemoteCIUpdatedAt   string `json:"remote_ci_updated_at,omitempty"`
+	LocalBaselineStatus string `json:"local_baseline_status"`
+	BaselineProfile     string `json:"baseline_profile,omitempty"`
+	BaselineCheckedAt   string `json:"baseline_checked_at,omitempty"`
+	BaselineCommit      string `json:"baseline_commit,omitempty"`
+	BaselineCommand     string `json:"baseline_command,omitempty"`
+	WorkflowPolicy      string `json:"workflow_policy,omitempty"`
+	WorkflowFamily      string `json:"workflow_family,omitempty"`
+	WorkflowStatus      string `json:"workflow_status,omitempty"`
+	SignalVerdict       string `json:"signal_verdict"`
+	SignalFreshnessDays int    `json:"signal_freshness_days,omitempty"`
+	TestCount           int    `json:"test_count"`
+	LastCommitDays      int    `json:"last_commit_days"`
+	HasPipelineMk       bool   `json:"has_pipeline_mk"`
+	HasCLAUDEmd         bool   `json:"has_claude_md"`
+	HasCI               bool   `json:"has_ci"`
 }
 
 type FleetAuditOutput struct {
-	Total   int             `json:"total"`
-	Passing int             `json:"passing"`
-	Failing int             `json:"failing"`
-	GoRepos int             `json:"go_repos"`
-	Repos   []RepoAuditInfo `json:"repos"`
+	Total      int             `json:"total"`
+	Passing    int             `json:"passing"`
+	Failing    int             `json:"failing"`
+	GoRepos    int             `json:"go_repos"`
+	Stale      int             `json:"stale"`
+	Governance int             `json:"governance"`
+	Unknown    int             `json:"unknown"`
+	Repos      []RepoAuditInfo `json:"repos"`
 }
 
 // Tool 19: dotfiles_cascade_reload
@@ -539,11 +579,14 @@ type PaletteViolation struct {
 }
 
 type RiceCheckOutput struct {
-	Compositor        string                `json:"compositor"`
-	Shader            string                `json:"shader"`
-	Wallpaper         string                `json:"wallpaper"`
-	Services          []ServiceReloadStatus `json:"services"`
-	PaletteViolations []PaletteViolation    `json:"palette_violations,omitempty"`
+	Compositor            string                `json:"compositor"`
+	Shader                string                `json:"shader"`
+	Wallpaper             string                `json:"wallpaper"`
+	Services              []ServiceReloadStatus `json:"services"`
+	ShellServices         []ServiceReloadStatus `json:"shell_services,omitempty"`
+	MonitorIncludePath    string                `json:"monitor_include_path,omitempty"`
+	MonitorIncludePresent bool                  `json:"monitor_include_present,omitempty"`
+	PaletteViolations     []PaletteViolation    `json:"palette_violations,omitempty"`
 }
 
 // Tool 21: dotfiles_bulk_pipeline
@@ -1098,64 +1141,9 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 		// ── dotfiles_eww_restart ──────────────────────
 		handler.TypedHandler[EwwRestartInput, EwwRestartOutput](
 			"dotfiles_eww_restart",
-			"Kill all eww and waybar processes, restart eww daemon, and open both bars (bar and bar-secondary). Use after editing eww config files.",
+			"Kill all eww and waybar processes, restart eww daemon, and open the primary eww surface (sidebar). Use after editing eww config files.",
 			func(_ context.Context, _ EwwRestartInput) (EwwRestartOutput, error) {
-				r := EwwRestartOutput{}
-
-				waybar := exec.Command("killall", "waybar")
-				if waybar.Run() == nil {
-					r.WaybarOff = true
-				}
-
-				countCmd := exec.Command("pgrep", "-c", "eww")
-				var countOut bytes.Buffer
-				countCmd.Stdout = &countOut
-				if countCmd.Run() == nil {
-					fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &r.Killed)
-				}
-
-				exec.Command("killall", "-9", "eww").Run()
-				exec.Command("sleep", "1").Run()
-
-				home := homeDir()
-				sockets, _ := filepath.Glob(filepath.Join("/run/user/1000", "eww-server_*"))
-				for _, s := range sockets {
-					os.Remove(s)
-				}
-
-				daemon := exec.Command("eww", "daemon", "--restart")
-				daemon.Dir = home
-				if err := daemon.Start(); err != nil {
-					r.Error = fmt.Sprintf("daemon start failed: %v", err)
-					return r, nil
-				}
-
-				exec.Command("sleep", "3").Run()
-
-				ping := exec.Command("eww", "ping")
-				var pingOut bytes.Buffer
-				ping.Stdout = &pingOut
-				if err := ping.Run(); err != nil {
-					r.Error = "daemon started but not responding to ping"
-					return r, nil
-				}
-
-				pidCmd := exec.Command("pgrep", "-o", "eww")
-				var pidOut bytes.Buffer
-				pidCmd.Stdout = &pidOut
-				if pidCmd.Run() == nil {
-					r.DaemonPID = strings.TrimSpace(pidOut.String())
-				}
-
-				bars := []string{"bar", "bar-secondary"}
-				for _, bar := range bars {
-					openCmd := exec.Command("eww", "open", bar)
-					if err := openCmd.Run(); err == nil {
-						r.BarsOpen = append(r.BarsOpen, bar)
-					}
-				}
-
-				return r, nil
+				return restartEwwBars(), nil
 			},
 		),
 
@@ -1164,78 +1152,7 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 			"dotfiles_eww_status",
 			"Show eww bar status: daemon health, open windows, layer surfaces, key variable values, and whether waybar is incorrectly running.",
 			func(_ context.Context, _ EwwStatusInput) (EwwStatusOutput, error) {
-				st := EwwStatusOutput{
-					Variables: make(map[string]string),
-				}
-
-				countCmd := exec.Command("pgrep", "-c", "eww")
-				var countOut bytes.Buffer
-				countCmd.Stdout = &countOut
-				if countCmd.Run() == nil {
-					fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &st.DaemonCount)
-					st.DaemonRunning = st.DaemonCount > 0
-				}
-
-				waybarCmd := exec.Command("pgrep", "-x", "waybar")
-				st.WaybarRunning = waybarCmd.Run() == nil
-
-				winCmd := exec.Command("eww", "active-windows")
-				var winOut bytes.Buffer
-				winCmd.Stdout = &winOut
-				if winCmd.Run() == nil {
-					for _, line := range strings.Split(strings.TrimSpace(winOut.String()), "\n") {
-						line = strings.TrimSpace(line)
-						if line == "" {
-							continue
-						}
-						if parts := strings.SplitN(line, ":", 2); len(parts) > 0 {
-							st.Windows = append(st.Windows, strings.TrimSpace(parts[0]))
-						}
-					}
-				}
-
-				layerCmd := exec.Command("hyprctl", "layers")
-				var layerOut bytes.Buffer
-				layerCmd.Stdout = &layerOut
-				if layerCmd.Run() == nil {
-					var currentMonitor string
-					for _, line := range strings.Split(layerOut.String(), "\n") {
-						line = strings.TrimSpace(line)
-						if strings.HasPrefix(line, "Monitor ") {
-							currentMonitor = strings.TrimSuffix(strings.TrimPrefix(line, "Monitor "), ":")
-						}
-						if strings.Contains(line, "namespace:") {
-							parts := strings.Split(line, "namespace: ")
-							if len(parts) == 2 {
-								ns := strings.Split(parts[1], ",")[0]
-								xywh := ""
-								if xywhIdx := strings.Index(line, "xywh: "); xywhIdx >= 0 {
-									xywh = strings.Split(line[xywhIdx+6:], ",")[0]
-								}
-								st.Layers = append(st.Layers, EwwLayerInfo{
-									Monitor:   currentMonitor,
-									Namespace: ns,
-									Position:  xywh,
-								})
-							}
-						}
-					}
-				}
-
-				varsToCheck := []string{
-					"bar_workspaces_dp1", "bar_workspaces_dp2",
-					"bar_cpu", "bar_mem", "bar_vol", "bar_shader",
-				}
-				for _, v := range varsToCheck {
-					getCmd := exec.Command("eww", "get", v)
-					var getOut bytes.Buffer
-					getCmd.Stdout = &getOut
-					if getCmd.Run() == nil {
-						st.Variables[v] = strings.TrimSpace(getOut.String())
-					}
-				}
-
-				return st, nil
+				return currentEwwStatus(), nil
 			},
 		),
 
@@ -1248,16 +1165,10 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					return EwwGetOutput{}, fmt.Errorf("[%s] variable name is required", handler.ErrInvalidParam)
 				}
 
-				cmd := exec.Command("eww", "get", input.Variable)
-				var stdout, stderr bytes.Buffer
-				cmd.Stdout = &stdout
-				cmd.Stderr = &stderr
-
-				if err := cmd.Run(); err != nil {
-					return EwwGetOutput{}, fmt.Errorf("eww get %s failed: %v: %s", input.Variable, err, strings.TrimSpace(stderr.String()))
+				value, err := runEww("get", input.Variable)
+				if err != nil {
+					return EwwGetOutput{}, err
 				}
-
-				value := strings.TrimSpace(stdout.String())
 
 				var parsed any
 				if json.Unmarshal([]byte(value), &parsed) == nil {
@@ -2353,173 +2264,21 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 			},
 		),
 
+		// ── dotfiles_fleet_baseline_refresh ───────────
+		handler.TypedHandler[FleetBaselineRefreshInput, FleetBaselineRefreshOutput](
+			"dotfiles_fleet_baseline_refresh",
+			"Run each repo's local baseline on the current main checkout, cache the results under docs/agent-parity, and return the refreshed local-baseline snapshot set.",
+			func(_ context.Context, input FleetBaselineRefreshInput) (FleetBaselineRefreshOutput, error) {
+				return runFleetBaselineRefresh(input)
+			},
+		),
+
 		// ── dotfiles_fleet_audit ──────────────────────
 		handler.TypedHandler[FleetAuditInput, FleetAuditOutput](
 			"dotfiles_fleet_audit",
-			"Comprehensive fleet audit: per-repo language, Go version, CI status, test count, last commit age, pipeline.mk and CLAUDE.md presence. Single tool replaces manual health+dep+CI checks.",
+			"Comprehensive fleet audit: per-repo language, Go version, remote CI, cached local baseline status, workflow-governance state, test count, last commit age, pipeline.mk and CLAUDE.md presence.",
 			func(_ context.Context, input FleetAuditInput) (FleetAuditOutput, error) {
-				localDir := input.LocalDir
-				if localDir == "" {
-					localDir = filepath.Join(homeDir(), "hairglasses-studio")
-				}
-
-				entries, err := os.ReadDir(localDir)
-				if err != nil {
-					return FleetAuditOutput{}, fmt.Errorf("read dir: %v", err)
-				}
-
-				var repos []RepoAuditInfo
-				var total, passing, failing, goRepos int
-
-				for _, e := range entries {
-					if !e.IsDir() {
-						continue
-					}
-					repoPath := filepath.Join(localDir, e.Name())
-					gitDir := filepath.Join(repoPath, ".git")
-					if _, err := os.Stat(gitDir); err != nil {
-						continue
-					}
-					total++
-
-					info := RepoAuditInfo{Name: e.Name()}
-
-					// Detect language.
-					if _, err := os.Stat(filepath.Join(repoPath, "go.mod")); err == nil {
-						info.Language = "go"
-						goRepos++
-						// Read Go version.
-						goModCmd := exec.Command("grep", "-m1", "^go ", filepath.Join(repoPath, "go.mod"))
-						var goModOut bytes.Buffer
-						goModCmd.Stdout = &goModOut
-						if goModCmd.Run() == nil {
-							parts := strings.Fields(strings.TrimSpace(goModOut.String()))
-							if len(parts) >= 2 {
-								info.GoVersion = parts[1]
-							}
-						}
-					} else if _, err := os.Stat(filepath.Join(repoPath, "package.json")); err == nil {
-						info.Language = "node"
-					} else if _, err := os.Stat(filepath.Join(repoPath, "pyproject.toml")); err == nil {
-						info.Language = "python"
-					} else {
-						info.Language = "shell"
-					}
-
-					// Last commit age.
-					logCmd := exec.Command("git", "log", "-1", "--format=%ct")
-					logCmd.Dir = repoPath
-					var logOut bytes.Buffer
-					logCmd.Stdout = &logOut
-					if logCmd.Run() == nil {
-						ts := strings.TrimSpace(logOut.String())
-						if ts != "" {
-							var epoch int64
-							fmt.Sscanf(ts, "%d", &epoch)
-							nowCmd := exec.Command("date", "+%s")
-							var nowOut bytes.Buffer
-							nowCmd.Stdout = &nowOut
-							nowCmd.Run()
-							var nowEpoch int64
-							fmt.Sscanf(strings.TrimSpace(nowOut.String()), "%d", &nowEpoch)
-							info.LastCommitDays = int((nowEpoch - epoch) / 86400)
-						}
-					}
-
-					// CI status — derive org/repo from git remote.
-					ciRemoteCmd := exec.Command("git", "config", "remote.origin.url")
-					ciRemoteCmd.Dir = repoPath
-					var ciRemoteOut bytes.Buffer
-					ciRemoteCmd.Stdout = &ciRemoteOut
-					repoSlug := e.Name()
-					if ciRemoteCmd.Run() == nil {
-						url := strings.TrimSpace(ciRemoteOut.String())
-						url = strings.TrimSuffix(url, ".git")
-						if idx := strings.Index(url, "github.com"); idx >= 0 {
-							slug := url[idx+len("github.com"):]
-							slug = strings.TrimPrefix(slug, ":")
-							slug = strings.TrimPrefix(slug, "/")
-							if slug != "" {
-								repoSlug = slug
-							}
-						}
-					}
-					ciCmd := exec.Command("gh", "run", "list", "--repo", repoSlug, "--limit", "1", "--json", "conclusion", "--jq", ".[0].conclusion")
-					ciCmd.Dir = repoPath
-					var ciOut bytes.Buffer
-					ciCmd.Stdout = &ciOut
-					if ciCmd.Run() == nil {
-						conclusion := strings.TrimSpace(ciOut.String())
-						switch conclusion {
-						case "success":
-							info.CIStatus = "pass"
-							passing++
-						case "failure":
-							info.CIStatus = "fail"
-							failing++
-						case "":
-							info.CIStatus = "none"
-						default:
-							info.CIStatus = conclusion
-						}
-					} else {
-						info.CIStatus = "none"
-					}
-
-					// Test count.
-					var testCount int
-					switch info.Language {
-					case "go":
-						countCmd := exec.Command("bash", "-c", "find . -name '*_test.go' -not -path './vendor/*' 2>/dev/null | wc -l")
-						countCmd.Dir = repoPath
-						var countOut bytes.Buffer
-						countCmd.Stdout = &countOut
-						countCmd.Run()
-						fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &testCount)
-					case "node":
-						countCmd := exec.Command("bash", "-c", "find . -name '*.test.*' -o -name '*.spec.*' 2>/dev/null | wc -l")
-						countCmd.Dir = repoPath
-						var countOut bytes.Buffer
-						countCmd.Stdout = &countOut
-						countCmd.Run()
-						fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &testCount)
-					case "python":
-						countCmd := exec.Command("bash", "-c", "find . -name 'test_*.py' -o -name '*_test.py' 2>/dev/null | wc -l")
-						countCmd.Dir = repoPath
-						var countOut bytes.Buffer
-						countCmd.Stdout = &countOut
-						countCmd.Run()
-						fmt.Sscanf(strings.TrimSpace(countOut.String()), "%d", &testCount)
-					}
-					info.TestCount = testCount
-
-					// pipeline.mk check.
-					if _, err := os.Stat(filepath.Join(repoPath, "pipeline.mk")); err == nil {
-						info.HasPipelineMk = true
-					} else {
-						// Check Makefile for include.
-						makeCmd := exec.Command("grep", "-q", "pipeline.mk", filepath.Join(repoPath, "Makefile"))
-						info.HasPipelineMk = makeCmd.Run() == nil
-					}
-
-					// CLAUDE.md check.
-					_, err := os.Stat(filepath.Join(repoPath, "CLAUDE.md"))
-					info.HasCLAUDEmd = err == nil
-
-					// CI workflows check.
-					_, err = os.Stat(filepath.Join(repoPath, ".github", "workflows"))
-					info.HasCI = err == nil
-
-					repos = append(repos, info)
-				}
-
-				return FleetAuditOutput{
-					Total:   total,
-					Passing: passing,
-					Failing: failing,
-					GoRepos: goRepos,
-					Repos:   repos,
-				}, nil
+				return runFleetAudit(input.LocalDir)
 			},
 		),
 

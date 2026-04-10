@@ -507,7 +507,7 @@
   },
   {
     "name": "dotfiles_eww_restart",
-    "description": "Kill all eww and waybar processes, restart eww daemon, and open both bars (bar and bar-secondary). Use after editing eww config files.",
+    "description": "Kill all eww and waybar processes, restart eww daemon, and open the primary eww surface (sidebar). Use after editing eww config files.",
     "category": "",
     "is_write": true,
     "deferred": true
@@ -521,7 +521,14 @@
   },
   {
     "name": "dotfiles_fleet_audit",
-    "description": "Comprehensive fleet audit: per-repo language, Go version, CI status, test count, last commit age, pipeline.mk and CLAUDE.md presence. Single tool replaces manual health+dep+CI checks.",
+    "description": "Comprehensive fleet audit: per-repo language, Go version, remote CI, cached local baseline status, workflow-governance state, test count, last commit age, pipeline.mk and CLAUDE.md presence.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_fleet_baseline_refresh",
+    "description": "Run each repo's local baseline on the current main checkout, cache the results under docs/agent-parity, and return the refreshed local-baseline snapshot set.",
     "category": "",
     "is_write": false,
     "deferred": true
@@ -1902,6 +1909,20 @@
     "deferred": true
   },
   {
+    "name": "notify_history_clear",
+    "description": "DESTRUCTIVE: Clear the locally logged notification history. By default entries are marked dismissed; set purge=true to remove them entirely.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "notify_history_entries",
+    "description": "Get the locally logged notification history entries with app, summary, body, urgency, timestamp, and dismissal state.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "notify_panel",
     "description": "DESTRUCTIVE: Control the SwayNotificationCenter panel visibility. Actions: toggle, open, close.",
     "category": "",
@@ -2362,7 +2383,7 @@
   },
   {
     "name": "shader_cycle",
-    "description": "Advance the shader playlist (next/prev). Reads current playlist state, advances position, and applies the next shader.",
+    "description": "Advance the active Kitty visual playlist (next/prev) via kitty-shader-playlist.sh.",
     "category": "",
     "is_write": false,
     "deferred": true
@@ -2376,21 +2397,21 @@
   },
   {
     "name": "shader_get_state",
-    "description": "Read the currently active shader from the Ghostty config.",
+    "description": "Read the current Kitty shader and theme state from kitty-shader-playlist state files.",
     "category": "",
     "is_write": false,
     "deferred": true
   },
   {
     "name": "shader_hot_reload",
-    "description": "Force Ghostty to reload its config. Touches the config file to trigger inotify; falls back to SIGUSR1.",
+    "description": "Force kitty to reload shader config via SIGUSR1.",
     "category": "",
     "is_write": false,
     "deferred": true
   },
   {
     "name": "shader_list",
-    "description": "List all GLSL shaders in the Ghostty shaders directory. Optionally filter by category.",
+    "description": "List all GLSL shaders in the source shaders directory. Optionally filter by category.",
     "category": "",
     "is_write": false,
     "deferred": true
@@ -2425,21 +2446,21 @@
   },
   {
     "name": "shader_random",
-    "description": "Pick a random shader and apply it to Ghostty.",
+    "description": "Pick a random paired Kitty visual from the active playlist and apply it.",
     "category": "",
     "is_write": false,
     "deferred": true
   },
   {
     "name": "shader_set",
-    "description": "Apply a shader to Ghostty by updating the config with an atomic write. Ghostty auto-reloads.",
+    "description": "Apply a CRTty shader to kitty via kitty-shader-playlist.sh.",
     "category": "",
     "is_write": true,
     "deferred": true
   },
   {
     "name": "shader_status",
-    "description": "Rich status: current shader, animation state, active playlist, position, and auto-rotate timer status.",
+    "description": "Rich status: current shader, Kitty theme, visual label, animation state, playlist position, and auto-rotate timer status.",
     "category": "",
     "is_write": false,
     "deferred": true

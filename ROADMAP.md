@@ -2,7 +2,7 @@
 
 ## Current State
 
-dotfiles-mcp is now best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The current `main` target surface exposes 340 tools across 35 modules, plus 24 resources and 12 prompts, when published from the canonical source. The mirror keeps discovery-first loading, workflow resources, prompt entrypoints, and a juhradial-first MX input contract while staying explicit about its relationship to the canonical source of record.
+dotfiles-mcp is now best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The committed bundle under `snapshots/contract/overview.json` and `.well-known/mcp.json` is the authoritative source for the current tool, resource, and prompt counts. The mirror keeps discovery-first loading, workflow resources, prompt entrypoints, and a juhradial-first MX input contract while staying explicit about its relationship to the canonical source of record.
 
 All modules functional and tested. MIT licensed, README and CLAUDE.md in place. Batch tools default to dry-run mode.
 
@@ -68,5 +68,12 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 - [x] Added Kitty runtime control for tab/window inventory, config reloads, theme/layout/title changes, send-text, image overlays, and generic remote commands
 - [x] Added Arch Linux research-first surfaces for ArchWiki, official repos, AUR, PKGBUILD auditing, Arch news review, mirror status, update dry runs, pacman logs, orphan detection, and file ownership
 - [x] Refreshed `snapshots/contract/` and `.well-known/mcp.json` to publish the expanded tool/resource/prompt surface
+- [x] Carried forward the remaining canonical notification, fleet baseline, and shader parity fixes on top of the expanded standalone surface so canonical drift is now limited to intentional mirror-only extensions
+
+### Next Mirror Governance Tranche
+- [ ] Automate canonical sync intake from `dotfiles/mcp/dotfiles-mcp` so publish mirrors can apply bounded carry-forward updates without manual file checkout
+- [ ] Promote contract diffs into release artifacts and changelog summaries instead of keeping them only in step summaries
+- [ ] Run `make host-smoke` on a logged-in Hyprland publish runner so evented desktop and input checks stop degrading to skip-only validation
+- [ ] Decide which standalone-only Arch, Hyprland, and Kitty extensions should upstream into canonical dotfiles vs remain mirror-only
 
 <!-- whiteclaw-rollout:end -->
