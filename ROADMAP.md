@@ -2,7 +2,7 @@
 
 ## Current State
 
-dotfiles-mcp is now best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The committed bundle under `snapshots/contract/overview.json` and `.well-known/mcp.json` is the authoritative source for the current tool, resource, and prompt counts. The current `main` target surface exposes 370 tools across 37 modules, plus 24 resources and 12 prompts, while keeping discovery-first loading, workflow resources, prompt entrypoints, semantic desktop/session control, and a juhradial-first MX input contract explicit in relation to the canonical source of record.
+dotfiles-mcp is now best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The committed bundle under `snapshots/contract/overview.json` and `.well-known/mcp.json` is the authoritative source for the current tool, resource, and prompt counts. The current `main` target surface exposes 372 tools across 37 modules, plus 24 resources and 12 prompts, while keeping discovery-first loading, workflow resources, prompt entrypoints, semantic desktop/session control, and a juhradial-first MX input contract explicit in relation to the canonical source of record.
 
 All modules functional and tested. MIT licensed, README and CLAUDE.md in place. Batch tools default to dry-run mode.
 
@@ -65,8 +65,8 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 
 ### Capability Expansion Tranche (2026-04-10)
 - [x] Expanded Hyprland IPC tooling with active-window/workspace, binds, devices, layers, layouts, config diagnostics, property control, and socket2 event helpers
-- [x] Added semantic desktop targeting with an embedded AT-SPI helper for snapshot/find/click/type/key flows and explicit capability checks
-- [x] Added desktop session tooling for live-session attachment, KWin virtual-session startup via `dbus-run-session`, session-local semantic tree/find/click/action flows, screenshots, clipboard access, app launch logs, D-Bus calls, and Hyprland window focus/inventory
+- [x] Added semantic desktop targeting with an embedded AT-SPI helper for snapshot/find/find-all/click/type/key flows, explicit capability checks, multi-match queries, stable refs, and action/state-aware targeting
+- [x] Added desktop session tooling for live-session attachment, KWin virtual-session startup via `dbus-run-session`, session-local semantic tree/find/find-all/click/action flows, screenshots, clipboard access, app launch logs, D-Bus calls, and Hyprland window focus/inventory
 - [x] Added Kitty runtime control for tab/window inventory, config reloads, theme/layout/title changes, send-text, image overlays, and generic remote commands
 - [x] Added Arch Linux research-first surfaces for ArchWiki, official repos, AUR, PKGBUILD auditing, Arch news review, mirror status, update dry runs, pacman logs, orphan detection, and file ownership
 - [x] Refreshed `snapshots/contract/` and `.well-known/mcp.json` to publish the expanded tool/resource/prompt surface

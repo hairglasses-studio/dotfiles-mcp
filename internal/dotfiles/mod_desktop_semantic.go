@@ -37,6 +37,7 @@ type desktopSemanticQueryInput struct {
 	Ref    string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous semantic result"`
 	Path   string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
 	States []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Limit  int      `json:"limit,omitempty" jsonschema:"description=Optional max matches for multi-match queries (default 20)"`
 	Exact  bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
 }
 
@@ -76,6 +77,16 @@ type desktopSemanticCapabilitiesOutput struct {
 type desktopSemanticSnapshotOutput struct {
 	HelperPath string           `json:"helper_path,omitempty"`
 	Apps       []map[string]any `json:"apps,omitempty"`
+}
+
+type desktopSemanticMatchesOutput struct {
+	HelperPath string                    `json:"helper_path,omitempty"`
+	App        string                    `json:"app"`
+	Query      desktopSemanticQueryInput `json:"query"`
+	Matched    bool                      `json:"matched"`
+	Count      int                       `json:"count"`
+	Matches    []map[string]any          `json:"matches,omitempty"`
+	Error      string                    `json:"error,omitempty"`
 }
 
 type desktopSemanticTreeOutput struct {
@@ -249,6 +260,9 @@ func semanticQueryArgs(input desktopSemanticQueryInput) ([]string, error) {
 			args = append(args, "--state", state)
 		}
 	}
+	if input.Limit > 0 {
+		args = append(args, "--limit", strconv.Itoa(input.Limit))
+	}
 	if input.Exact {
 		args = append(args, "--exact")
 	}
@@ -328,6 +342,33 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 	)
 	find.Category = "desktop"
 	find.SearchTerms = []string{"find semantic element", "find button", "accessibility search", "at-spi find", "semantic ref"}
+
+	findAll := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticMatchesOutput](
+		"desktop_find_all",
+		"Find all semantic elements matching an app plus name, role, states, ref, or path.",
+		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticMatchesOutput, error) {
+			args, err := semanticQueryArgs(input)
+			if err != nil {
+				return desktopSemanticMatchesOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSemanticHelper(ctx, append([]string{"find_all"}, args...)...)
+			if err != nil {
+				return desktopSemanticMatchesOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			return desktopSemanticMatchesOutput{
+				HelperPath: helperPath,
+				App:        input.App,
+				Query:      input,
+				Matched:    result["matched"] == true,
+				Count:      intValue(result["count"]),
+				Matches:    semanticMapSliceValue(result["elements"]),
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	findAll.Category = "desktop"
+	findAll.SearchTerms = []string{"find all semantic elements", "list matching buttons", "at-spi multiple matches"}
 
 	click := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticElementOutput](
 		"desktop_click",
@@ -502,6 +543,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		snapshot,
 		targetWindows,
 		find,
+		findAll,
 		click,
 		act,
 		wait,

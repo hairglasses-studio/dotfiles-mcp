@@ -145,6 +145,22 @@ def list_apps():
     return {"apps": apps}
 
 
+def list_windows(app_name=""):
+    windows = []
+    for idx, app in iter_apps():
+        if app_name and not match_value(app.name, app_name, exact=False):
+            continue
+        for child_idx in range(getattr(app, "childCount", 0)):
+            child = app.getChildAtIndex(child_idx)
+            if child is None:
+                continue
+            path = str(child_idx)
+            info = element_to_dict(child, path, 0, 0)
+            info["app"] = {"id": idx, "name": app.name, "role": safe_role(app)}
+            windows.append(info)
+    return {"windows": windows}
+
+
 def find_app(app_name):
     for idx, app in iter_apps():
         if match_value(app.name, app_name, exact=True):
@@ -210,6 +226,33 @@ def search_element(root, search_name, role=None, exact=False, path=None, ref_id=
     return visit(root, "")
 
 
+def search_elements(root, search_name, role=None, exact=False, path=None, ref_id=None, states=None, limit=20):
+    if ref_id or path is not None:
+        found, found_path = search_element(root, search_name, role, exact, path, ref_id, states)
+        if found is None:
+            return []
+        return [(found, found_path or "")]
+
+    results = []
+
+    def visit(obj, current_path=""):
+        if len(results) >= limit:
+            return
+        if match_value(obj.name, search_name, exact) and (
+            role is None or match_value(safe_role(obj), role, exact=True)
+        ) and state_matches(obj, states):
+            results.append((obj, current_path))
+        for idx in range(getattr(obj, "childCount", 0)):
+            child = obj.getChildAtIndex(idx)
+            if child is None:
+                continue
+            child_path = str(idx) if current_path == "" else f"{current_path}/{idx}"
+            visit(child, child_path)
+
+    visit(root, "")
+    return results
+
+
 def choose_action_index(action_iface, requested_action=None):
     if action_iface.nActions == 0:
         return None, None
@@ -255,6 +298,20 @@ def find_element(app_name, search_name, role=None, exact=False, path=None, ref_i
         "matched": True,
         "app": {"id": idx, "name": app.name, "role": safe_role(app)},
         "element": element_to_dict(found, found_path or "", 0, 0),
+    }
+
+
+def find_all_elements(app_name, search_name, role=None, exact=False, path=None, ref_id=None, states=None, limit=20):
+    idx, app = find_app(app_name)
+    if app is None:
+        return {"matched": False, "count": 0, "error": f"App {app_name} not found"}
+
+    matches = search_elements(app, search_name, role, exact, path, ref_id, states, limit)
+    return {
+        "matched": len(matches) > 0,
+        "count": len(matches),
+        "app": {"id": idx, "name": app.name, "role": safe_role(app)},
+        "elements": [element_to_dict(obj, matched_path or "", 0, 0) for obj, matched_path in matches],
     }
 
 
@@ -351,7 +408,7 @@ def wait_for_element(app_name, search_name, role=None, exact=False, path=None, r
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["list_apps", "get_tree", "find", "click", "act", "wait"])
+    parser.add_argument("command", choices=["list_apps", "list_windows", "get_tree", "find", "find_all", "click", "act", "wait"])
     parser.add_argument("--app", help="Application name")
     parser.add_argument("--name", help="Element name")
     parser.add_argument("--role", help="Element role")
@@ -360,6 +417,7 @@ def main():
     parser.add_argument("--state", action="append", default=[], help="Required state filter, repeat or pass comma-separated values")
     parser.add_argument("--action", help="Explicit action name to invoke")
     parser.add_argument("--exact", action="store_true", help="Require exact case-insensitive name matching")
+    parser.add_argument("--limit", type=int, default=20, help="Max matches for find_all")
     parser.add_argument("--depth", type=int, default=5, help="Max tree depth")
     parser.add_argument("--timeout", type=int, default=5, help="Timeout in seconds")
     args = parser.parse_args()
@@ -368,6 +426,10 @@ def main():
 
     if args.command == "list_apps":
         print(json.dumps(list_apps()))
+        return
+
+    if args.command == "list_windows":
+        print(json.dumps(list_windows(args.app or "")))
         return
 
     if not args.app:
@@ -383,6 +445,13 @@ def main():
             print(json.dumps({"matched": False, "error": "--name, --path, or --ref is required"}))
             return
         print(json.dumps(find_element(args.app, args.name, args.role, args.exact, args.path, args.ref, states)))
+        return
+
+    if args.command == "find_all":
+        if not args.name and args.path is None and not args.ref and not states:
+            print(json.dumps({"matched": False, "count": 0, "error": "--name, --path, --ref, or --state is required"}))
+            return
+        print(json.dumps(find_all_elements(args.app, args.name, args.role, args.exact, args.path, args.ref, states, args.limit)))
         return
 
     if args.command == "click":

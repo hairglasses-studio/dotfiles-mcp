@@ -110,6 +110,7 @@ type SessionSemanticQueryInput struct {
 	Ref       string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous session semantic result"`
 	Path      string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous session semantic result"`
 	States    []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
+	Limit     int      `json:"limit,omitempty" jsonschema:"description=Optional max matches for multi-match queries (default 20)"`
 	Exact     bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
 }
 
@@ -152,11 +153,12 @@ type SessionDBusCallInput struct {
 }
 
 type SessionWindowsOutput struct {
-	Session     desktopSessionRecord `json:"session"`
-	Mode        string               `json:"mode"`
-	Count       int                  `json:"count"`
-	Windows     []hyprClient         `json:"windows,omitempty"`
-	Unsupported string               `json:"unsupported,omitempty"`
+	Session         desktopSessionRecord `json:"session"`
+	Mode            string               `json:"mode"`
+	Count           int                  `json:"count"`
+	Windows         []hyprClient         `json:"windows,omitempty"`
+	SemanticWindows []map[string]any     `json:"semantic_windows,omitempty"`
+	Unsupported     string               `json:"unsupported,omitempty"`
 }
 
 type SessionScreenshotOutput struct {
@@ -205,6 +207,17 @@ type SessionSemanticElementOutput struct {
 	Invoked    bool                      `json:"invoked,omitempty"`
 	Action     string                    `json:"action,omitempty"`
 	Element    map[string]any            `json:"element,omitempty"`
+	Error      string                    `json:"error,omitempty"`
+}
+
+type SessionSemanticMatchesOutput struct {
+	Session    desktopSessionRecord      `json:"session"`
+	HelperPath string                    `json:"helper_path,omitempty"`
+	App        string                    `json:"app"`
+	Query      desktopSemanticQueryInput `json:"query"`
+	Matched    bool                      `json:"matched"`
+	Count      int                       `json:"count"`
+	Matches    []map[string]any          `json:"matches,omitempty"`
 	Error      string                    `json:"error,omitempty"`
 }
 
@@ -508,6 +521,7 @@ func sessionSemanticQuery(input SessionSemanticQueryInput) desktopSemanticQueryI
 		Ref:    input.Ref,
 		Path:   input.Path,
 		States: input.States,
+		Limit:  input.Limit,
 		Exact:  input.Exact,
 	}
 }
@@ -676,17 +690,35 @@ exec kwin_wayland --virtual --no-lockscreen
 
 	listWindows := handler.TypedHandler[SessionRefInput, SessionWindowsOutput](
 		"session_list_windows",
-		"List windows for a Hyprland-backed session. Returns an unsupported note for non-Hyprland sessions.",
-		func(_ context.Context, input SessionRefInput) (SessionWindowsOutput, error) {
+		"List windows for a tracked session. Hyprland-backed sessions use hyprctl; other sessions fall back to AT-SPI window discovery.",
+		func(ctx context.Context, input SessionRefInput) (SessionWindowsOutput, error) {
 			record, err := resolveDesktopSession(input.SessionID)
 			if err != nil {
 				return SessionWindowsOutput{}, err
 			}
 			if strings.TrimSpace(record.HyprlandInstanceSignature) == "" {
+				parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, "list_windows")
+				if err != nil {
+					return SessionWindowsOutput{
+						Session:     record,
+						Mode:        "unsupported",
+						Unsupported: err.Error(),
+					}, nil
+				}
+				result := semanticMapValue(parsed)
+				windows := semanticMapSliceValue(result["windows"])
+				if helperPath != "" {
+					for i := range windows {
+						if windows[i] != nil {
+							windows[i]["helper_path"] = helperPath
+						}
+					}
+				}
 				return SessionWindowsOutput{
-					Session:     record,
-					Mode:        "unsupported",
-					Unsupported: "window inventory currently supports Hyprland-backed sessions only",
+					Session:         record,
+					Mode:            "atspi",
+					Count:           len(windows),
+					SemanticWindows: windows,
 				}, nil
 			}
 			clientsJSON, err := runDesktopSessionHyprctl(record, "clients", "-j")
@@ -969,6 +1001,39 @@ exec kwin_wayland --virtual --no-lockscreen
 	findUIElement.Category = "desktop"
 	findUIElement.SearchTerms = []string{"session find element", "session semantic ref", "session at-spi find"}
 
+	findUIElements := handler.TypedHandler[SessionSemanticQueryInput, SessionSemanticMatchesOutput](
+		"session_find_ui_elements",
+		"Find all semantic UI elements inside a tracked session that match the app plus name, role, states, ref, or path query.",
+		func(ctx context.Context, input SessionSemanticQueryInput) (SessionSemanticMatchesOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticMatchesOutput{}, err
+			}
+			query := sessionSemanticQuery(input)
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return SessionSemanticMatchesOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSessionSemanticHelper(ctx, record, append([]string{"find_all"}, args...)...)
+			if err != nil {
+				return SessionSemanticMatchesOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			return SessionSemanticMatchesOutput{
+				Session:    record,
+				HelperPath: helperPath,
+				App:        input.App,
+				Query:      query,
+				Matched:    result["matched"] == true,
+				Count:      intValue(result["count"]),
+				Matches:    semanticMapSliceValue(result["elements"]),
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	findUIElements.Category = "desktop"
+	findUIElements.SearchTerms = []string{"session find elements", "session multi match", "session at-spi matches"}
+
 	waitForElement := handler.TypedHandler[SessionSemanticWaitInput, SessionSemanticElementOutput](
 		"session_wait_for_element",
 		"Wait for a semantic element to appear or satisfy requested states inside a tracked session.",
@@ -1176,6 +1241,7 @@ exec kwin_wayland --virtual --no-lockscreen
 		readAppLog,
 		accessibilityTree,
 		findUIElement,
+		findUIElements,
 		waitForElement,
 		clickElement,
 		invokeAction,
