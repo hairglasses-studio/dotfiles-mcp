@@ -1,4 +1,4 @@
-.PHONY: build test vet lint check coverage contract-snapshot contract-check contract-diff canonical-drift host-smoke release-parity publish-check
+.PHONY: build test vet lint check coverage contract-snapshot contract-check contract-diff canonical-drift canonical-sync-report canonical-sync-diff host-smoke host-smoke-strict release-parity publish-check
 
 build:
 	go build ./...
@@ -31,8 +31,17 @@ contract-diff:
 canonical-drift:
 	bash ./scripts/canonical-drift.sh
 
+canonical-sync-report:
+	bash ./scripts/canonical-sync.sh --report
+
+canonical-sync-diff:
+	bash ./scripts/canonical-sync.sh --diff
+
 host-smoke:
 	bash ./scripts/host-smoke.sh
+
+host-smoke-strict:
+	bash ./scripts/host-smoke.sh --strict-missing --strict-skip
 
 release-parity:
 	bash ./scripts/release-parity.sh

@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `make contract-diff` and `make canonical-drift` plus supporting scripts for mirror surface and canonical drift reporting
 - Expanded standalone-only Hyprland IPC, Kitty runtime, and Arch Linux research-first surfaces
 - Contract-diff publication in GitHub workflow step summaries for publish and release runs
+- `make canonical-sync-report` / `make canonical-sync-diff` plus a manifest-driven carry-forward helper for canonical-owned files
+- `make host-smoke-strict` for publish runners that should fail on skipped desktop and input checks
 
 ### Changed
 

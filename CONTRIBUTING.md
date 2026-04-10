@@ -20,7 +20,10 @@ go test ./... -count=1
 make pipeline-check   # build + vet + test (via shared pipeline)
 make publish-check    # mirror contract + manifest parity
 make host-smoke       # host-dependent surfaces on the publish machine
+make host-smoke-strict  # fail if host-dependent checks degrade to skip/missing
 make canonical-drift  # compare this mirror against dotfiles/mcp/dotfiles-mcp
+make canonical-sync-report  # summarize drift for the manifest-driven canonical carry-forward subset
+make canonical-sync-diff    # emit unified diffs for the manifest-driven canonical carry-forward subset
 ```
 
 Or use the pipeline script directly:
@@ -53,8 +56,9 @@ All tools are built on [mcpkit](https://github.com/hairglasses-studio/mcpkit) us
 4. If the change affects the public surface, refresh the committed mirror artifacts: `make contract-snapshot`
 5. Run mirror parity checks: `make publish-check`
 6. Compare against the canonical source when applicable: `make canonical-drift`
-7. Commit with a descriptive message
-8. Push and open a PR
+7. If the change touches canonical-owned files, inspect the carry-forward subset with `make canonical-sync-report` or `make canonical-sync-diff`
+8. Commit with a descriptive message
+9. Push and open a PR
 
 ## Code Style
 
@@ -86,6 +90,7 @@ For publish-mirror work, also keep these repo-owned guards green:
 - `make contract-diff` for human-readable public surface deltas
 - `make canonical-drift` to compare the committed mirror bundle against canonical `dotfiles/mcp/dotfiles-mcp`
 - `make host-smoke` on a real workstation host before release-oriented pushes
+- `make host-smoke-strict` when the runner is expected to have a live Hyprland/input session
 
 ## Questions?
 
