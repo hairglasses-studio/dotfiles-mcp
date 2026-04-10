@@ -305,6 +305,10 @@
       "description": "Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → eww), verifying each is healthy before proceeding to the next."
     },
     {
+      "name": "dotfiles_changelog_gen",
+      "description": "Generate changelog previews across selected workspace repos by reusing the ops changelog engine. Optionally write CHANGELOG.md updates in place."
+    },
+    {
       "name": "dotfiles_check_symlinks",
       "description": "Check health of all expected dotfiles symlinks (healthy, broken, or missing)."
     },
@@ -427,6 +431,14 @@
     {
       "name": "dotfiles_pipeline_run",
       "description": "Run the build+test pipeline (hg-pipeline.sh) on a repo. Supports Go, Node.js, and Python. Returns JSON results with per-step timing."
+    },
+    {
+      "name": "dotfiles_pipeline_status",
+      "description": "Aggregate remote CI and cached local baseline signals across repos in one view. Optionally refresh baseline data first and filter to specific repos."
+    },
+    {
+      "name": "dotfiles_release",
+      "description": "Run dry-run or execute release orchestration across explicit repo/version targets by reusing the ops release engine."
     },
     {
       "name": "dotfiles_reload_service",
@@ -1608,7 +1620,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 393,
+  "tool_count": 396,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [

@@ -645,6 +645,13 @@
     "deferred": true
   },
   {
+    "name": "dotfiles_changelog_gen",
+    "description": "Generate changelog previews across selected workspace repos by reusing the ops changelog engine. Optionally write CHANGELOG.md updates in place.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "dotfiles_check_symlinks",
     "description": "Check health of all expected dotfiles symlinks (healthy, broken, or missing).",
     "category": "",
@@ -876,6 +883,20 @@
     "description": "Run the build+test pipeline (hg-pipeline.sh) on a repo. Supports Go, Node.js, and Python. Returns JSON results with per-step timing.",
     "category": "",
     "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_pipeline_status",
+    "description": "Aggregate remote CI and cached local baseline signals across repos in one view. Optionally refresh baseline data first and filter to specific repos.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "dotfiles_release",
+    "description": "Run dry-run or execute release orchestration across explicit repo/version targets by reusing the ops release engine.",
+    "category": "",
+    "is_write": false,
     "deferred": true
   },
   {
