@@ -28,12 +28,12 @@ Or use the pipeline script directly:
 
 ## Architecture
 
-dotfiles-mcp is a single-binary MCP server with 86 tools registered across module files:
+dotfiles-mcp is a single-binary MCP server with 87 tools registered across module files:
 
 - `main.go` -- Server setup, tool registration
 - `mod_hyprland.go` -- Hyprland compositor tools
 - `mod_shader.go` -- Ghostty shader pipeline
-- `mod_input.go` -- Input device management (logiops, makima, Solaar, MIDI)
+- `mod_input.go` -- Input device management (juhradial-mx, makima, MIDI)
 - `oss.go` -- Open-source readiness scoring
 
 All tools are built on [mcpkit](https://github.com/hairglasses-studio/mcpkit) using `handler.TypedHandler` generics and `registry.ToolDefinition`.

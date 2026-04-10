@@ -30,8 +30,6 @@ func TestInputModuleRegistration(t *testing.T) {
 
 	for _, want := range []string{
 		"input_status",
-		"input_get_logiops_config",
-		"input_set_logiops_config",
 		"input_list_makima_profiles",
 		"input_get_makima_profile",
 		"input_set_makima_profile",
@@ -77,19 +75,19 @@ func TestMidiModuleRegistration(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SolaarModule registration
+// JuhradialModule registration
 // ---------------------------------------------------------------------------
 
-func TestSolaarModuleRegistration(t *testing.T) {
-	m := &SolaarModule{}
+func TestJuhradialModuleRegistration(t *testing.T) {
+	m := &JuhradialModule{}
 
-	if m.Name() != "solaar" {
-		t.Fatalf("expected name solaar, got %s", m.Name())
+	if m.Name() != "juhradial" {
+		t.Fatalf("expected name juhradial, got %s", m.Name())
 	}
 
 	tools := m.Tools()
-	if len(tools) != 2 {
-		t.Fatalf("expected 2 solaar tools, got %d", len(tools))
+	if len(tools) != 5 {
+		t.Fatalf("expected 5 juhradial tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -97,8 +95,11 @@ func TestSolaarModuleRegistration(t *testing.T) {
 	srv := mcptest.NewServer(t, reg)
 
 	for _, want := range []string{
-		"input_get_solaar_settings",
-		"input_set_solaar_setting",
+		"input_get_juhradial_config",
+		"input_set_juhradial_config",
+		"input_get_juhradial_profiles",
+		"input_set_juhradial_profiles",
+		"input_get_juhradial_battery",
 	} {
 		if !srv.HasTool(want) {
 			t.Errorf("missing tool: %s", want)

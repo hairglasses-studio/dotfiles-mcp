@@ -107,7 +107,7 @@ Set in your MCP config:
 | Desktop Services | 6 | Cascade reload, rice check, eww bar management |
 | Shader Pipeline | 13 | GLSL shader lifecycle for Ghostty and wallpapers -- list, set, cycle, test, build |
 | Bluetooth | 9 | Device discovery, pairing (BLE-safe), connect/disconnect, battery, trust |
-| Input Devices | 13 | Logitech mouse config, gamepad profiles (makima), Solaar settings |
+| Input Devices | 14 | juhradial-mx config, MX battery, and gamepad profiles (makima) |
 | MIDI | 4 | USB MIDI controller detection and mapping config |
 | Composed Workflows | 2 | Multi-step automations: BT discover-and-connect, controller auto-setup |
 | Open-Source Readiness | 2 | Score repos 0-100 across 8 categories with actionable suggestions |
@@ -132,7 +132,7 @@ Runtime tools vary by category. Missing tools are detected gracefully -- unused 
 | Hyprland | `hyprctl`, `ydotool`, `wtype` |
 | Bluetooth | `bluetoothctl` |
 | Shaders | `glslangValidator` (optional, for compile-testing) |
-| Input / Mouse | `logiops` (logid), `solaar`, `makima` |
+| Input / Mouse | `juhradial-mx`, `ydotool`, `makima` |
 | Desktop | `eww`, `makoctl`, `pgrep` |
 | GitHub Org | `gh` (GitHub CLI) |
 | MIDI | ALSA (`aconnect`, `amidi`) |

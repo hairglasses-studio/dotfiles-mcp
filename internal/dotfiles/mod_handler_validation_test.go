@@ -111,36 +111,32 @@ func TestMidiGenerateMapping_ValidTemplate(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Solaar handler validation tests
+// Juhradial handler validation tests
 // ---------------------------------------------------------------------------
 
-func TestSolaarSetSetting_MissingSetting(t *testing.T) {
-	m := &SolaarModule{}
-	td := findModuleTool(t, m, "input_set_solaar_setting")
+func TestJuhradialSetConfig_MissingContent(t *testing.T) {
+	m := &JuhradialModule{}
+	td := findModuleTool(t, m, "input_set_juhradial_config")
 	req := registry.CallToolRequest{}
 	req.Params.Arguments = map[string]any{
-		"device":  "MX Master 4",
-		"setting": "",
-		"value":   "10",
+		"content": "",
 	}
 	result, err := td.Handler(context.Background(), req)
 	if err == nil && (result == nil || !result.IsError) {
-		t.Fatal("expected error for empty setting")
+		t.Fatal("expected error for empty content")
 	}
 }
 
-func TestSolaarSetSetting_MissingValue(t *testing.T) {
-	m := &SolaarModule{}
-	td := findModuleTool(t, m, "input_set_solaar_setting")
+func TestJuhradialSetProfiles_InvalidJSON(t *testing.T) {
+	m := &JuhradialModule{}
+	td := findModuleTool(t, m, "input_set_juhradial_profiles")
 	req := registry.CallToolRequest{}
 	req.Params.Arguments = map[string]any{
-		"device":  "MX Master 4",
-		"setting": "scroll-ratchet-torque",
-		"value":   "",
+		"content": "{invalid}",
 	}
 	result, err := td.Handler(context.Background(), req)
 	if err == nil && (result == nil || !result.IsError) {
-		t.Fatal("expected error for empty value")
+		t.Fatal("expected error for invalid JSON")
 	}
 }
 
@@ -256,32 +252,32 @@ func TestOSSCheck_MissingRepoPath_Handler(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Input logiops config handler validation
+// Input juhradial config handler validation
 // ---------------------------------------------------------------------------
 
-func TestInputGetLogiopsConfig_NoConfigFile(t *testing.T) {
+func TestInputGetJuhradialConfig_NoConfigFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
 
-	m := &InputModule{}
-	td := findModuleTool(t, m, "input_get_logiops_config")
+	m := &JuhradialModule{}
+	td := findModuleTool(t, m, "input_get_juhradial_config")
 	req := registry.CallToolRequest{}
 	req.Params.Arguments = map[string]any{}
 	result, err := td.Handler(context.Background(), req)
 	if err == nil && (result == nil || !result.IsError) {
-		t.Fatal("expected error when logiops config file doesn't exist")
+		t.Fatal("expected error when juhradial config file doesn't exist")
 	}
 }
 
-func TestInputGetLogiopsConfig_ValidFile(t *testing.T) {
+func TestInputGetJuhradialConfig_ValidFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
 
-	os.MkdirAll(filepath.Join(dir, "logiops"), 0755)
-	os.WriteFile(filepath.Join(dir, "logiops", "logid.cfg"), []byte("devices = []"), 0644)
+	os.MkdirAll(filepath.Join(dir, "juhradial"), 0755)
+	os.WriteFile(filepath.Join(dir, "juhradial", "config.json"), []byte("{\"app\":{}}"), 0644)
 
-	m := &InputModule{}
-	td := findModuleTool(t, m, "input_get_logiops_config")
+	m := &JuhradialModule{}
+	td := findModuleTool(t, m, "input_get_juhradial_config")
 	req := registry.CallToolRequest{}
 	req.Params.Arguments = map[string]any{}
 	result, err := td.Handler(context.Background(), req)

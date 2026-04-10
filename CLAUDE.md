@@ -107,11 +107,9 @@ go install .
 - `input_generate_controller_profile` — Generate makima profile from template (desktop/gaming/media/macropad)
 - `input_controller_test` — Detect controllers, generate missing profiles, optionally restart makima
 
-### Logiops / Mouse (4)
-- `input_status` — Show running state of input services (logid, makima) and battery levels
-- `input_get_logiops_config` — Read current logiops config for Logitech mice
-- `input_set_logiops_config` — Write logiops config, optionally deploy to /etc/logid.cfg + restart logid
-- `input_restart_services` — Restart input device services (logid, makima, or both; requires sudo)
+### Input Services (2)
+- `input_status` — Show running state of juhradial mouse services, makima, and MX battery status
+- `input_restart_services` — Restart `mouse`, `controller`, or `all` input service groups
 
 ### Makima Profiles (4)
 - `input_list_makima_profiles` — List all per-app button remapping profiles
@@ -119,9 +117,12 @@ go install .
 - `input_set_makima_profile` — Create or update a makima profile (validates TOML)
 - `input_delete_makima_profile` — Delete a makima profile
 
-### Solaar (2)
-- `input_get_solaar_settings` — Read Solaar settings for Logitech devices
-- `input_set_solaar_setting` — Set a Solaar device setting
+### juhradial-mx (5)
+- `input_get_juhradial_config` — Read the tracked `juhradial/config.json`
+- `input_set_juhradial_config` — Write the tracked `juhradial/config.json` after JSON validation
+- `input_get_juhradial_profiles` — Read the tracked `juhradial/profiles.json`
+- `input_set_juhradial_profiles` — Write the tracked `juhradial/profiles.json` after JSON validation
+- `input_get_juhradial_battery` — Read MX battery status from juhradial D-Bus with bluetoothctl fallback
 
 ### MIDI (4)
 - `midi_list_devices` — Detect connected USB MIDI controllers via ALSA

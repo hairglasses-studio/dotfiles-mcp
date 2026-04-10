@@ -196,7 +196,7 @@ type SystemdFailedOutput struct {
 // ── systemd_restart_verify (composed) ──────────────────────────────────────
 
 type SystemdRestartVerifyInput struct {
-	Unit      string `json:"unit" jsonschema:"required,description=systemd unit name (e.g. logid.service)"`
+	Unit      string `json:"unit" jsonschema:"required,description=systemd unit name (e.g. juhradialmx-daemon.service)"`
 	TimeoutMs int    `json:"timeout_ms,omitempty" jsonschema:"description=Max time to wait for unit to become active (default 10000ms)"`
 	Scope     string `json:"scope,omitempty" jsonschema:"description=systemd scope: user (default) or system,enum=user,enum=system"`
 }
