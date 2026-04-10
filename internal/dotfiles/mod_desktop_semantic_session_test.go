@@ -1054,14 +1054,15 @@ func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
 	}
 
 	waitReadyResult := callDesktopSessionTool(t, "session_wait_ready", map[string]any{
-		"session_id": newest.ID,
-		"timeout":    1,
+		"session_id":       newest.ID,
+		"timeout":          1,
+		"require_semantic": true,
 	})
 	if waitReadyResult == nil || waitReadyResult.IsError {
 		t.Fatalf("expected successful session_wait_ready result, got %q", extractTextFromResult(t, waitReadyResult))
 	}
 	waitOut := unmarshalSessionWaitReadyResult(t, waitReadyResult)
-	if !waitOut.Ready || waitOut.Status.ResolvedStatus != "connected" || waitOut.Timeout != 1 {
+	if !waitOut.Ready || !waitOut.RequireSemantic || waitOut.Status.ResolvedStatus != "connected" || waitOut.Timeout != 1 {
 		t.Fatalf("unexpected session wait-ready output: %#v", waitOut)
 	}
 	if !waitOut.Status.SemanticProbeReady || waitOut.Status.SemanticAppCount != 1 {

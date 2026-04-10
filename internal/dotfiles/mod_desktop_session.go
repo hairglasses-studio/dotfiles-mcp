@@ -72,8 +72,9 @@ type SessionListInput struct {
 }
 
 type SessionWaitReadyInput struct {
-	SessionID string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
-	Timeout   int    `json:"timeout,omitempty" jsonschema:"description=Max seconds to wait for the session Wayland socket and D-Bus bus (default 5)"`
+	SessionID       string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	Timeout         int    `json:"timeout,omitempty" jsonschema:"description=Max seconds to wait for the session Wayland socket and D-Bus bus (default 5)"`
+	RequireSemantic bool   `json:"require_semantic,omitempty" jsonschema:"description=When true, continue waiting until semantic AT-SPI inspection is reachable, not just the Wayland socket and session bus."`
 }
 
 type SessionScreenshotInput struct {
@@ -267,10 +268,11 @@ type SessionStatusOutput struct {
 }
 
 type SessionWaitReadyOutput struct {
-	Status  SessionStatusOutput `json:"status"`
-	Timeout int                 `json:"timeout"`
-	Ready   bool                `json:"ready"`
-	Error   string              `json:"error,omitempty"`
+	Status          SessionStatusOutput `json:"status"`
+	Timeout         int                 `json:"timeout"`
+	RequireSemantic bool                `json:"require_semantic,omitempty"`
+	Ready           bool                `json:"ready"`
+	Error           string              `json:"error,omitempty"`
 }
 
 type SessionScreenshotOutput struct {
@@ -559,17 +561,27 @@ func desktopSessionAlive(pid int) bool {
 	return syscall.Kill(pid, 0) == nil
 }
 
-func waitForDesktopSessionReady(record *desktopSessionRecord, timeout time.Duration) error {
+func waitForDesktopSessionReady(record *desktopSessionRecord, timeout time.Duration, requireSemantic bool) error {
 	if record == nil {
 		return fmt.Errorf("session record is required")
 	}
 	deadline := time.Now().Add(timeout)
 	socketPath := filepath.Join(record.XDGRuntimeDir, record.WaylandDisplay)
+	lastSemanticProbeError := ""
 	for time.Now().Before(deadline) {
 		hydrateDesktopSessionRecord(record)
 		if strings.TrimSpace(record.DBUSSessionBusAddress) != "" && pathExists(socketPath) {
-			record.Status = "connected"
-			return nil
+			if requireSemantic {
+				semanticProbeReady, _, _, semanticProbeError := desktopSessionSemanticProbe(*record)
+				if semanticProbeReady {
+					record.Status = "connected"
+					return nil
+				}
+				lastSemanticProbeError = strings.TrimSpace(semanticProbeError)
+			} else {
+				record.Status = "connected"
+				return nil
+			}
 		}
 		if record.PID > 0 && !desktopSessionAlive(record.PID) {
 			logTail := ""
@@ -590,6 +602,13 @@ func waitForDesktopSessionReady(record *desktopSessionRecord, timeout time.Durat
 	}
 	if !pathExists(socketPath) {
 		record.Notes = append(record.Notes, "wayland socket not detected before timeout")
+	}
+	if requireSemantic {
+		note := "semantic probe not ready before timeout"
+		if lastSemanticProbeError != "" {
+			note += ": " + lastSemanticProbeError
+		}
+		record.Notes = append(record.Notes, note)
 	}
 	record.Status = "starting"
 	return nil
@@ -1063,7 +1082,7 @@ exec kwin_wayland --virtual --no-lockscreen
 			}
 
 			record.PID = cmd.Process.Pid
-			if err := waitForDesktopSessionReady(&record, 5*time.Second); err != nil {
+			if err := waitForDesktopSessionReady(&record, 5*time.Second, false); err != nil {
 				return desktopSessionRecord{}, err
 			}
 			if err := saveDesktopSessionRecord(record); err != nil {
@@ -1097,7 +1116,7 @@ exec kwin_wayland --virtual --no-lockscreen
 			if timeout <= 0 {
 				timeout = 5
 			}
-			waitErr := waitForDesktopSessionReady(&record, time.Duration(timeout)*time.Second)
+			waitErr := waitForDesktopSessionReady(&record, time.Duration(timeout)*time.Second, input.RequireSemantic)
 			if waitErr != nil {
 				record.Notes = append(record.Notes, waitErr.Error())
 			}
@@ -1110,10 +1129,11 @@ exec kwin_wayland --virtual --no-lockscreen
 				errText = waitErr.Error()
 			}
 			return SessionWaitReadyOutput{
-				Status:  status,
-				Timeout: timeout,
-				Ready:   status.ResolvedStatus == "connected",
-				Error:   errText,
+				Status:          status,
+				Timeout:         timeout,
+				RequireSemantic: input.RequireSemantic,
+				Ready:           status.ResolvedStatus == "connected" && (!input.RequireSemantic || status.SemanticProbeReady),
+				Error:           errText,
 			}, nil
 		},
 	)
