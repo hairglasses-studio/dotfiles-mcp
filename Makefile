@@ -1,4 +1,4 @@
-.PHONY: build test vet lint check coverage contract-snapshot contract-check host-smoke release-parity publish-check
+.PHONY: build test vet lint check coverage contract-snapshot contract-check contract-diff canonical-drift host-smoke release-parity publish-check
 
 build:
 	go build ./...
@@ -24,6 +24,12 @@ contract-snapshot:
 
 contract-check:
 	go run ./cmd/dotfiles-mcp-contract --check
+
+contract-diff:
+	bash ./scripts/contract-diff-summary.sh
+
+canonical-drift:
+	bash ./scripts/canonical-drift.sh
 
 host-smoke:
 	bash ./scripts/host-smoke.sh

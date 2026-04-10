@@ -20,6 +20,7 @@ go test ./... -count=1
 make pipeline-check   # build + vet + test (via shared pipeline)
 make publish-check    # mirror contract + manifest parity
 make host-smoke       # host-dependent surfaces on the publish machine
+make canonical-drift  # compare this mirror against dotfiles/mcp/dotfiles-mcp
 ```
 
 Or use the pipeline script directly:
@@ -30,7 +31,9 @@ Or use the pipeline script directly:
 
 ## Architecture
 
-dotfiles-mcp is a single-binary MCP server with a discovery-first contract. The canonical source of truth lives at `dotfiles/mcp/dotfiles-mcp` inside the shared `hairglasses-studio/dotfiles` repo. That canonical module now exposes 276 tools across 32 modules plus workflow resources and prompt entrypoints, while this standalone repo remains a publish mirror for installation and discovery.
+dotfiles-mcp is a single-binary MCP server with a discovery-first contract. The canonical source of truth lives at `dotfiles/mcp/dotfiles-mcp` inside the shared `hairglasses-studio/dotfiles` repo. This standalone repo remains a publish mirror for installation and discovery, with its exact public surface committed under `snapshots/contract/` and `.well-known/mcp.json`.
+
+Current mirror counts should always come from the checked-in contract bundle, not hand-maintained prose. At the time of this tranche the mirror bundle exposes `278` tools, `32` modules, `8` resources, and `4` prompts.
 
 Focus paths:
 
@@ -49,8 +52,9 @@ All tools are built on [mcpkit](https://github.com/hairglasses-studio/mcpkit) us
 3. Run the pipeline: `go build ./... && go vet ./... && go test ./... -count=1`
 4. If the change affects the public surface, refresh the committed mirror artifacts: `make contract-snapshot`
 5. Run mirror parity checks: `make publish-check`
-6. Commit with a descriptive message
-7. Push and open a PR
+6. Compare against the canonical source when applicable: `make canonical-drift`
+7. Commit with a descriptive message
+8. Push and open a PR
 
 ## Code Style
 
@@ -79,6 +83,8 @@ For publish-mirror work, also keep these repo-owned guards green:
 
 - `make contract-check` for snapshot and `.well-known/mcp.json` drift
 - `make release-parity` for canonical-source and manifest parity
+- `make contract-diff` for human-readable public surface deltas
+- `make canonical-drift` to compare the committed mirror bundle against canonical `dotfiles/mcp/dotfiles-mcp`
 - `make host-smoke` on a real workstation host before release-oriented pushes
 
 ## Questions?
