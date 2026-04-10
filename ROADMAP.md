@@ -43,11 +43,17 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 - Keep the roadmap explicit about mirror ownership, host dependencies, and publish parity.
 
 ### Recommended Work
-- [ ] [Mirror contract] Keep the canonical-source mapping to `dotfiles/mcp/dotfiles-mcp` explicit in roadmap, README, and release notes.
-- [ ] [Count reconciliation] Make the standalone mirror state explicit whenever its public docs lag the canonical tool count or module inventory.
-- [ ] [Contract snapshots] Snapshot the exported tool/resource/prompt contracts for the major module groups so mirror drift is visible.
-- [ ] [Host smoke tests] Add smoke tests for the host-dependent Hyprland, Bluetooth, input, and org-lifecycle surfaces before publish.
-- [ ] [Release parity] Verify that release tags and manifests still reflect the canonical source-of-truth module.
+- [x] [Mirror contract] Keep the canonical-source mapping to `dotfiles/mcp/dotfiles-mcp` explicit in roadmap, README, and release notes.
+- [x] [Count reconciliation] Make the standalone mirror state explicit whenever its public docs lag the canonical tool count or module inventory.
+- [x] [Contract snapshots] Snapshot the exported tool/resource/prompt contracts for the major module groups so mirror drift is visible.
+- [x] [Host smoke tests] Add smoke tests for the host-dependent Hyprland, Bluetooth, input, and org-lifecycle surfaces before publish.
+- [x] [Release parity] Verify that release tags and manifests still reflect the canonical source-of-truth module.
+
+### Landed Safeguards (2026-04-09)
+- `cmd/dotfiles-mcp-contract` now generates committed tool/resource/prompt snapshots plus `.well-known/mcp.json`.
+- `scripts/host-smoke.sh` provides bounded workstation checks for Hyprland, Bluetooth, input, and GitHub CLI dependencies.
+- `scripts/release-parity.sh` verifies canonical-source references and manifest parity before publish.
+- `make contract-snapshot`, `make contract-check`, `make host-smoke`, `make release-parity`, and `make publish-check` make the mirror guard path explicit.
 
 ### Rationale Snapshot
 - Tier / lifecycle: `standalone` / `publish-mirror`

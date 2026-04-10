@@ -114,6 +114,29 @@ Set in your MCP config:
 }
 ```
 
+## Mirror Guards
+
+The standalone repo now keeps its publish-mirror contract explicit and checkable:
+
+```bash
+# Regenerate committed contract snapshots and .well-known manifest
+make contract-snapshot
+
+# Fail if snapshots or .well-known/mcp.json drift from the live registry
+make contract-check
+
+# Run bounded host checks for Hyprland, Bluetooth, input, and GitHub CLI surfaces
+make host-smoke
+
+# Verify mirror docs + manifest parity for publish
+make release-parity
+
+# Full publish guard: vet + test + contract + manifest parity
+make publish-check
+```
+
+Generated artifacts live under `snapshots/contract/` and `.well-known/mcp.json`.
+
 ## Tool Categories
 
 | Category | Tools | Description |

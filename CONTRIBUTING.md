@@ -18,6 +18,8 @@ go test ./... -count=1
 
 ```bash
 make pipeline-check   # build + vet + test (via shared pipeline)
+make publish-check    # mirror contract + manifest parity
+make host-smoke       # host-dependent surfaces on the publish machine
 ```
 
 Or use the pipeline script directly:
@@ -28,7 +30,7 @@ Or use the pipeline script directly:
 
 ## Architecture
 
-dotfiles-mcp is a single-binary MCP server with a discovery-first contract. The canonical module now exposes 276 tools across 32 modules plus workflow resources and prompt entrypoints, while this standalone repo remains a publish mirror for installation and discovery.
+dotfiles-mcp is a single-binary MCP server with a discovery-first contract. The canonical source of truth lives at `dotfiles/mcp/dotfiles-mcp` inside the shared `hairglasses-studio/dotfiles` repo. That canonical module now exposes 276 tools across 32 modules plus workflow resources and prompt entrypoints, while this standalone repo remains a publish mirror for installation and discovery.
 
 Focus paths:
 
@@ -45,8 +47,10 @@ All tools are built on [mcpkit](https://github.com/hairglasses-studio/mcpkit) us
 1. Create a branch: `git checkout -b feat/my-change`
 2. Make your changes
 3. Run the pipeline: `go build ./... && go vet ./... && go test ./... -count=1`
-4. Commit with a descriptive message
-5. Push and open a PR
+4. If the change affects the public surface, refresh the committed mirror artifacts: `make contract-snapshot`
+5. Run mirror parity checks: `make publish-check`
+6. Commit with a descriptive message
+7. Push and open a PR
 
 ## Code Style
 
@@ -70,6 +74,12 @@ This runs vet + fast tests before each commit.
 ## CI
 
 All PRs trigger CI automatically. The pipeline runs lint, test, and build checks.
+
+For publish-mirror work, also keep these repo-owned guards green:
+
+- `make contract-check` for snapshot and `.well-known/mcp.json` drift
+- `make release-parity` for canonical-source and manifest parity
+- `make host-smoke` on a real workstation host before release-oriented pushes
 
 ## Questions?
 

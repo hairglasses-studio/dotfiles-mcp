@@ -375,6 +375,8 @@ func dotfilesProfile() string {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("DOTFILES_MCP_PROFILE"))) {
 	case "", "default":
 		return "default"
+	case "desktop":
+		return "desktop"
 	case "ops":
 		return "ops"
 	case "full":
@@ -388,6 +390,8 @@ func shouldDeferDotfilesTool(profile string, td registry.ToolDefinition) bool {
 	switch profile {
 	case "full":
 		return false
+	case "desktop":
+		return !isDesktopProfileTool(td.Tool.Name)
 	case "ops":
 		return !(strings.HasPrefix(td.Tool.Name, "dotfiles_") ||
 			strings.HasPrefix(td.Tool.Name, "workflow_") ||

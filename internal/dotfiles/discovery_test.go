@@ -23,6 +23,9 @@ func TestDotfilesProfile(t *testing.T) {
 		{"default", "default"},
 		{"Default", "default"},
 		{"DEFAULT", "default"},
+		{"desktop", "desktop"},
+		{"Desktop", "desktop"},
+		{"DESKTOP", "desktop"},
 		{"ops", "ops"},
 		{"Ops", "ops"},
 		{"OPS", "ops"},
@@ -58,6 +61,16 @@ func TestShouldDeferDotfilesTool(t *testing.T) {
 		{"full", "shader_list", false},
 		{"full", "dotfiles_validate_config", false},
 		{"full", "hypr_list_windows", false},
+
+		// desktop profile: desktop control surfaces eager, non-desktop deferred
+		{"desktop", "hypr_list_windows", false},
+		{"desktop", "shader_status", false},
+		{"desktop", "dotfiles_rice_check", false},
+		{"desktop", "dotfiles_eww_status", false},
+		{"desktop", "input_status", false},
+		{"desktop", "bt_connect", true},
+		{"desktop", "midi_list_devices", true},
+		{"desktop", "dotfiles_fleet_audit", true},
 
 		// ops profile: dotfiles_, workflow_, oss_ are NOT deferred
 		{"ops", "dotfiles_validate_config", false},
@@ -143,6 +156,34 @@ func TestRegisterDotfilesModules_OpsProfile(t *testing.T) {
 	// Non-dotfiles tools should be deferred.
 	if !reg.IsDeferred("shader_list") {
 		t.Error("shader_list should be deferred in ops profile")
+	}
+}
+
+func TestRegisterDotfilesModules_DesktopProfile(t *testing.T) {
+	t.Setenv("DOTFILES_MCP_PROFILE", "desktop")
+
+	reg := registry.NewToolRegistry()
+	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
+
+	for _, toolName := range []string{
+		"hypr_list_windows",
+		"shader_status",
+		"dotfiles_rice_check",
+		"dotfiles_eww_status",
+		"input_status",
+	} {
+		if reg.IsDeferred(toolName) {
+			t.Fatalf("%s should NOT be deferred in desktop profile", toolName)
+		}
+	}
+	for _, toolName := range []string{
+		"dotfiles_fleet_audit",
+		"bt_connect",
+		"midi_list_devices",
+	} {
+		if !reg.IsDeferred(toolName) {
+			t.Fatalf("%s should be deferred in desktop profile", toolName)
+		}
 	}
 }
 
