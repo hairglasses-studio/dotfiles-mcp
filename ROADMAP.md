@@ -26,6 +26,8 @@ Name-based semantic targeting now resolves relation labels, placeholder text, de
 
 Session status and readiness inspection now include semantic probe readiness, visible app counts, and probe errors so KWin-backed and other tracked sessions can be triaged for semantic targetability before deeper automation attempts.
 
+`session_wait_ready` can now explicitly gate on semantic reachability, so workflows that depend on AT-SPI targeting no longer need to treat “Wayland socket plus D-Bus” as sufficient readiness on their own.
+
 ## Planned
 
 ### Phase 2 — Product Expansion
