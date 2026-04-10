@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
-MCP server for desktop environment management, repo ops, GitHub org lifecycle, fleet auditing, open-source readiness scoring, kitty runtime control, and Arch Linux research-first package workflows.
+MCP server for desktop environment management, semantic AT-SPI control, isolated desktop sessions, repo ops, GitHub org lifecycle, fleet auditing, open-source readiness scoring, kitty runtime control, and Arch Linux research-first package workflows.
 
 Canonical development lives in [`hairglasses-studio/dotfiles`](https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp) under `dotfiles/mcp/dotfiles-mcp`. The standalone [`dotfiles-mcp`](https://github.com/hairglasses-studio/dotfiles-mcp) repo is a publish mirror kept in parity for installation and discovery.
 
@@ -148,6 +148,9 @@ Generated artifacts live under `snapshots/contract/` and `.well-known/mcp.json`.
 The authoritative publish-mirror contract is generated into `snapshots/contract/` and `.well-known/mcp.json`. Treat those committed artifacts as the source of truth for the live tool, resource, and prompt counts. The current exported surface is:
 
 - a canonical-superset mirror with zero missing canonical tools
+- 359 tools across 37 modules
+- 24 resources, including 5 resource templates
+- 12 prompt entrypoints
 - a small set of standalone-only Arch, Hyprland, and Kitty extensions
 - discovery-first profiles: `default`, `desktop`, `ops`, `full`
 
@@ -155,6 +158,8 @@ High-value additions in the current surface include:
 
 - Canonical carry-forward fixes for notification history entry/clear tools, fleet baseline refresh parity, updated fleet audit semantics, and Kitty-aligned shader helpers
 - Expanded Hyprland IPC coverage: active window/workspace, binds, devices, layers, layouts, config errors, cursor position, option reads, keyword writes, dispatch, notify, property control, and socket2 event capture/wait helpers
+- Semantic desktop targeting: AT-SPI backed desktop snapshots, window targeting, element find/click/wait flows, and typed keyboard actions with OCR remaining available as a fallback path
+- Desktop session control: live-session handles plus optional KWin virtual-session startup, window inventory/focus, screenshots, clipboard reads/writes, app launches, and per-session log access
 - Kitty runtime control: status, tab/window inventory, config reload, font size, opacity, themes, layouts, titles, send-text, image overlays, and generic remote subcommands
 - Arch Linux research-first operations: ArchWiki search/page reads, official package search/info, AUR search, PKGBUILD auditing, Arch news review, mirror status, update dry runs, pacman log reads, orphan detection, and file-owner inspection
 
@@ -176,6 +181,8 @@ Runtime tools vary by category. Missing tools are detected gracefully -- unused 
 | Category | Runtime Dependencies |
 |----------|---------------------|
 | Hyprland | `hyprctl`, `ydotool`, `wtype` |
+| Semantic Desktop | `python3`, `pyatspi` |
+| Session Tools | `wayland-info`, `grim`, `wl-copy`, `wl-paste`; `kwin_wayland` for virtual-session startup |
 | Bluetooth | `bluetoothctl` |
 | Shaders | `glslangValidator` (optional, for compile-testing) |
 | Input / Mouse | `juhradial-mx`, `ydotool`, `makima` |

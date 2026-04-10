@@ -213,12 +213,28 @@
       "description": "Write text to the Wayland clipboard. Uses wl-copy. Optionally specify a MIME type."
     },
     {
+      "name": "desktop_capabilities",
+      "description": "Check whether the embedded AT-SPI helper, python3, and pyatspi are available on this host."
+    },
+    {
+      "name": "desktop_click",
+      "description": "Click a semantic element by path or by app plus name and optional role."
+    },
+    {
       "name": "desktop_click_text",
       "description": "DESTRUCTIVE: Find text on screen via OCR and click at its center. The atomic 'click the button labeled X' primitive. Requires explicit approval."
     },
     {
+      "name": "desktop_find",
+      "description": "Find a semantic element by app plus name, role, or a previously returned path."
+    },
+    {
       "name": "desktop_find_text",
       "description": "Screenshot + OCR + locate text on screen. Returns bounding box coordinates in desktop space suitable for ydotool. Use to find where a button or label appears before clicking."
+    },
+    {
+      "name": "desktop_key",
+      "description": "Send raw ydotool key events after a semantic target has focus."
     },
     {
       "name": "desktop_project_open",
@@ -227,6 +243,22 @@
     {
       "name": "desktop_screenshot_ocr",
       "description": "Screenshot the full desktop or a specific window (by address/class) and extract text via OCR. Returns both the image (for LLM vision) and extracted text. Use for seeing what is on screen."
+    },
+    {
+      "name": "desktop_snapshot",
+      "description": "List running AT-SPI applications and high-level semantic metadata before targeting a window."
+    },
+    {
+      "name": "desktop_target_windows",
+      "description": "Read the semantic accessibility tree for one application, bounded by depth."
+    },
+    {
+      "name": "desktop_type",
+      "description": "Type text as a semantic desktop follow-up after a semantic target has focus."
+    },
+    {
+      "name": "desktop_wait_for_element",
+      "description": "Wait for a semantic element to appear, then return its resolved element record."
     },
     {
       "name": "desktop_wait_for_text",
@@ -254,7 +286,7 @@
     },
     {
       "name": "dotfiles_desktop_status",
-      "description": "Report desktop control readiness, including Hyprland, screenshot/OCR, input injection, and the kitty-to-ghostty terminal shader pipeline."
+      "description": "Report desktop control readiness, including Hyprland, AT-SPI semantic targeting, session helpers, screenshot/OCR, input injection, and the kitty-to-ghostty terminal shader pipeline."
     },
     {
       "name": "dotfiles_eww_get",
@@ -1205,6 +1237,50 @@
       "description": "Take a screenshot and immediately open it in swappy for annotation. Composed: wayshot capture then swappy launch."
     },
     {
+      "name": "session_clipboard_get",
+      "description": "Read the clipboard for a tracked session using wl-paste."
+    },
+    {
+      "name": "session_clipboard_set",
+      "description": "Write text into a tracked session clipboard using wl-copy."
+    },
+    {
+      "name": "session_connect",
+      "description": "Create or rehydrate a session handle for the current live Wayland desktop."
+    },
+    {
+      "name": "session_focus_window",
+      "description": "Focus a window inside a Hyprland-backed session by address, class, or title substring."
+    },
+    {
+      "name": "session_launch_app",
+      "description": "Launch an application inside a tracked session and persist a launch log."
+    },
+    {
+      "name": "session_list_windows",
+      "description": "List windows for a Hyprland-backed session. Returns an unsupported note for non-Hyprland sessions."
+    },
+    {
+      "name": "session_read_app_log",
+      "description": "Read the most recent launch log for a tracked session, optionally filtered by app substring."
+    },
+    {
+      "name": "session_screenshot",
+      "description": "Take a screenshot inside a tracked session using grim."
+    },
+    {
+      "name": "session_start",
+      "description": "Start and persist a desktop session handle. Supports a live handle or an optional KWin virtual backend."
+    },
+    {
+      "name": "session_stop",
+      "description": "Stop a tracked desktop session. Live handles are marked stopped without killing the current compositor."
+    },
+    {
+      "name": "session_wayland_info",
+      "description": "Read wayland-info for a tracked session."
+    },
+    {
       "name": "shader_audit_trail",
       "description": "View the raw, append-only shader change history log. Returns all recorded shader changes with timestamps and sources."
     },
@@ -1408,7 +1484,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 343,
+  "tool_count": 362,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [
