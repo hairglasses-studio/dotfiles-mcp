@@ -2894,6 +2894,19 @@
     "deferred": true
   },
   {
+    "name": "session_list",
+    "description": "List tracked desktop session handles with readiness and attachment summaries.",
+    "category": "desktop",
+    "search_terms": [
+      "list sessions",
+      "desktop session handles",
+      "tracked sessions",
+      "session inventory"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "session_list_windows",
     "description": "List windows for a tracked session. Hyprland-backed sessions use hyprctl; other sessions fall back to AT-SPI window discovery.",
     "category": "desktop",
@@ -2913,6 +2926,19 @@
       "session app log",
       "launch log",
       "read session log"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_read_log",
+    "description": "Read the compositor or session log for a tracked desktop session.",
+    "category": "desktop",
+    "search_terms": [
+      "session log",
+      "read compositor log",
+      "kwin virtual log",
+      "session startup log"
     ],
     "is_write": false,
     "deferred": true
@@ -2976,6 +3002,19 @@
       "wayland session"
     ],
     "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "session_status",
+    "description": "Inspect one tracked desktop session handle, including readiness, process, and log hints.",
+    "category": "desktop",
+    "search_terms": [
+      "session status",
+      "session readiness",
+      "kwin session health",
+      "session inspect"
+    ],
+    "is_write": false,
     "deferred": true
   },
   {

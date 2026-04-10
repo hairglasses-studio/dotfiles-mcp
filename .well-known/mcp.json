@@ -1397,12 +1397,20 @@
       "description": "Launch an application inside a tracked session and persist a launch log."
     },
     {
+      "name": "session_list",
+      "description": "List tracked desktop session handles with readiness and attachment summaries."
+    },
+    {
       "name": "session_list_windows",
       "description": "List windows for a tracked session. Hyprland-backed sessions use hyprctl; other sessions fall back to AT-SPI window discovery."
     },
     {
       "name": "session_read_app_log",
       "description": "Read the most recent launch log for a tracked session, optionally filtered by app substring."
+    },
+    {
+      "name": "session_read_log",
+      "description": "Read the compositor or session log for a tracked desktop session."
     },
     {
       "name": "session_read_value",
@@ -1423,6 +1431,10 @@
     {
       "name": "session_start",
       "description": "Start and persist a desktop session handle. Supports a live handle or an optional KWin virtual backend."
+    },
+    {
+      "name": "session_status",
+      "description": "Inspect one tracked desktop session handle, including readiness, process, and log hints."
     },
     {
       "name": "session_stop",
@@ -1644,7 +1656,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 402,
+  "tool_count": 405,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [
