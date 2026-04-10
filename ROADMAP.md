@@ -75,7 +75,7 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 ### Next Mirror Governance Tranche
 - [x] Automate canonical sync intake from `dotfiles/mcp/dotfiles-mcp` so publish mirrors can apply bounded carry-forward updates without manual file checkout
 - [x] Add a strict host-smoke mode so a logged-in Hyprland publish runner can turn current skip behavior into a hard gate
-- [ ] Promote contract diffs into release artifacts and changelog summaries instead of keeping them only in step summaries
+- [x] Promote contract diffs into release artifacts so tagged releases carry the public-surface delta without opening the JSON bundles
 - [ ] Run `make host-smoke` on a logged-in Hyprland publish runner so evented desktop and input checks stop degrading to skip-only validation
 - [ ] Decide which standalone-only Arch, Hyprland, and Kitty extensions should upstream into canonical dotfiles vs remain mirror-only
 

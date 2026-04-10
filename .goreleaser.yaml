@@ -6,18 +6,31 @@ before:
     - go mod tidy
 
 builds:
-  - binary: dotfiles-mcp
+  - main: ./
+    binary: dotfiles-mcp
+    env:
+      - CGO_ENABLED=1
+      - CGO_CFLAGS=-DSQLITE_ENABLE_FTS5
+      - CGO_LDFLAGS=-lm
     goos: [linux]
     goarch: [amd64, arm64]
     ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}}
 
 archives:
   - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   algorithm: sha256
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
 
 release:
   github:

@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Contract-diff publication in GitHub workflow step summaries for publish and release runs
 - `make canonical-sync-report` / `make canonical-sync-diff` plus a manifest-driven carry-forward helper for canonical-owned files
 - `make host-smoke-strict` for publish runners that should fail on skipped desktop and input checks
+- Release workflow appends the generated contract diff into the published GitHub release body
 
 ### Changed
 
