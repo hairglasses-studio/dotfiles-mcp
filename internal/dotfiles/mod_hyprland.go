@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -66,6 +67,59 @@ func runHyprctl(args ...string) (string, error) {
 		return string(out), fmt.Errorf("hyprctl %s failed: %w: %s", strings.Join(args, " "), err, string(out))
 	}
 	return string(out), nil
+}
+
+func appendHyprJSONStrings(dst []string, value any) []string {
+	switch v := value.(type) {
+	case string:
+		v = strings.TrimSpace(v)
+		if v != "" {
+			dst = append(dst, v)
+		}
+	case []any:
+		for _, item := range v {
+			dst = appendHyprJSONStrings(dst, item)
+		}
+	case map[string]any:
+		keys := make([]string, 0, len(v))
+		for key := range v {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			dst = appendHyprJSONStrings(dst, v[key])
+		}
+	}
+	return dst
+}
+
+func hyprConfigErrorMessages(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+
+	var parsed any
+	if err := json.Unmarshal([]byte(raw), &parsed); err == nil {
+		return appendHyprJSONStrings(nil, parsed)
+	}
+
+	if strings.Contains(strings.ToLower(raw), "no errors") {
+		return nil
+	}
+
+	var messages []string
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			messages = append(messages, line)
+		}
+	}
+	return messages
+}
+
+func hyprConfigHealthy(raw string) bool {
+	return len(hyprConfigErrorMessages(raw)) == 0
 }
 
 // ---------- input/output types ----------
@@ -206,7 +260,7 @@ func (m *HyprlandModule) Name() string        { return "hyprland" }
 func (m *HyprlandModule) Description() string { return "Hyprland desktop control tools" }
 
 func (m *HyprlandModule) Tools() []registry.ToolDefinition {
-	return []registry.ToolDefinition{
+	tools := []registry.ToolDefinition{
 		// ── hypr_screenshot ────────────────────────────
 		// Raw handler because TypedHandler marshals output as JSON text,
 		// but screenshots need to return mcp.ImageContent directly.
@@ -535,13 +589,16 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 					return "", err
 				}
 
-				errorsOut, err := runHyprctl("configerrors")
-				if err != nil {
-					// configerrors returns exit 1 when there are errors — that's expected
-					errorsOut = err.Error()
+				errorsOut, configErr := runHyprctl("-j", "configerrors")
+				configSummary := "none"
+				messages := hyprConfigErrorMessages(errorsOut)
+				if len(messages) > 0 {
+					configSummary = strings.Join(messages, "; ")
+				} else if configErr != nil && strings.TrimSpace(errorsOut) == "" {
+					configSummary = strings.TrimSpace(configErr.Error())
 				}
 
-				result := fmt.Sprintf("reload: %s\nconfigerrors: %s", strings.TrimSpace(reloadOut), strings.TrimSpace(errorsOut))
+				result := fmt.Sprintf("reload: %s\nconfigerrors: %s", strings.TrimSpace(reloadOut), configSummary)
 				return result, nil
 			},
 		),
@@ -915,6 +972,9 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 			Category: "hyprland",
 		},
 	}
+	tools = append(tools, hyprExtendedToolDefinitions()...)
+	tools = append(tools, hyprPersistenceToolDefinitions()...)
+	return tools
 }
 
 // ---------- window manipulation handlers ----------

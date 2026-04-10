@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
-MCP server for desktop environment management, repo ops, GitHub org lifecycle, fleet auditing, and open-source readiness scoring.
+MCP server for desktop environment management, repo ops, GitHub org lifecycle, fleet auditing, open-source readiness scoring, kitty runtime control, and Arch Linux research-first package workflows.
 
 Canonical development lives in [`hairglasses-studio/dotfiles`](https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp) under `dotfiles/mcp/dotfiles-mcp`. The standalone [`dotfiles-mcp`](https://github.com/hairglasses-studio/dotfiles-mcp) repo is a publish mirror kept in parity for installation and discovery.
 
@@ -52,15 +52,6 @@ It also ships discovery-adjacent resources and prompts for workflow entrypoints:
 - prompt entrypoints for fleet, repo, and desktop flows
 
 Use `DOTFILES_MCP_PROFILE=desktop` for a practical workstation-first eager set, or `full` if you explicitly want the full catalog treated as eager.
-
-The committed mirror contract currently exposes:
-
-- `278` tools
-- `32` registered modules
-- `8` resources
-- `4` prompts
-
-Those counts come from the checked-in bundle under [`snapshots/contract`](./snapshots/contract). The canonical source in `dotfiles/mcp/dotfiles-mcp` may lead this mirror between carry-forward tranches, so the mirror tracks its own published contract explicitly instead of implying perfect real-time parity.
 
 ## Quick Start
 
@@ -103,12 +94,12 @@ claude mcp call dotfiles dotfiles_gh_star_lists_list '{"include_items":true}'
 
 Control how many tools load at startup via `DOTFILES_MCP_PROFILE`:
 
-| Profile | Behavior | Approx. Prompt Footprint |
-|---------|----------|--------------------------|
-| `default` | Discovery tools loaded, rest deferred on demand | ~2-4K tokens |
-| `desktop` | Desktop/operator subset loaded eagerly | ~8-12K tokens |
-| `ops` | Operational subset (config, desktop, fleet) loaded eagerly | ~15-22K tokens |
-| `full` | All tools loaded immediately | ~40K+ tokens |
+| Profile | Behavior | Context Cost |
+|---------|----------|-------------|
+| `default` | Discovery tools loaded, rest deferred on demand | ~2K tokens |
+| `desktop` | Desktop/operator subset loaded eagerly | ~8K tokens |
+| `ops` | Operational subset (config, desktop, fleet) loaded eagerly | ~15K tokens |
+| `full` | All tools loaded immediately | ~40K tokens |
 
 Set in your MCP config:
 
@@ -134,12 +125,6 @@ make contract-snapshot
 # Fail if snapshots or .well-known/mcp.json drift from the live registry
 make contract-check
 
-# Summarize surface deltas against a base ref
-make contract-diff
-
-# Compare the mirror snapshot against the canonical dotfiles source
-make canonical-drift
-
 # Run bounded host checks for Hyprland, Bluetooth, input, and GitHub CLI surfaces
 make host-smoke
 
@@ -152,18 +137,20 @@ make publish-check
 
 Generated artifacts live under `snapshots/contract/` and `.well-known/mcp.json`.
 
-## Surface Domains
+## Current Surface
 
-Exact counts should come from the committed contract bundle, not prose. The mirror currently publishes these major domains:
+The authoritative publish-mirror contract is generated into `snapshots/contract/` and `.well-known/mcp.json`. The current exported surface is:
 
-| Domain | Description |
-|--------|-------------|
-| Discovery | Search, schema, catalog, stats, and health entrypoints for the deferred surface |
-| Desktop Control | Hyprland, screenshot/OCR, clipboard, notifications, shaders, and Wayland input workflows |
-| Workstation Ops | Systemd, process, tmux, sandbox, fleet audit, repo hygiene, and SDLC loops |
-| GitHub Workflows | Org lifecycle, GitHub Stars, and repo sync helpers |
-| Input & Devices | Bluetooth, juhradial-mx, controller mapping, MIDI, and mouse/controller diagnostics |
-| Research & Recovery | Claude session recovery, prompt registry, roadmap, and cross-repo operator tooling |
+- 340 tools across 35 modules
+- 24 resources, including 5 resource templates
+- 12 prompt entrypoints
+- discovery-first profiles: `default`, `desktop`, `ops`, `full`
+
+High-value additions in the current surface include:
+
+- Expanded Hyprland IPC coverage: active window/workspace, binds, devices, layers, layouts, config errors, cursor position, option reads, keyword writes, dispatch, notify, property control, and socket2 event capture/wait helpers
+- Kitty runtime control: status, tab/window inventory, config reload, font size, opacity, themes, layouts, titles, send-text, image overlays, and generic remote subcommands
+- Arch Linux research-first operations: ArchWiki search/page reads, official package search/info, AUR search, PKGBUILD auditing, Arch news review, mirror status, update dry runs, pacman log reads, orphan detection, and file-owner inspection
 
 ## Key Patterns
 

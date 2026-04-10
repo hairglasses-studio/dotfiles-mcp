@@ -1,1 +1,62 @@
-[]
+[
+  {
+    "uri_template": "archrepo://package/{name}",
+    "name": "Arch Package Metadata",
+    "description": "Read exact official Arch package metadata by package name",
+    "mime_type": "application/json",
+    "category": "arch",
+    "tags": [
+      "arch",
+      "packages",
+      "repo"
+    ]
+  },
+  {
+    "uri_template": "archwiki://page/{title}",
+    "name": "ArchWiki Page",
+    "description": "Read an ArchWiki page by title",
+    "mime_type": "application/json",
+    "category": "arch",
+    "tags": [
+      "arch",
+      "wiki",
+      "page"
+    ]
+  },
+  {
+    "uri_template": "archwiki://search/{query}",
+    "name": "ArchWiki Search",
+    "description": "Search the ArchWiki for a query string",
+    "mime_type": "application/json",
+    "category": "arch",
+    "tags": [
+      "arch",
+      "wiki",
+      "search"
+    ]
+  },
+  {
+    "uri_template": "aur://package/{name}/info",
+    "name": "AUR Package Metadata",
+    "description": "Read AUR package metadata by package name",
+    "mime_type": "application/json",
+    "category": "arch",
+    "tags": [
+      "arch",
+      "aur",
+      "package"
+    ]
+  },
+  {
+    "uri_template": "aur://package/{name}/pkgbuild",
+    "name": "AUR PKGBUILD",
+    "description": "Read the raw PKGBUILD for an AUR package",
+    "mime_type": "text/plain",
+    "category": "arch",
+    "tags": [
+      "arch",
+      "aur",
+      "pkgbuild"
+    ]
+  }
+]

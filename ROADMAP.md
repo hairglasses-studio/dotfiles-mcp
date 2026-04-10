@@ -2,31 +2,35 @@
 
 ## Current State
 
-dotfiles-mcp is best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The committed mirror contract currently exposes `278` tools across `32` modules, plus `8` resources and `4` prompts. Those counts are snapshot-backed by `.well-known/mcp.json` and `snapshots/contract/*`, and they may temporarily trail the canonical source between carry-forward tranches.
+dotfiles-mcp is now best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The current `main` target surface exposes 340 tools across 35 modules, plus 24 resources and 12 prompts, when published from the canonical source. The mirror keeps discovery-first loading, workflow resources, prompt entrypoints, and a juhradial-first MX input contract while staying explicit about its relationship to the canonical source of record.
 
-The repo now has explicit publish-mirror guards, but it should stay honest about the remaining job: reducing the still-real gap between this mirror and the richer canonical source in `dotfiles`.
+All modules functional and tested. MIT licensed, README and CLAUDE.md in place. Batch tools default to dry-run mode.
 
 ## Planned
 
-### Phase 1 — Canonical Carry-Forward
-- Automate or semi-automate source carry-forward from `dotfiles/mcp/dotfiles-mcp` so the mirror stops lagging canonical resources, prompts, and newer workstation modules
-- Reduce the current contract delta by porting the missing canonical workflow catalogs, prompts, and module registrations into the standalone layout
-- Keep `make canonical-drift` green or at least bounded enough that drift is a conscious release decision rather than an accident
+### Phase 1 — Test Coverage & Documentation
+- Increase unit test coverage for GitHub org lifecycle tools (currently lowest coverage)
+- Add integration tests for Bluetooth and input device modules
+- Per-module documentation with usage examples
+- Improve error messages for missing system dependencies (ydotool, wtype, bluetoothctl)
 
-### Phase 2 — Publish Guard Hardening
-- Keep active GitHub workflows for CI, release, server-card validation, and publish guard in this repo rather than assuming canonical-only checks are enough
-- Publish contract diff summaries into release notes or docs whenever `snapshots/contract/` changes
-- Run `host-smoke` on a logged-in self-hosted Hyprland runner before release-oriented pushes
+### Phase 2 — Desktop Automation
+- Semantic desktop control — AT-SPI backed desktop snapshot/find/click/type/key flows with OCR fallback
+- Desktop session tooling — isolated session bootstrap, screenshots, focus/window inventory, and clipboard access
+- KWin virtual-session support where the host provides `kwin_wayland --virtual`
+- Additional Hyprland eventing and compositor-adjacent helpers as new stable IPC hooks appear upstream
 
-### Phase 3 — Verification And Surface Quality
-- Expand integration coverage for Bluetooth, juhradial-mx, and desktop-control paths that still rely on workstation state
-- Add stronger tests around profile-specific eager/deferred loading behavior
-- Improve contributor guidance so mirror maintainers know when to regenerate snapshots, compare against canonical, and update the publish workflows
+### Phase 3 — Fleet & CI Improvements
+- `dotfiles_pipeline_status` — aggregate CI status across all repos in one view
+- `dotfiles_changelog_gen` — generate changelogs from conventional commits
+- `dotfiles_release` — orchestrate go-releaser across repos
+- Webhook support for fleet audit notifications
 
 ## Future Considerations
-- Full structural convergence with the canonical module, potentially by collapsing the mirror layout closer to the embedded source instead of preserving today’s dual architecture indefinitely
-- Release automation that attaches contract drift reports and snapshot diffs as artifacts
-- Removal of remaining recovery-only compatibility paths once the canonical source fully retires them
+- Wayland-native screenshot/recording (replace ydotool with libinput where possible)
+- Audio device management tools (PipeWire/PulseAudio)
+- Multi-monitor layout presets (save/restore per-workspace monitor configurations)
+- Plugin architecture for community-contributed modules
 
 <!-- whiteclaw-rollout:start -->
 ## Whiteclaw-Derived Overhaul (2026-04-08)
@@ -46,7 +50,7 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 - [x] [Release parity] Verify that release tags and manifests still reflect the canonical source-of-truth module.
 
 ### Landed Safeguards (2026-04-09)
-- `cmd/dotfiles-mcp-contract` now generates committed tool/resource/prompt snapshots plus `.well-known/mcp.json`.
+- `cmd/dotfiles-mcp-contract` now generates committed tool/resource/prompt snapshots under `snapshots/contract/` plus `.well-known/mcp.json`.
 - `scripts/host-smoke.sh` provides bounded workstation checks for Hyprland, Bluetooth, input, and GitHub CLI dependencies.
 - `scripts/release-parity.sh` verifies canonical-source references and manifest parity before publish.
 - `make contract-snapshot`, `make contract-check`, `make host-smoke`, `make release-parity`, and `make publish-check` make the mirror guard path explicit.
@@ -58,5 +62,11 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 - Surface baseline: AGENTS=yes, skills=yes, codex=yes, mcp_manifest=missing, ralph=no, roadmap=yes
 - Whiteclaw transfers in scope: mirror contract, contract snapshots, host-dependent smoke tests, release parity
 - Live repo notes: AGENTS, skills, Codex config, 1 workflow(s)
+
+### Capability Expansion Tranche (2026-04-10)
+- [x] Expanded Hyprland IPC tooling with active-window/workspace, binds, devices, layers, layouts, config diagnostics, property control, and socket2 event helpers
+- [x] Added Kitty runtime control for tab/window inventory, config reloads, theme/layout/title changes, send-text, image overlays, and generic remote commands
+- [x] Added Arch Linux research-first surfaces for ArchWiki, official repos, AUR, PKGBUILD auditing, Arch news review, mirror status, update dry runs, pacman logs, orphan detection, and file ownership
+- [x] Refreshed `snapshots/contract/` and `.well-known/mcp.json` to publish the expanded tool/resource/prompt surface
 
 <!-- whiteclaw-rollout:end -->

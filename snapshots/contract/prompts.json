@@ -1,5 +1,15 @@
 [
   {
+    "name": "audit_aur_package",
+    "description": "Audit one AUR package before installation or upgrade",
+    "category": "arch",
+    "tags": [
+      "arch",
+      "aur",
+      "audit"
+    ]
+  },
+  {
     "name": "dotfiles_audit_fleet",
     "description": "Run a bounded fleet audit and sync analysis before changing repos",
     "category": "workflow",
@@ -7,6 +17,38 @@
       "fleet",
       "audit",
       "sync"
+    ]
+  },
+  {
+    "name": "dotfiles_cleanup_repo_hygiene",
+    "description": "Scan or clean repo branch and worktree drift with a dry-run-first workflow",
+    "category": "workflow",
+    "tags": [
+      "repo",
+      "git",
+      "cleanup",
+      "worktree"
+    ]
+  },
+  {
+    "name": "dotfiles_control_desktop",
+    "description": "Drive a desktop automation task with capability checks, OCR-assisted targeting, and the smallest write action",
+    "category": "workflow",
+    "tags": [
+      "desktop",
+      "control",
+      "ocr",
+      "hyprland"
+    ]
+  },
+  {
+    "name": "dotfiles_diagnose_workstation",
+    "description": "Investigate a workstation symptom with read-first machine health tools",
+    "category": "workflow",
+    "tags": [
+      "workstation",
+      "health",
+      "diagnose"
     ]
   },
   {
@@ -30,6 +72,17 @@
     ]
   },
   {
+    "name": "dotfiles_repair_config",
+    "description": "Inspect and repair one config surface before reloading services",
+    "category": "workflow",
+    "tags": [
+      "config",
+      "repair",
+      "validate",
+      "reload"
+    ]
+  },
+  {
     "name": "dotfiles_triage_desktop",
     "description": "Investigate a desktop symptom with read-first tools before reloads",
     "category": "workflow",
@@ -38,6 +91,36 @@
       "triage",
       "hyprland",
       "eww"
+    ]
+  },
+  {
+    "name": "dotfiles_validate_repository",
+    "description": "Validate repo readiness, build behavior, and baseline drift before making repo-wide changes",
+    "category": "workflow",
+    "tags": [
+      "repo",
+      "validate",
+      "pipeline"
+    ]
+  },
+  {
+    "name": "safe_system_update",
+    "description": "Review critical Arch news and pending updates before deciding on a package upgrade path",
+    "category": "arch",
+    "tags": [
+      "arch",
+      "updates",
+      "safety"
+    ]
+  },
+  {
+    "name": "troubleshoot_issue",
+    "description": "Troubleshoot an Arch Linux issue with wiki, package, and log evidence",
+    "category": "arch",
+    "tags": [
+      "arch",
+      "troubleshooting",
+      "wiki"
     ]
   }
 ]

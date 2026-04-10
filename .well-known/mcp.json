@@ -25,6 +25,58 @@
   },
   "tools": [
     {
+      "name": "arch_aur_search",
+      "description": "Search AUR packages and return key metadata for the best matches."
+    },
+    {
+      "name": "arch_file_owner",
+      "description": "Find the pacman package that owns a given file path."
+    },
+    {
+      "name": "arch_mirror_status",
+      "description": "Return the healthiest official Arch Linux mirrors from the mirror-status JSON feed."
+    },
+    {
+      "name": "arch_news_critical",
+      "description": "Return the latest Arch news items that look like manual-intervention or high-risk upgrade notices."
+    },
+    {
+      "name": "arch_news_latest",
+      "description": "Return the latest Arch Linux news items from the official RSS feed."
+    },
+    {
+      "name": "arch_orphans",
+      "description": "List orphaned packages from pacman -Qtdq."
+    },
+    {
+      "name": "arch_package_info",
+      "description": "Fetch official Arch Linux package metadata for an exact package name."
+    },
+    {
+      "name": "arch_package_search",
+      "description": "Search official Arch Linux packages by keyword."
+    },
+    {
+      "name": "arch_pacman_log",
+      "description": "Read recent pacman log lines, optionally filtered by a substring."
+    },
+    {
+      "name": "arch_pkgbuild_audit",
+      "description": "Audit an AUR PKGBUILD or raw PKGBUILD content for risky patterns."
+    },
+    {
+      "name": "arch_updates_dry_run",
+      "description": "Show official and AUR updates without installing anything."
+    },
+    {
+      "name": "archwiki_page",
+      "description": "Fetch an ArchWiki page with sections and cleaned page content."
+    },
+    {
+      "name": "archwiki_search",
+      "description": "Search the ArchWiki and return matching pages with cleaned snippets."
+    },
+    {
       "name": "audio_device_switch",
       "description": "Switch the default audio output device. Provide a PipeWire node ID (numeric) or a device name substring to match. Uses wpctl set-default."
     },
@@ -169,6 +221,10 @@
       "description": "Screenshot + OCR + locate text on screen. Returns bounding box coordinates in desktop space suitable for ydotool. Use to find where a button or label appears before clicking."
     },
     {
+      "name": "desktop_project_open",
+      "description": "Open a project scene by combining an optional monitor preset, optional Hyprland layout, and an optional tmux bootstrap in the target repo path."
+    },
+    {
       "name": "desktop_screenshot_ocr",
       "description": "Screenshot the full desktop or a specific window (by address/class) and extract text via OCR. Returns both the image (for LLM vision) and extracted text. Use for seeing what is on screen."
     },
@@ -197,8 +253,20 @@
       "description": "Audit Go dependency version skew across all hairglasses-studio repos. Reports which deps are unified vs which have version drift."
     },
     {
+      "name": "dotfiles_desktop_status",
+      "description": "Report desktop control readiness, including Hyprland, screenshot/OCR, input injection, and the kitty-to-ghostty terminal shader pipeline."
+    },
+    {
       "name": "dotfiles_eww_get",
       "description": "Get the current value of an eww variable. Useful for debugging bar widgets (e.g. bar_workspaces_dp1, bar_cpu, bar_shader, rg_fleet)."
+    },
+    {
+      "name": "dotfiles_eww_inspect",
+      "description": "Inspect the current eww daemon state, active and defined windows, visible layer bindings, and parsed variable map."
+    },
+    {
+      "name": "dotfiles_eww_reload",
+      "description": "Reload eww narrowly when possible by reopening one target window, falling back to full eww reload and then daemon restart only when needed."
     },
     {
       "name": "dotfiles_eww_restart",
@@ -397,12 +465,24 @@
       "description": "Query NVIDIA GPU status: driver, temperature, utilization, memory, power draw, and running GPU processes."
     },
     {
+      "name": "hypr_capture_events",
+      "description": "Capture one or more Hyprland IPC events from .socket2.sock."
+    },
+    {
       "name": "hypr_click",
       "description": "Click at absolute screen coordinates using ydotool."
     },
     {
       "name": "hypr_close_window",
       "description": "Close a window. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_dismiss_notify",
+      "description": "Dismiss the most recent Hyprland notification via hyprctl dismissnotify."
+    },
+    {
+      "name": "hypr_dispatch",
+      "description": "Run an arbitrary Hyprland dispatcher via hyprctl dispatch."
     },
     {
       "name": "hypr_focus_window",
@@ -413,16 +493,88 @@
       "description": "Toggle fullscreen for a window. Focuses the window first, then applies fullscreen. Resolves window by address or class."
     },
     {
+      "name": "hypr_get_active_window",
+      "description": "Return the active Hyprland window as raw JSON from hyprctl."
+    },
+    {
+      "name": "hypr_get_active_workspace",
+      "description": "Return the active Hyprland workspace as raw JSON from hyprctl."
+    },
+    {
+      "name": "hypr_get_config_errors",
+      "description": "Return Hyprland config parse errors and whether the active config is healthy."
+    },
+    {
+      "name": "hypr_get_cursor_position",
+      "description": "Return the current cursor position as raw JSON from hyprctl."
+    },
+    {
       "name": "hypr_get_monitors",
       "description": "List connected monitors with resolution, refresh rate, position, scale, and active workspace."
+    },
+    {
+      "name": "hypr_get_option",
+      "description": "Read a Hyprland option value via hyprctl getoption."
+    },
+    {
+      "name": "hypr_get_prop",
+      "description": "Read a Hyprland window property via hyprctl getprop."
+    },
+    {
+      "name": "hypr_get_system_info",
+      "description": "Return Hyprland system information from hyprctl."
+    },
+    {
+      "name": "hypr_get_version",
+      "description": "Return Hyprland version data as raw JSON or text from hyprctl."
+    },
+    {
+      "name": "hypr_hyprpaper",
+      "description": "Run a Hyprland hyprpaper subcommand through hyprctl hyprpaper."
+    },
+    {
+      "name": "hypr_hyprsunset",
+      "description": "Run a Hyprland hyprsunset subcommand through hyprctl hyprsunset."
     },
     {
       "name": "hypr_key",
       "description": "Send key events using ydotool. Use Linux input event codes (e.g. '29:1 29:0' for Ctrl tap, '56:1 31:1 31:0 56:0' for Alt+S)."
     },
     {
+      "name": "hypr_layout_list",
+      "description": "List saved Hyprland layout snapshots from local state."
+    },
+    {
+      "name": "hypr_layout_restore",
+      "description": "Best-effort restore of a saved Hyprland layout. Reuses matching windows first and only launches missing apps when the saved scene has explicit launch commands."
+    },
+    {
+      "name": "hypr_layout_save",
+      "description": "Save the current Hyprland window/workspace scene with class, title, workspace, monitor, floating state, size, position, fullscreen, pinning, and optional launch commands."
+    },
+    {
+      "name": "hypr_list_binds",
+      "description": "Return the configured Hyprland keybinds as raw JSON from hyprctl."
+    },
+    {
+      "name": "hypr_list_devices",
+      "description": "Return the connected Hyprland devices as raw JSON from hyprctl."
+    },
+    {
+      "name": "hypr_list_layers",
+      "description": "Return the Hyprland layer-shell surfaces as raw JSON from hyprctl."
+    },
+    {
+      "name": "hypr_list_layouts",
+      "description": "Return the available Hyprland layouts as raw JSON or text from hyprctl."
+    },
+    {
       "name": "hypr_list_windows",
       "description": "List all windows managed by Hyprland with their address, title, class, workspace, size, position, and focus state."
+    },
+    {
+      "name": "hypr_list_workspace_rules",
+      "description": "Return Hyprland workspace rules as raw JSON or text from hyprctl."
     },
     {
       "name": "hypr_list_workspaces",
@@ -433,8 +585,32 @@
       "description": "Minimize a window by moving it to the special:minimized workspace. Resolves window by address or class."
     },
     {
+      "name": "hypr_monitor_preset_list",
+      "description": "List saved Hyprland monitor presets from local state."
+    },
+    {
+      "name": "hypr_monitor_preset_restore",
+      "description": "Restore a saved Hyprland monitor preset. Validates the generated hyprctl commands first, then applies them unless dry_run=true."
+    },
+    {
+      "name": "hypr_monitor_preset_save",
+      "description": "Save the current Hyprland monitor arrangement into a local preset, including resolution, refresh, position, scale, transform, and enabled state."
+    },
+    {
       "name": "hypr_move_window",
       "description": "Move a window to exact pixel coordinates. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_notify",
+      "description": "Show a Hyprland notification using hyprctl notify."
+    },
+    {
+      "name": "hypr_output",
+      "description": "Run a Hyprland output subcommand such as create remove list or dpms through hyprctl output."
+    },
+    {
+      "name": "hypr_plugin",
+      "description": "Run a Hyprland plugin subcommand through hyprctl plugin."
     },
     {
       "name": "hypr_reload_config",
@@ -443,6 +619,10 @@
     {
       "name": "hypr_resize_window",
       "description": "Resize a window to exact pixel dimensions. Resolves window by address or class."
+    },
+    {
+      "name": "hypr_rolling_log",
+      "description": "Return a recent snapshot of the Hyprland rolling log."
     },
     {
       "name": "hypr_screenshot",
@@ -457,12 +637,28 @@
       "description": "Take a screenshot of a specific window by address or class name. Returns the image inline for LLM vision."
     },
     {
+      "name": "hypr_set_cursor",
+      "description": "Set the active Hyprland cursor theme and size."
+    },
+    {
+      "name": "hypr_set_keyword",
+      "description": "Set a Hyprland keyword via hyprctl keyword."
+    },
+    {
       "name": "hypr_set_monitor",
       "description": "Configure a monitor's resolution, position, or scale."
     },
     {
+      "name": "hypr_set_prop",
+      "description": "Set a Hyprland window property via hyprctl setprop."
+    },
+    {
       "name": "hypr_switch_workspace",
       "description": "Switch to a workspace by ID."
+    },
+    {
+      "name": "hypr_switch_xkb_layout",
+      "description": "Switch a Hyprland keyboard layout via hyprctl switchxkblayout."
     },
     {
       "name": "hypr_toggle_floating",
@@ -471,6 +667,10 @@
     {
       "name": "hypr_type_text",
       "description": "Type text at the current cursor position using wtype (Wayland)."
+    },
+    {
+      "name": "hypr_wait_for_event",
+      "description": "Wait for a specific Hyprland IPC event on .socket2.sock."
     },
     {
       "name": "input_auto_setup_controller",
@@ -567,6 +767,54 @@
     {
       "name": "kill_process",
       "description": "Send a signal to a process. Supports TERM, KILL, HUP, INT, USR1, USR2, STOP, CONT."
+    },
+    {
+      "name": "kitty_list_tabs",
+      "description": "List kitty tabs with OS window, title, layout, focus, and window count."
+    },
+    {
+      "name": "kitty_list_windows",
+      "description": "List kitty windows with IDs, titles, cwd, pid, focus state, and command lines."
+    },
+    {
+      "name": "kitty_load_config",
+      "description": "Reload one or more kitty config files, optionally with transient overrides."
+    },
+    {
+      "name": "kitty_run_remote",
+      "description": "Run an arbitrary kitty remote-control subcommand when the dedicated tools do not cover the exact action."
+    },
+    {
+      "name": "kitty_send_text",
+      "description": "Send arbitrary text to the active or matched kitty windows."
+    },
+    {
+      "name": "kitty_set_font_size",
+      "description": "Set the kitty font size in points or with a relative delta."
+    },
+    {
+      "name": "kitty_set_layout",
+      "description": "Set the kitty tab layout for the active or matched tabs."
+    },
+    {
+      "name": "kitty_set_opacity",
+      "description": "Set the kitty background opacity for the active, matched, or all windows."
+    },
+    {
+      "name": "kitty_set_theme",
+      "description": "Apply a kitty color theme from DOTFILES_DIR/kitty or by dumping a named kitten theme."
+    },
+    {
+      "name": "kitty_set_title",
+      "description": "Set or reset the title of the active or matched kitty windows."
+    },
+    {
+      "name": "kitty_show_image",
+      "description": "Show an image in an overlay kitty window using kitten icat."
+    },
+    {
+      "name": "kitty_status",
+      "description": "Show kitty remote-control readiness, active connection status, and local theme candidates."
     },
     {
       "name": "mapping_auto_setup",
@@ -1148,11 +1396,12 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 278,
-  "resource_count": 8,
-  "prompt_count": 4,
+  "tool_count": 340,
+  "resource_count": 24,
+  "prompt_count": 12,
   "categories": [
     "",
+    "desktop",
     "desktop_interact",
     "discovery",
     "github",

@@ -200,8 +200,8 @@ func TestDiscoveryModuleRegistration(t *testing.T) {
 	}
 
 	tools := m.Tools()
-	if len(tools) != 5 {
-		t.Fatalf("expected 5 discovery tools, got %d", len(tools))
+	if len(tools) != 6 {
+		t.Fatalf("expected 6 discovery tools, got %d", len(tools))
 	}
 
 	names := make(map[string]bool)
@@ -214,6 +214,7 @@ func TestDiscoveryModuleRegistration(t *testing.T) {
 		"dotfiles_tool_catalog",
 		"dotfiles_tool_stats",
 		"dotfiles_server_health",
+		"dotfiles_desktop_status",
 	} {
 		if !names[want] {
 			t.Errorf("missing tool: %s", want)
@@ -355,8 +356,8 @@ func TestServerHealth_WithSurfaceRegistries(t *testing.T) {
 	if out.PromptCount == 0 {
 		t.Fatal("expected non-zero prompt count")
 	}
-	if len(out.DiscoveryTools) != 5 {
-		t.Fatalf("expected 5 discovery tools, got %d", len(out.DiscoveryTools))
+	if len(out.DiscoveryTools) != 6 {
+		t.Fatalf("expected 6 discovery tools, got %d", len(out.DiscoveryTools))
 	}
 }
 
