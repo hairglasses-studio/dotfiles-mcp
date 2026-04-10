@@ -64,6 +64,9 @@ func TestShouldDeferDotfilesTool(t *testing.T) {
 
 		// desktop profile: desktop control surfaces eager, non-desktop deferred
 		{"desktop", "hypr_list_windows", false},
+		{"desktop", "kitty_status", false},
+		{"desktop", "kitty_launch", false},
+		{"desktop", "kitty_get_text", false},
 		{"desktop", "screen_screenshot", false},
 		{"desktop", "desktop_find_text", false},
 		{"desktop", "desktop_snapshot", false},
