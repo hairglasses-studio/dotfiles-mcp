@@ -79,7 +79,7 @@ Control how many tools load at startup via `DOTFILES_MCP_PROFILE`:
 |---------|----------|-------------|
 | `default` | Discovery tools loaded, rest deferred on demand | ~2K tokens |
 | `ops` | Operational subset (config, desktop, fleet) loaded eagerly | ~15K tokens |
-| `full` | All 90 tools loaded immediately | ~40K tokens |
+| `full` | All tools loaded immediately | ~40K tokens |
 
 Set in your MCP config:
 
@@ -100,6 +100,7 @@ Set in your MCP config:
 |----------|------:|-------------|
 | Config Management | 4 | Dotfiles symlink health, config validation, service reloads |
 | GitHub Org Lifecycle | 12 | Repo transfers, fork squashing, bulk clone/pull/archive, fleet sync |
+| GitHub Stars | 14 | Starred repo inventory, GitHub star folders, taxonomy audit/sync, bootstrap, and Codex MCP install helpers |
 | Fleet Auditing & CI | 4 | Per-repo health dashboard, dependency skew, workflow sync |
 | Build & Sync | 5 | Multi-language build pipeline, Go version sync, repo scaffolding |
 | Hyprland Desktop | 12 | Window/workspace management, screenshots, monitor config, input simulation |
