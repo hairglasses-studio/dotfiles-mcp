@@ -435,6 +435,19 @@
     "deferred": true
   },
   {
+    "name": "desktop_focus",
+    "description": "Focus a semantic element by ref, path, or by app plus name and optional role, using AT-SPI component focus or a focus action fallback.",
+    "category": "desktop",
+    "search_terms": [
+      "focus semantic element",
+      "focus window control",
+      "at-spi focus",
+      "grab focus"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "desktop_key",
     "description": "Send raw ydotool key events after a semantic target has focus.",
     "category": "desktop",
@@ -460,6 +473,19 @@
     "deferred": true
   },
   {
+    "name": "desktop_read_value",
+    "description": "Read the current text or numeric value from a semantic element, such as an entry, label, slider, or spinbox.",
+    "category": "desktop",
+    "search_terms": [
+      "read semantic value",
+      "read text field",
+      "read slider value",
+      "at-spi value"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "desktop_screenshot_ocr",
     "description": "Screenshot the full desktop or a specific window (by address/class) and extract text via OCR. Returns both the image (for LLM vision) and extracted text. Use for seeing what is on screen.",
     "category": "desktop_interact",
@@ -476,6 +502,32 @@
       "read screen",
       "capture text",
       "desktop vision"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "desktop_set_text",
+    "description": "Set the text contents of an editable semantic element. Pass an empty string to clear the field.",
+    "category": "desktop",
+    "search_terms": [
+      "set semantic text",
+      "fill input field",
+      "replace entry text",
+      "clear text field"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "desktop_set_value",
+    "description": "Set the numeric value of a semantic element such as a slider, dial, or spinbox.",
+    "category": "desktop",
+    "search_terms": [
+      "set semantic value",
+      "set slider",
+      "set spinbox",
+      "adjust accessible value"
     ],
     "is_write": false,
     "deferred": true
@@ -2591,8 +2643,20 @@
     "deferred": true
   },
   {
+    "name": "session_focus_element",
+    "description": "Focus a semantic element inside a tracked session using AT-SPI component focus or a focus action fallback.",
+    "category": "desktop",
+    "search_terms": [
+      "session focus element",
+      "session at-spi focus",
+      "session grab focus"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "session_focus_window",
-    "description": "Focus a window inside a Hyprland-backed session by address, class, or title substring.",
+    "description": "Focus a window inside a tracked session by Hyprland address/class/title or by semantic AT-SPI window targeting for non-Hyprland sessions.",
     "category": "desktop",
     "search_terms": [
       "focus session window",
@@ -2651,6 +2715,18 @@
     "deferred": true
   },
   {
+    "name": "session_read_value",
+    "description": "Read the current text or numeric value from a semantic element inside a tracked session.",
+    "category": "desktop",
+    "search_terms": [
+      "session read value",
+      "session read field",
+      "session slider value"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "session_screenshot",
     "description": "Take a screenshot inside a tracked session using grim.",
     "category": "desktop",
@@ -2658,6 +2734,30 @@
       "session screenshot",
       "grim screenshot",
       "virtual session screenshot"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_set_text",
+    "description": "Set the text contents of an editable semantic element inside a tracked session. Pass an empty string to clear the field.",
+    "category": "desktop",
+    "search_terms": [
+      "session set text",
+      "session fill field",
+      "session clear field"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_set_value",
+    "description": "Set the numeric value of a semantic element inside a tracked session, such as a slider or spinbox.",
+    "category": "desktop",
+    "search_terms": [
+      "session set value",
+      "session slider set",
+      "session spinbox set"
     ],
     "is_write": false,
     "deferred": true
