@@ -264,6 +264,7 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 		"Show high-level catalog statistics, including how many tools are marked deferred in the active profile.",
 		func(_ context.Context, _ dotfilesToolStatsInput) (dotfilesToolStatsOutput, error) {
 			toolStats := m.reg.GetToolStats()
+			totalTools := len(m.reg.GetAllToolDefinitions())
 			resourceCount := 0
 			promptCount := 0
 			if m.resources != nil {
@@ -273,7 +274,7 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				promptCount = m.prompts.PromptCount()
 			}
 			return dotfilesToolStatsOutput{
-				TotalTools:      toolStats.TotalTools,
+				TotalTools:      totalTools,
 				ModuleCount:     toolStats.ModuleCount,
 				DeferredTools:   len(m.reg.ListDeferredTools()),
 				ResourceCount:   resourceCount,
@@ -295,6 +296,7 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 		"Show the active dotfiles-mcp contract shape: discovery coverage, tool counts, profile, and resource/prompt availability.",
 		func(_ context.Context, _ dotfilesServerHealthInput) (dotfilesServerHealthOutput, error) {
 			toolStats := m.reg.GetToolStats()
+			totalTools := len(m.reg.GetAllToolDefinitions())
 			resourceCount := 0
 			promptCount := 0
 			if m.resources != nil {
@@ -322,7 +324,7 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				Status:          status,
 				Profile:         dotfilesProfile(),
 				RuntimeOS:       runtime.GOOS,
-				TotalTools:      toolStats.TotalTools,
+				TotalTools:      totalTools,
 				ModuleCount:     toolStats.ModuleCount,
 				DeferredTools:   len(m.reg.ListDeferredTools()),
 				ResourceCount:   resourceCount,

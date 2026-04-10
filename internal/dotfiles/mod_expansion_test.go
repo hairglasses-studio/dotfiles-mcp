@@ -10,8 +10,8 @@ import (
 func TestDesktopSemanticModuleRegistration(t *testing.T) {
 	m := &DesktopSemanticModule{}
 	tools := m.Tools()
-	if len(tools) != 14 {
-		t.Fatalf("expected 14 semantic tools, got %d", len(tools))
+	if len(tools) != 16 {
+		t.Fatalf("expected 16 semantic tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -20,9 +20,11 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 
 	for _, want := range []string{
 		"desktop_snapshot",
+		"desktop_list_windows",
 		"desktop_target_windows",
 		"desktop_find",
 		"desktop_find_all",
+		"desktop_focus_window",
 		"desktop_focus",
 		"desktop_read_value",
 		"desktop_set_text",

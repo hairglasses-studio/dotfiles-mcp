@@ -1,8 +1,11 @@
 package dotfiles
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/hairglasses-studio/mcpkit/prompts"
@@ -139,6 +142,7 @@ func BuildContractSnapshotBundle(profile string) (ContractSnapshotBundle, error)
 
 		toolDefs := reg.GetAllToolDefinitions()
 		sort.Slice(toolDefs, func(i, j int) bool { return toolDefs[i].Tool.Name < toolDefs[j].Tool.Name })
+		totalTools := len(toolDefs)
 		resourceDefs := resReg.GetAllResourceDefinitions()
 		sort.Slice(resourceDefs, func(i, j int) bool { return resourceDefs[i].Resource.URI < resourceDefs[j].Resource.URI })
 		templateDefs := resReg.GetAllTemplateDefinitions()
@@ -148,10 +152,10 @@ func BuildContractSnapshotBundle(profile string) (ContractSnapshotBundle, error)
 		promptDefs := promptReg.GetAllPromptDefinitions()
 		sort.Slice(promptDefs, func(i, j int) bool { return promptDefs[i].Prompt.Name < promptDefs[j].Prompt.Name })
 
-		tools := make([]ContractToolSnapshot, 0, len(toolDefs))
+		toolsOut := make([]ContractToolSnapshot, 0, len(toolDefs))
 		manifestTools := make([]WellKnownTool, 0, len(toolDefs))
 		for _, td := range toolDefs {
-			tools = append(tools, ContractToolSnapshot{
+			toolsOut = append(toolsOut, ContractToolSnapshot{
 				Name:         td.Tool.Name,
 				Description:  td.Tool.Description,
 				Category:     td.Category,
@@ -209,22 +213,23 @@ func BuildContractSnapshotBundle(profile string) (ContractSnapshotBundle, error)
 		}
 		sort.Strings(categories)
 
+		resourceCount := resReg.ResourceCount() + resReg.TemplateCount()
 		bundle.Overview = ContractOverviewSnapshot{
 			Version:         dotfilesMCPVersion,
 			Profile:         activeProfile,
 			CanonicalSource: canonicalSourceURL,
 			PublishMirror:   true,
-			TotalTools:      stats.TotalTools,
+			TotalTools:      totalTools,
 			ModuleCount:     stats.ModuleCount,
 			DeferredTools:   len(reg.ListDeferredTools()),
-			ResourceCount:   resReg.ResourceCount() + resReg.TemplateCount(),
+			ResourceCount:   resourceCount,
 			TemplateCount:   resReg.TemplateCount(),
 			PromptCount:     promptReg.PromptCount(),
 			ByCategory:      stats.ByCategory,
 			ByRuntimeGroup:  stats.ByRuntimeGroup,
 			DiscoveryTools:  dotfilesDiscoveryToolNames(),
 		}
-		bundle.Tools = tools
+		bundle.Tools = toolsOut
 		bundle.Resources = resourcesOut
 		bundle.Templates = templatesOut
 		bundle.Prompts = promptsOut
@@ -248,8 +253,8 @@ func BuildContractSnapshotBundle(profile string) (ContractSnapshotBundle, error)
 			},
 			Tools:         manifestTools,
 			Tags:          []string{"linux", "desktop", "hyprland", "wayland", "bluetooth", "input", "github-org", "fleet-management", "publish-mirror"},
-			ToolCount:     stats.TotalTools,
-			ResourceCount: resReg.ResourceCount() + resReg.TemplateCount(),
+			ToolCount:     totalTools,
+			ResourceCount: resourceCount,
 			PromptCount:   promptReg.PromptCount(),
 			Categories:    categories,
 		}
@@ -260,6 +265,82 @@ func BuildContractSnapshotBundle(profile string) (ContractSnapshotBundle, error)
 
 func SnapshotJSON(v any) ([]byte, error) {
 	return json.MarshalIndent(v, "", "  ")
+}
+
+func contractSnapshotFiles(bundle ContractSnapshotBundle) (map[string][]byte, error) {
+	files := map[string]any{
+		".well-known/mcp.json":              bundle.Manifest,
+		"snapshots/contract/overview.json":  bundle.Overview,
+		"snapshots/contract/tools.json":     bundle.Tools,
+		"snapshots/contract/resources.json": bundle.Resources,
+		"snapshots/contract/templates.json": bundle.Templates,
+		"snapshots/contract/prompts.json":   bundle.Prompts,
+	}
+
+	out := make(map[string][]byte, len(files))
+	for path, payload := range files {
+		content, err := SnapshotJSON(payload)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		out[path] = append(content, '\n')
+	}
+	return out, nil
+}
+
+func writeContractSnapshotFiles(files map[string][]byte) error {
+	for path, content := range files {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
+		if err != nil {
+			return err
+		}
+		tmpPath := tmp.Name()
+		if _, err := tmp.Write(content); err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath)
+			return err
+		}
+		if err := tmp.Close(); err != nil {
+			_ = os.Remove(tmpPath)
+			return err
+		}
+		if err := os.Rename(tmpPath, path); err != nil {
+			_ = os.Remove(tmpPath)
+			return err
+		}
+	}
+	return nil
+}
+
+func checkContractSnapshotFiles(files map[string][]byte) error {
+	var drift []string
+	for path, content := range files {
+		current, err := os.ReadFile(path)
+		if err != nil {
+			drift = append(drift, fmt.Sprintf("%s (missing: %v)", path, err))
+			continue
+		}
+		if !bytes.Equal(current, content) {
+			drift = append(drift, path)
+		}
+	}
+	if len(drift) == 0 {
+		return nil
+	}
+	return fmt.Errorf("contract drift detected:\n%s", stringsJoinBullets(drift))
+}
+
+func stringsJoinBullets(items []string) string {
+	var buf bytes.Buffer
+	for _, item := range items {
+		buf.WriteString(" - ")
+		buf.WriteString(item)
+		buf.WriteByte('\n')
+	}
+	return string(bytes.TrimRight(buf.Bytes(), "\n"))
 }
 
 var _ = resources.NewResourceRegistry

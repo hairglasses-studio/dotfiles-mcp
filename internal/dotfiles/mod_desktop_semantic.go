@@ -30,6 +30,10 @@ type desktopSemanticTreeInput struct {
 	Depth int    `json:"depth,omitempty" jsonschema:"description=Max tree depth (default 5)"`
 }
 
+type desktopSemanticWindowsInput struct {
+	App string `json:"app,omitempty" jsonschema:"description=Optional application name filter for semantic window enumeration"`
+}
+
 type desktopSemanticQueryInput struct {
 	App    string   `json:"app" jsonschema:"required,description=Application name or unique substring"`
 	Name   string   `json:"name,omitempty" jsonschema:"description=Element name or substring"`
@@ -61,6 +65,14 @@ type desktopSemanticWaitInput struct {
 	States  []string `json:"states,omitempty" jsonschema:"description=Optional required AT-SPI states such as focused or enabled"`
 	Exact   bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive name matching"`
 	Timeout int      `json:"timeout,omitempty" jsonschema:"description=Timeout in seconds (default 5)"`
+}
+
+type desktopSemanticWindowInput struct {
+	App           string `json:"app,omitempty" jsonschema:"description=AT-SPI application name when focusing a window by semantic ref or path"`
+	Class         string `json:"class,omitempty" jsonschema:"description=Application name substring to match when focusing a window semantically"`
+	TitleContains string `json:"title_contains,omitempty" jsonschema:"description=Window title substring to match when focusing a window semantically"`
+	Ref           string `json:"ref,omitempty" jsonschema:"description=Semantic window reference from desktop_list_windows"`
+	Path          string `json:"path,omitempty" jsonschema:"description=Semantic child-index path from desktop_list_windows"`
 }
 
 type desktopSemanticTextInput struct {
@@ -99,6 +111,14 @@ type desktopSemanticCapabilitiesOutput struct {
 type desktopSemanticSnapshotOutput struct {
 	HelperPath string           `json:"helper_path,omitempty"`
 	Apps       []map[string]any `json:"apps,omitempty"`
+}
+
+type desktopSemanticWindowsOutput struct {
+	HelperPath string           `json:"helper_path,omitempty"`
+	App        string           `json:"app,omitempty"`
+	Count      int              `json:"count"`
+	Windows    []map[string]any `json:"windows,omitempty"`
+	Error      string           `json:"error,omitempty"`
 }
 
 type desktopSemanticMatchesOutput struct {
@@ -337,6 +357,59 @@ func desktopSemanticElementFromResult(helperPath string, query desktopSemanticQu
 	}
 }
 
+func desktopResolveSemanticWindow(ctx context.Context, input desktopSemanticWindowInput) (desktopSemanticQueryInput, string, error) {
+	appName := strings.TrimSpace(input.App)
+	if appName != "" && (strings.TrimSpace(input.Ref) != "" || strings.TrimSpace(input.Path) != "") {
+		return desktopSemanticQueryInput{
+			App:  appName,
+			Ref:  strings.TrimSpace(input.Ref),
+			Path: strings.TrimSpace(input.Path),
+		}, "", nil
+	}
+
+	args := []string{"list_windows"}
+	if appName != "" {
+		args = append(args, "--app", appName)
+	}
+	parsed, helperPath, err := runDesktopSemanticHelper(ctx, args...)
+	if err != nil {
+		return desktopSemanticQueryInput{}, helperPath, err
+	}
+
+	result := semanticMapValue(parsed)
+	windows := semanticMapSliceValue(result["windows"])
+	for _, window := range windows {
+		app := semanticMapValue(window["app"])
+		windowTitle := strings.ToLower(stringValue(window["name"]))
+		windowApp := strings.ToLower(stringValue(app["name"]))
+		if title := strings.TrimSpace(strings.ToLower(input.TitleContains)); title != "" && strings.Contains(windowTitle, title) {
+			return desktopSemanticQueryInput{
+				App:  stringValue(app["name"]),
+				Ref:  stringValue(window["ref"]),
+				Path: stringValue(window["path"]),
+			}, helperPath, nil
+		}
+		if class := strings.TrimSpace(strings.ToLower(input.Class)); class != "" && strings.Contains(windowApp, class) {
+			return desktopSemanticQueryInput{
+				App:  stringValue(app["name"]),
+				Ref:  stringValue(window["ref"]),
+				Path: stringValue(window["path"]),
+			}, helperPath, nil
+		}
+	}
+
+	if strings.TrimSpace(input.TitleContains) != "" {
+		return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("no semantic window title matched %q", input.TitleContains)
+	}
+	if strings.TrimSpace(input.Class) != "" {
+		return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("no semantic window app matched %q", input.Class)
+	}
+	if appName != "" {
+		return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("app %q requires a semantic ref or path", appName)
+	}
+	return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("[%s] title_contains, class, or app+ref/path is required", handler.ErrInvalidParam)
+}
+
 func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 	snapshot := handler.TypedHandler[EmptyInput, desktopSemanticSnapshotOutput](
 		"desktop_snapshot",
@@ -355,6 +428,32 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 	)
 	snapshot.Category = "desktop"
 	snapshot.SearchTerms = []string{"semantic desktop", "accessibility tree", "at-spi apps", "desktop snapshot"}
+
+	listWindows := handler.TypedHandler[desktopSemanticWindowsInput, desktopSemanticWindowsOutput](
+		"desktop_list_windows",
+		"List semantic desktop windows with their app identity, refs, bounds, and current value metadata.",
+		func(ctx context.Context, input desktopSemanticWindowsInput) (desktopSemanticWindowsOutput, error) {
+			args := []string{"list_windows"}
+			if strings.TrimSpace(input.App) != "" {
+				args = append(args, "--app", input.App)
+			}
+			parsed, helperPath, err := runDesktopSemanticHelper(ctx, args...)
+			if err != nil {
+				return desktopSemanticWindowsOutput{}, err
+			}
+			result := semanticMapValue(parsed)
+			windows := semanticMapSliceValue(result["windows"])
+			return desktopSemanticWindowsOutput{
+				HelperPath: helperPath,
+				App:        strings.TrimSpace(input.App),
+				Count:      len(windows),
+				Windows:    windows,
+				Error:      semanticErrorValue(result),
+			}, nil
+		},
+	)
+	listWindows.Category = "desktop"
+	listWindows.SearchTerms = []string{"semantic windows", "desktop windows", "list accessibility windows", "at-spi windows"}
 
 	targetWindows := handler.TypedHandler[desktopSemanticTreeInput, desktopSemanticTreeOutput](
 		"desktop_target_windows",
@@ -430,6 +529,28 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 	)
 	findAll.Category = "desktop"
 	findAll.SearchTerms = []string{"find all semantic elements", "list matching buttons", "at-spi multiple matches"}
+
+	focusWindow := handler.TypedHandler[desktopSemanticWindowInput, desktopSemanticElementOutput](
+		"desktop_focus_window",
+		"Focus a top-level semantic desktop window by title, app/class substring, or a previously returned semantic ref/path.",
+		func(ctx context.Context, input desktopSemanticWindowInput) (desktopSemanticElementOutput, error) {
+			query, _, err := desktopResolveSemanticWindow(ctx, input)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			args, err := semanticQueryArgs(query)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			parsed, helperPath, err := runDesktopSemanticHelper(ctx, append([]string{"focus"}, args...)...)
+			if err != nil {
+				return desktopSemanticElementOutput{}, err
+			}
+			return desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed)), nil
+		},
+	)
+	focusWindow.Category = "desktop"
+	focusWindow.SearchTerms = []string{"focus semantic window", "focus desktop window", "at-spi window focus", "window title focus"}
 
 	focus := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticElementOutput](
 		"desktop_focus",
@@ -653,9 +774,11 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 
 	return []registry.ToolDefinition{
 		snapshot,
+		listWindows,
 		targetWindows,
 		find,
 		findAll,
+		focusWindow,
 		focus,
 		readValue,
 		setText,
