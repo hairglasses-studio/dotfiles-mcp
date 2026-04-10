@@ -137,6 +137,10 @@ make contract-diff
 # Compare the committed mirror bundle against canonical dotfiles/mcp/dotfiles-mcp
 make canonical-drift
 
+# Report or diff the manifest-driven canonical carry-forward subset
+make canonical-sync-report
+make canonical-sync-diff
+
 # Full publish guard: vet + test + contract + manifest parity
 make publish-check
 ```
@@ -153,6 +157,7 @@ The authoritative publish-mirror contract is generated into `snapshots/contract/
 - 12 prompt entrypoints
 - a small set of standalone-only Arch, Hyprland, and Kitty extensions
 - discovery-first profiles: `default`, `desktop`, `ops`, `full`
+- a manifest-driven canonical carry-forward path for the files that must stay byte-for-byte aligned with the canonical source
 
 High-value additions in the current surface include:
 

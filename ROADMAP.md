@@ -73,7 +73,8 @@ This tranche applies the highest-value whiteclaw findings that fit this repo's r
 - [x] Carried forward the remaining canonical notification, fleet baseline, and shader parity fixes on top of the expanded standalone surface so canonical drift is now limited to intentional mirror-only extensions
 
 ### Next Mirror Governance Tranche
-- [ ] Automate canonical sync intake from `dotfiles/mcp/dotfiles-mcp` so publish mirrors can apply bounded carry-forward updates without manual file checkout
+- [x] Automate canonical sync intake from `dotfiles/mcp/dotfiles-mcp` so publish mirrors can apply bounded carry-forward updates without manual file checkout
+- [x] Add a strict host-smoke mode so a logged-in Hyprland publish runner can turn current skip behavior into a hard gate
 - [ ] Promote contract diffs into release artifacts and changelog summaries instead of keeping them only in step summaries
 - [ ] Run `make host-smoke` on a logged-in Hyprland publish runner so evented desktop and input checks stop degrading to skip-only validation
 - [ ] Decide which standalone-only Arch, Hyprland, and Kitty extensions should upstream into canonical dotfiles vs remain mirror-only

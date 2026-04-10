@@ -3,6 +3,7 @@ set -euo pipefail
 
 json=0
 strict_missing=0
+strict_skip=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -11,6 +12,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --strict-missing)
       strict_missing=1
+      ;;
+    --strict-skip)
+      strict_skip=1
       ;;
     *)
       echo "unknown argument: $1" >&2
@@ -40,13 +44,16 @@ run_check() {
     fi
   elif eval "$probe" >/tmp/dotfiles-mcp-host-smoke.$$ 2>&1; then
     detail="$(tr '\n' ' ' </tmp/dotfiles-mcp-host-smoke.$$ | sed 's/[[:space:]]\\+/ /g' | sed 's/^ //; s/ $//')"
-    detail="${detail:0:160}"
-    if [[ "$detail" == SKIP:* ]]; then
-      status="skip"
-      detail="${detail#SKIP: }"
-    else
-      status="ok"
-    fi
+      detail="${detail:0:160}"
+      if [[ "$detail" == SKIP:* ]]; then
+        status="skip"
+        detail="${detail#SKIP: }"
+        if [[ $strict_skip -eq 1 ]]; then
+          ((failures+=1))
+        fi
+      else
+        status="ok"
+      fi
   else
     status="fail"
     detail="$(tr '\n' ' ' </tmp/dotfiles-mcp-host-smoke.$$ | sed 's/[[:space:]]\\+/ /g' | sed 's/^ //; s/ $//')"
@@ -71,6 +78,7 @@ if [[ $json -eq 1 ]]; then
   printf '{\n'
   printf '  "status": "%s",\n' "$([[ $failures -eq 0 ]] && echo ok || echo fail)"
   printf '  "strict_missing": %s,\n' "$([[ $strict_missing -eq 1 ]] && echo true || echo false)"
+  printf '  "strict_skip": %s,\n' "$([[ $strict_skip -eq 1 ]] && echo true || echo false)"
   printf '  "checks": [\n'
   for i in "${!lines[@]}"; do
     IFS='|' read -r group name status detail <<<"${lines[$i]}"

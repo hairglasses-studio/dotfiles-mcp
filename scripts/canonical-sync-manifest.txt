@@ -1,0 +1,13 @@
+# Path mappings intentionally carried forward from the canonical source at
+# dotfiles/mcp/dotfiles-mcp into this standalone publish mirror.
+#
+# Keep this list limited to files that should remain byte-for-byte aligned
+# with canonical. Standalone-only surfaces such as Arch, Kitty, and Hyprland
+# extensions are intentionally excluded.
+main.go => internal/dotfiles/main.go
+mod_fleet_health.go => internal/dotfiles/mod_fleet_health.go
+mod_fleet_test.go => internal/dotfiles/mod_fleet_test.go
+mod_notification.go => internal/dotfiles/mod_notification.go
+mod_shader.go => internal/dotfiles/mod_shader.go
+mod_shader_helpers_test.go => internal/dotfiles/mod_shader_helpers_test.go
+mod_shader_test.go => internal/dotfiles/mod_shader_test.go
