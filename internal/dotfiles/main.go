@@ -2282,6 +2282,27 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 			},
 		),
 
+		// ── dotfiles_pipeline_status ─────────────────
+		handler.TypedHandler[PipelineStatusInput, PipelineStatusOutput](
+			"dotfiles_pipeline_status",
+			"Aggregate remote CI and cached local baseline signals across repos in one view. Optionally refresh baseline data first and filter to specific repos.",
+			dotfilesPipelineStatus,
+		),
+
+		// ── dotfiles_changelog_gen ───────────────────
+		handler.TypedHandler[DotfilesChangelogGenInput, DotfilesChangelogGenOutput](
+			"dotfiles_changelog_gen",
+			"Generate changelog previews across selected workspace repos by reusing the ops changelog engine. Optionally write CHANGELOG.md updates in place.",
+			dotfilesChangelogGen,
+		),
+
+		// ── dotfiles_release ─────────────────────────
+		handler.TypedHandler[DotfilesReleaseInput, DotfilesReleaseOutput](
+			"dotfiles_release",
+			"Run dry-run or execute release orchestration across explicit repo/version targets by reusing the ops release engine.",
+			dotfilesRelease,
+		),
+
 		// ── dotfiles_cascade_reload ──────────────────
 		handler.TypedHandler[CascadeReloadInput, CascadeReloadOutput](
 			"dotfiles_cascade_reload",

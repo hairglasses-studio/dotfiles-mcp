@@ -13,8 +13,8 @@ func TestModuleRegistration(t *testing.T) {
 	m := &DotfilesModule{}
 
 	tools := m.Tools()
-	if len(tools) != 32 {
-		t.Fatalf("expected 32 tools, got %d", len(tools))
+	if len(tools) != 35 {
+		t.Fatalf("expected 35 tools, got %d", len(tools))
 	}
 
 	// Verify no panics by registering with mcptest server.
@@ -23,8 +23,8 @@ func TestModuleRegistration(t *testing.T) {
 	srv := mcptest.NewServer(t, reg)
 
 	names := srv.ToolNames()
-	if len(names) != 32 {
-		t.Fatalf("expected 32 registered tools, got %d", len(names))
+	if len(names) != 35 {
+		t.Fatalf("expected 35 registered tools, got %d", len(names))
 	}
 
 	// Spot-check a few tool names.
