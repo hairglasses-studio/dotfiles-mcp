@@ -2,35 +2,31 @@
 
 ## Current State
 
-dotfiles-mcp is now best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The current `main` target surface exposes 276 tools across 32 modules when published from the canonical source, with discovery-first loading, workflow resources, prompt entrypoints, and a juhradial-first MX input contract. This standalone repo should stay explicit about that relationship instead of pretending to be the system of record.
+dotfiles-mcp is best treated as a standalone publish mirror for the canonical `dotfiles/mcp/dotfiles-mcp` module. The committed mirror contract currently exposes `278` tools across `32` modules, plus `8` resources and `4` prompts. Those counts are snapshot-backed by `.well-known/mcp.json` and `snapshots/contract/*`, and they may temporarily trail the canonical source between carry-forward tranches.
 
-All modules functional and tested. MIT licensed, README and CLAUDE.md in place. Batch tools default to dry-run mode.
+The repo now has explicit publish-mirror guards, but it should stay honest about the remaining job: reducing the still-real gap between this mirror and the richer canonical source in `dotfiles`.
 
 ## Planned
 
-### Phase 1 — Test Coverage & Documentation
-- Increase unit test coverage for GitHub org lifecycle tools (currently lowest coverage)
-- Add integration tests for Bluetooth and input device modules
-- Per-module documentation with usage examples
-- Improve error messages for missing system dependencies (ydotool, wtype, bluetoothctl)
+### Phase 1 — Canonical Carry-Forward
+- Automate or semi-automate source carry-forward from `dotfiles/mcp/dotfiles-mcp` so the mirror stops lagging canonical resources, prompts, and newer workstation modules
+- Reduce the current contract delta by porting the missing canonical workflow catalogs, prompts, and module registrations into the standalone layout
+- Keep `make canonical-drift` green or at least bounded enough that drift is a conscious release decision rather than an accident
 
-### Phase 2 — Desktop Automation
-- `hypr_record_screen` — screen recording via wf-recorder with configurable region
-- `hypr_layout_save` / `hypr_layout_restore` — snapshot and restore window arrangements
-- Eww widget data tools — expose eww variable state and widget tree to MCP
-- Notification management tools (mako: list, dismiss, toggle DND)
+### Phase 2 — Publish Guard Hardening
+- Keep active GitHub workflows for CI, release, server-card validation, and publish guard in this repo rather than assuming canonical-only checks are enough
+- Publish contract diff summaries into release notes or docs whenever `snapshots/contract/` changes
+- Run `host-smoke` on a logged-in self-hosted Hyprland runner before release-oriented pushes
 
-### Phase 3 — Fleet & CI Improvements
-- `dotfiles_pipeline_status` — aggregate CI status across all repos in one view
-- `dotfiles_changelog_gen` — generate changelogs from conventional commits
-- `dotfiles_release` — orchestrate go-releaser across repos
-- Webhook support for fleet audit notifications
+### Phase 3 — Verification And Surface Quality
+- Expand integration coverage for Bluetooth, juhradial-mx, and desktop-control paths that still rely on workstation state
+- Add stronger tests around profile-specific eager/deferred loading behavior
+- Improve contributor guidance so mirror maintainers know when to regenerate snapshots, compare against canonical, and update the publish workflows
 
 ## Future Considerations
-- Wayland-native screenshot/recording (replace ydotool with libinput where possible)
-- Audio device management tools (PipeWire/PulseAudio)
-- Multi-monitor layout presets (save/restore per-workspace monitor configurations)
-- Plugin architecture for community-contributed modules
+- Full structural convergence with the canonical module, potentially by collapsing the mirror layout closer to the embedded source instead of preserving today’s dual architecture indefinitely
+- Release automation that attaches contract drift reports and snapshot diffs as artifacts
+- Removal of remaining recovery-only compatibility paths once the canonical source fully retires them
 
 <!-- whiteclaw-rollout:start -->
 ## Whiteclaw-Derived Overhaul (2026-04-08)

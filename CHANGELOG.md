@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - GitHub Stars workflow module for listing stars, managing GitHub star folders, auditing taxonomy drift, syncing list membership, and installing the global Codex MCP entries
 - `cmd/github-starsctl` CLI wrapper for the GitHub Stars workflow
+- Active standalone CI, release, publish-guard, and server-card validation workflows
+- `make contract-diff` and `make canonical-drift` plus supporting scripts for mirror surface and canonical drift reporting
 
 ## [v0.1.0] - 2026-04-03
 

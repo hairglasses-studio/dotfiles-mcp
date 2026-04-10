@@ -53,6 +53,15 @@ It also ships discovery-adjacent resources and prompts for workflow entrypoints:
 
 Use `DOTFILES_MCP_PROFILE=desktop` for a practical workstation-first eager set, or `full` if you explicitly want the full catalog treated as eager.
 
+The committed mirror contract currently exposes:
+
+- `278` tools
+- `32` registered modules
+- `8` resources
+- `4` prompts
+
+Those counts come from the checked-in bundle under [`snapshots/contract`](./snapshots/contract). The canonical source in `dotfiles/mcp/dotfiles-mcp` may lead this mirror between carry-forward tranches, so the mirror tracks its own published contract explicitly instead of implying perfect real-time parity.
+
 ## Quick Start
 
 After installing, try the discovery tools to explore what's available:
@@ -94,12 +103,12 @@ claude mcp call dotfiles dotfiles_gh_star_lists_list '{"include_items":true}'
 
 Control how many tools load at startup via `DOTFILES_MCP_PROFILE`:
 
-| Profile | Behavior | Context Cost |
-|---------|----------|-------------|
-| `default` | Discovery tools loaded, rest deferred on demand | ~2K tokens |
-| `desktop` | Desktop/operator subset loaded eagerly | ~8K tokens |
-| `ops` | Operational subset (config, desktop, fleet) loaded eagerly | ~15K tokens |
-| `full` | All tools loaded immediately | ~40K tokens |
+| Profile | Behavior | Approx. Prompt Footprint |
+|---------|----------|--------------------------|
+| `default` | Discovery tools loaded, rest deferred on demand | ~2-4K tokens |
+| `desktop` | Desktop/operator subset loaded eagerly | ~8-12K tokens |
+| `ops` | Operational subset (config, desktop, fleet) loaded eagerly | ~15-22K tokens |
+| `full` | All tools loaded immediately | ~40K+ tokens |
 
 Set in your MCP config:
 
@@ -125,6 +134,12 @@ make contract-snapshot
 # Fail if snapshots or .well-known/mcp.json drift from the live registry
 make contract-check
 
+# Summarize surface deltas against a base ref
+make contract-diff
+
+# Compare the mirror snapshot against the canonical dotfiles source
+make canonical-drift
+
 # Run bounded host checks for Hyprland, Bluetooth, input, and GitHub CLI surfaces
 make host-smoke
 
@@ -137,23 +152,18 @@ make publish-check
 
 Generated artifacts live under `snapshots/contract/` and `.well-known/mcp.json`.
 
-## Tool Categories
+## Surface Domains
 
-| Category | Tools | Description |
-|----------|------:|-------------|
-| Config Management | 4 | Dotfiles symlink health, config validation, service reloads |
-| GitHub Org Lifecycle | 12 | Repo transfers, fork squashing, bulk clone/pull/archive, fleet sync |
-| GitHub Stars | 14 | Starred repo inventory, GitHub star folders, taxonomy audit/sync, bootstrap, and Codex MCP install helpers |
-| Fleet Auditing & CI | 4 | Per-repo health dashboard, dependency skew, workflow sync |
-| Build & Sync | 5 | Multi-language build pipeline, Go version sync, repo scaffolding |
-| Hyprland Desktop | 12 | Window/workspace management, screenshots, monitor config, input simulation |
-| Desktop Services | 6 | Cascade reload, rice check, eww bar management |
-| Shader Pipeline | 13 | GLSL shader lifecycle for kitty write-target configs and Ghostty companion wallpapers -- list, set, cycle, test, build |
-| Bluetooth | 9 | Device discovery, pairing (BLE-safe), connect/disconnect, battery, trust |
-| Input Devices | 14 | juhradial-mx config, MX battery, and gamepad profiles (makima) |
-| MIDI | 4 | USB MIDI controller detection and mapping config |
-| Composed Workflows | 3 | Multi-step automations: BT discover-and-connect, controller auto-setup, repo onboarding |
-| Open-Source Readiness | 2 | Score repos 0-100 across 8 categories with actionable suggestions |
+Exact counts should come from the committed contract bundle, not prose. The mirror currently publishes these major domains:
+
+| Domain | Description |
+|--------|-------------|
+| Discovery | Search, schema, catalog, stats, and health entrypoints for the deferred surface |
+| Desktop Control | Hyprland, screenshot/OCR, clipboard, notifications, shaders, and Wayland input workflows |
+| Workstation Ops | Systemd, process, tmux, sandbox, fleet audit, repo hygiene, and SDLC loops |
+| GitHub Workflows | Org lifecycle, GitHub Stars, and repo sync helpers |
+| Input & Devices | Bluetooth, juhradial-mx, controller mapping, MIDI, and mouse/controller diagnostics |
+| Research & Recovery | Claude session recovery, prompt registry, roadmap, and cross-repo operator tooling |
 
 ## Key Patterns
 
