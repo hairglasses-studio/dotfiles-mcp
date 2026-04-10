@@ -1,6 +1,10 @@
 package dotfiles
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/hairglasses-studio/mcpkit/registry"
+)
 
 func TestBuildContractSnapshotBundle(t *testing.T) {
 	bundle, err := BuildContractSnapshotBundle("default")
@@ -76,6 +80,113 @@ func TestBuildContractSnapshotBundleDesktopProfile(t *testing.T) {
 	}
 	if desktopStatusDeferred {
 		t.Fatal("expected dotfiles_desktop_status to be eager in desktop profile")
+	}
+}
+
+func TestBuildContractSnapshotBundleOpsProfile(t *testing.T) {
+	bundle, err := BuildContractSnapshotBundle("ops")
+	if err != nil {
+		t.Fatalf("BuildContractSnapshotBundle(ops): %v", err)
+	}
+
+	if bundle.Overview.Profile != "ops" {
+		t.Fatalf("profile = %q, want ops", bundle.Overview.Profile)
+	}
+
+	deferred := make(map[string]bool, len(bundle.Tools))
+	for _, tool := range bundle.Tools {
+		deferred[tool.Name] = tool.Deferred
+	}
+
+	if deferred["dotfiles_validate_config"] {
+		t.Fatal("expected dotfiles_validate_config to be eager in ops profile")
+	}
+	if deferred["dotfiles_rice_check"] {
+		t.Fatal("expected dotfiles_rice_check to be eager in ops profile")
+	}
+	if deferred["workflow_sync"] {
+		t.Fatal("expected workflow_sync to be eager in ops profile")
+	}
+	if deferred["oss_score"] {
+		t.Fatal("expected oss_score to be eager in ops profile")
+	}
+	if !deferred["hypr_list_windows"] {
+		t.Fatal("expected hypr_list_windows to remain deferred in ops profile")
+	}
+	if !deferred["shader_list"] {
+		t.Fatal("expected shader_list to remain deferred in ops profile")
+	}
+}
+
+func TestBuildContractSnapshotBundleFrontDoorParity(t *testing.T) {
+	bundle, err := BuildContractSnapshotBundle("default")
+	if err != nil {
+		t.Fatalf("BuildContractSnapshotBundle(default): %v", err)
+	}
+
+	reg := registry.NewToolRegistry()
+	promptReg := buildDotfilesPromptRegistry()
+	resReg := buildDotfilesResourceRegistry(reg, promptReg)
+
+	if len(bundle.Resources) != resReg.ResourceCount() {
+		t.Fatalf("bundle resources = %d, want %d", len(bundle.Resources), resReg.ResourceCount())
+	}
+	if len(bundle.Templates) != resReg.TemplateCount() {
+		t.Fatalf("bundle templates = %d, want %d", len(bundle.Templates), resReg.TemplateCount())
+	}
+	if len(bundle.Prompts) != promptReg.PromptCount() {
+		t.Fatalf("bundle prompts = %d, want %d", len(bundle.Prompts), promptReg.PromptCount())
+	}
+	if bundle.Overview.ResourceCount != len(bundle.Resources)+len(bundle.Templates) {
+		t.Fatalf("overview resource_count = %d, want %d", bundle.Overview.ResourceCount, len(bundle.Resources)+len(bundle.Templates))
+	}
+	if bundle.Overview.TemplateCount != len(bundle.Templates) {
+		t.Fatalf("overview template_count = %d, want %d", bundle.Overview.TemplateCount, len(bundle.Templates))
+	}
+	if bundle.Overview.PromptCount != len(bundle.Prompts) {
+		t.Fatalf("overview prompt_count = %d, want %d", bundle.Overview.PromptCount, len(bundle.Prompts))
+	}
+
+	resourceSet := make(map[string]struct{}, len(bundle.Resources))
+	for _, resource := range bundle.Resources {
+		resourceSet[resource.URI] = struct{}{}
+	}
+	templateSet := make(map[string]struct{}, len(bundle.Templates))
+	for _, template := range bundle.Templates {
+		templateSet[template.URITemplate] = struct{}{}
+	}
+	promptSet := make(map[string]struct{}, len(bundle.Prompts))
+	for _, prompt := range bundle.Prompts {
+		promptSet[prompt.Name] = struct{}{}
+	}
+
+	for _, rd := range resReg.GetAllResourceDefinitions() {
+		if _, ok := resourceSet[rd.Resource.URI]; !ok {
+			t.Fatalf("resource %q missing from contract bundle", rd.Resource.URI)
+		}
+	}
+	for _, td := range resReg.GetAllTemplateDefinitions() {
+		if _, ok := templateSet[td.Template.URITemplate.Raw()]; !ok {
+			t.Fatalf("template %q missing from contract bundle", td.Template.URITemplate.Raw())
+		}
+	}
+	for _, pd := range promptReg.GetAllPromptDefinitions() {
+		if _, ok := promptSet[pd.Prompt.Name]; !ok {
+			t.Fatalf("prompt %q missing from contract bundle", pd.Prompt.Name)
+		}
+	}
+
+	for _, workflow := range dotfilesWorkflowCatalog() {
+		if workflow.ResourceURI != "" {
+			if _, ok := resourceSet[workflow.ResourceURI]; !ok {
+				t.Fatalf("workflow %q resource %q missing from contract bundle", workflow.Name, workflow.ResourceURI)
+			}
+		}
+		if workflow.PromptName != "" {
+			if _, ok := promptSet[workflow.PromptName]; !ok {
+				t.Fatalf("workflow %q prompt %q missing from contract bundle", workflow.Name, workflow.PromptName)
+			}
+		}
 	}
 }
 
