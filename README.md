@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-2025--11--25-blue)](https://modelcontextprotocol.io/specification/2025-11-25)
 
-MCP server for desktop environment management, semantic desktop control, session tooling, repo ops, GitHub org lifecycle, fleet auditing, kitty runtime control, Arch Linux workflows, and open-source readiness scoring.
+MCP server for desktop environment management, semantic desktop control, semantic form discovery and batch fill, session tooling, repo ops, GitHub org lifecycle, fleet auditing, kitty runtime control, Arch Linux workflows, and open-source readiness scoring.
 
 Canonical development lives in [`hairglasses-studio/dotfiles`](https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp) under `dotfiles/mcp/dotfiles-mcp`. The standalone [`dotfiles-mcp`](https://github.com/hairglasses-studio/dotfiles-mcp) repo is a publish mirror kept in parity for installation and discovery.
 
@@ -51,7 +51,7 @@ The server also exposes read-first workflow resources and prompt entrypoints for
 
 The canonical module now commits public contract snapshots under [`snapshots/contract`](./snapshots/contract) and regenerates the public server card at [`.well-known/mcp.json`](./.well-known/mcp.json). Current canonical snapshot counts:
 
-- `398` tools
+- `402` tools
 - `37` registered modules
 - `24` resources
 - `12` prompts
@@ -81,6 +81,10 @@ claude mcp call dotfiles dotfiles_workstation_diagnostics '{"symptom":"desktop b
 
 # Capture the live workspace scene plus saved layouts and monitor presets
 claude mcp call dotfiles dotfiles_workspace_scene '{}'
+
+# Derive semantic form fields and preview a batch fill plan
+claude mcp call dotfiles desktop_form_fields '{"app":"Firefox","include_actions":true}'
+claude mcp call dotfiles desktop_fill_form '{"app":"Firefox","preview":true,"fields":[{"name":"Email","text":"user@example.com"}]}'
 
 # Check desktop rice health
 claude mcp call dotfiles dotfiles_rice_check '{}'
@@ -140,7 +144,7 @@ Exact per-tool counts should come from the snapshot bundle rather than prose. Th
 | Domain | Description |
 |--------|-------------|
 | Discovery | Search, schema, catalog, stats, and health entrypoints for the deferred surface |
-| Desktop Control | Hyprland, semantic AT-SPI targeting with refs/actions/multi-match queries plus window focus and value read-write helpers, kitty tab/window launch-focus-resize-text helpers, session-local accessibility and D-Bus control, screenshot/OCR, clipboard, notifications, shaders, audio, and Wayland input workflows |
+| Desktop Control | Hyprland, semantic AT-SPI targeting with refs/actions/multi-match queries plus window focus, form discovery, batch fill, and value read-write helpers, kitty tab/window launch-focus-resize-text helpers, session-local accessibility and D-Bus control, screenshot/OCR, clipboard, notifications, shaders, audio, and Wayland input workflows |
 | Workstation Ops | Systemd, process, tmux, sandbox, fleet audit, repo hygiene, and SDLC loops |
 | GitHub Workflows | Org lifecycle, GitHub Stars, and repo sync helpers |
 | Input & Devices | Bluetooth, juhradial-mx, controller mapping, MIDI, and mouse/controller diagnostics |

@@ -388,6 +388,19 @@
     "deferred": true
   },
   {
+    "name": "desktop_fill_form",
+    "description": "Batch-resolve and fill semantic desktop form fields by label, ref, or path, with optional preview mode.",
+    "category": "desktop",
+    "search_terms": [
+      "semantic form fill",
+      "batch fill fields",
+      "fill desktop form",
+      "at-spi batch input"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "desktop_find",
     "description": "Find a semantic element by app plus name, role, states, ref, or a previously returned path.",
     "category": "desktop",
@@ -456,6 +469,19 @@
       "focus desktop window",
       "at-spi window focus",
       "window title focus"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "desktop_form_fields",
+    "description": "Derive fillable semantic form fields from an AT-SPI application subtree, including labels, strategies, and refs.",
+    "category": "desktop",
+    "search_terms": [
+      "semantic form fields",
+      "form discovery",
+      "discover fields",
+      "at-spi form"
     ],
     "is_write": false,
     "deferred": true
@@ -2771,6 +2797,19 @@
     "deferred": true
   },
   {
+    "name": "session_fill_form",
+    "description": "Batch-resolve and fill semantic session form fields by label, ref, or path, with optional preview mode.",
+    "category": "desktop",
+    "search_terms": [
+      "session form fill",
+      "session batch fill",
+      "fill session form",
+      "session at-spi batch input"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "session_find_ui_element",
     "description": "Find a semantic UI element inside a tracked session by app plus name, role, states, ref, or path.",
     "category": "desktop",
@@ -2814,6 +2853,18 @@
       "focus session window",
       "focus by class",
       "focus by title"
+    ],
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "session_form_fields",
+    "description": "Derive fillable semantic form fields from an AT-SPI application subtree inside a tracked session.",
+    "category": "desktop",
+    "search_terms": [
+      "session form fields",
+      "session form discovery",
+      "session at-spi form"
     ],
     "is_write": false,
     "deferred": true

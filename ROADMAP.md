@@ -2,7 +2,7 @@
 
 ## Current State
 
-dotfiles-mcp is now a discovery-first workstation MCP surface with committed contract artifacts. The canonical snapshot currently exposes `398` tools across `37` registered modules, plus `24` resources and `12` prompts. Public release metadata is regenerated into `.well-known/mcp.json`, and the JSON bundle in `snapshots/contract/` is treated as the checked-in contract for publish parity.
+dotfiles-mcp is now a discovery-first workstation MCP surface with committed contract artifacts. The canonical snapshot currently exposes `402` tools across `37` registered modules, plus `24` resources and `12` prompts. Public release metadata is regenerated into `.well-known/mcp.json`, and the JSON bundle in `snapshots/contract/` is treated as the checked-in contract for publish parity.
 
 The server remains stdio-first, built on mcpkit, and defaults to deferred loading outside the discovery surface. Batch workflows still default to dry-run where live mutation would be risky.
 
@@ -18,10 +18,12 @@ The workstation diagnosis workflow now has a concrete front door in `dotfiles_wo
 
 Workspace scene inspection now has a matching front door in `dotfiles_workspace_scene`, which combines live Hyprland monitors, workspaces, windows, and the saved layout or monitor-preset inventory used for restoration.
 
+Semantic desktop workflows now have dedicated form surfaces in `desktop_form_fields`, `desktop_fill_form`, `session_form_fields`, and `session_fill_form`, which add label-aware field discovery, preview-first batch plans, and batch semantic fill for live and tracked session targets.
+
 ## Planned
 
 ### Phase 2 — Product Expansion
-- Broader semantic desktop compatibility for Electron/Chromium-heavy apps, richer semantic form editing, and more resilient KWin virtual-session introspection
+- Broader semantic desktop compatibility for Electron/Chromium-heavy apps beyond current AT-SPI label/attribute heuristics, and more resilient KWin virtual-session introspection
 
 ## Future Considerations
 - Remove the remaining Solaar recovery-only bridge once juhradial can replay full MX wheel state durably

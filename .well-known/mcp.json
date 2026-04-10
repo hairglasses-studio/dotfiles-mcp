@@ -229,6 +229,10 @@
       "description": "DESTRUCTIVE: Find text on screen via OCR and click at its center. The atomic 'click the button labeled X' primitive. Requires explicit approval."
     },
     {
+      "name": "desktop_fill_form",
+      "description": "Batch-resolve and fill semantic desktop form fields by label, ref, or path, with optional preview mode."
+    },
+    {
       "name": "desktop_find",
       "description": "Find a semantic element by app plus name, role, states, ref, or a previously returned path."
     },
@@ -247,6 +251,10 @@
     {
       "name": "desktop_focus_window",
       "description": "Focus a top-level semantic desktop window by title, app/class substring, or a previously returned semantic ref/path."
+    },
+    {
+      "name": "desktop_form_fields",
+      "description": "Derive fillable semantic form fields from an AT-SPI application subtree, including labels, strategies, and refs."
     },
     {
       "name": "desktop_key",
@@ -1357,6 +1365,10 @@
       "description": "Run a session-scoped dbus-send call for advanced KWin, portal, or app-specific automation."
     },
     {
+      "name": "session_fill_form",
+      "description": "Batch-resolve and fill semantic session form fields by label, ref, or path, with optional preview mode."
+    },
+    {
       "name": "session_find_ui_element",
       "description": "Find a semantic UI element inside a tracked session by app plus name, role, states, ref, or path."
     },
@@ -1371,6 +1383,10 @@
     {
       "name": "session_focus_window",
       "description": "Focus a window inside a tracked session by Hyprland address/class/title or by semantic AT-SPI window targeting for non-Hyprland sessions."
+    },
+    {
+      "name": "session_form_fields",
+      "description": "Derive fillable semantic form fields from an AT-SPI application subtree inside a tracked session."
     },
     {
       "name": "session_invoke_action",
@@ -1628,7 +1644,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 398,
+  "tool_count": 402,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [

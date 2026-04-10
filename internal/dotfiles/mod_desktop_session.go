@@ -252,6 +252,57 @@ type SessionSemanticMatchesOutput struct {
 	Error      string                    `json:"error,omitempty"`
 }
 
+type SessionSemanticFormFieldsInput struct {
+	SessionID      string `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	App            string `json:"app" jsonschema:"required,description=Application name or unique substring inside the session"`
+	Ref            string `json:"ref,omitempty" jsonschema:"description=Optional semantic reference that scopes discovery to one subtree, such as ref_0_2_1"`
+	Path           string `json:"path,omitempty" jsonschema:"description=Optional child-index path that scopes discovery to one subtree, such as 0/2/1"`
+	Depth          int    `json:"depth,omitempty" jsonschema:"description=Max AT-SPI tree depth to inspect before deriving fields (default 8)"`
+	Limit          int    `json:"limit,omitempty" jsonschema:"description=Optional max number of form fields to return"`
+	IncludeActions bool   `json:"include_actions,omitempty" jsonschema:"description=Include action-oriented controls such as buttons and combo boxes in addition to editable fields"`
+}
+
+type SessionSemanticFormFieldsOutput struct {
+	Session        desktopSessionRecord `json:"session"`
+	HelperPath     string               `json:"helper_path,omitempty"`
+	App            string               `json:"app"`
+	ScopeRef       string               `json:"scope_ref,omitempty"`
+	ScopePath      string               `json:"scope_path,omitempty"`
+	Depth          int                  `json:"depth"`
+	IncludeActions bool                 `json:"include_actions"`
+	Count          int                  `json:"count"`
+	Fields         []semanticFormField  `json:"fields,omitempty"`
+	Error          string               `json:"error,omitempty"`
+}
+
+type SessionSemanticFormFillInput struct {
+	SessionID       string                      `json:"session_id,omitempty" jsonschema:"description=Session handle to use. Defaults to the newest saved session."`
+	App             string                      `json:"app" jsonschema:"required,description=Application name or unique substring inside the session"`
+	ScopeRef        string                      `json:"scope_ref,omitempty" jsonschema:"description=Optional semantic reference that scopes matching to one subtree, such as ref_0_2_1"`
+	ScopePath       string                      `json:"scope_path,omitempty" jsonschema:"description=Optional child-index path that scopes matching to one subtree, such as 0/2/1"`
+	Depth           int                         `json:"depth,omitempty" jsonschema:"description=Max AT-SPI tree depth to inspect before resolving form fields (default 8)"`
+	Preview         bool                        `json:"preview,omitempty" jsonschema:"description=When true, resolve targets and strategies without mutating the UI"`
+	ContinueOnError *bool                       `json:"continue_on_error,omitempty" jsonschema:"description=Continue filling remaining fields after an error. Defaults to true."`
+	Fields          []semanticFormFillItemInput `json:"fields" jsonschema:"required,description=Fields to fill or actions to invoke inside the session"`
+}
+
+type SessionSemanticFormFillOutput struct {
+	Session         desktopSessionRecord         `json:"session"`
+	HelperPath      string                       `json:"helper_path,omitempty"`
+	App             string                       `json:"app"`
+	ScopeRef        string                       `json:"scope_ref,omitempty"`
+	ScopePath       string                       `json:"scope_path,omitempty"`
+	Depth           int                          `json:"depth"`
+	Preview         bool                         `json:"preview"`
+	ContinueOnError bool                         `json:"continue_on_error"`
+	Requested       int                          `json:"requested"`
+	Matched         int                          `json:"matched"`
+	Planned         int                          `json:"planned"`
+	Applied         int                          `json:"applied"`
+	Results         []semanticFormFillItemOutput `json:"results,omitempty"`
+	Error           string                       `json:"error,omitempty"`
+}
+
 func desktopSessionsRootDir() string {
 	return dotfilesManagedStateDir("sessions")
 }
@@ -578,6 +629,29 @@ func sessionSemanticQueryFromValueInput(input SessionSemanticValueInput) desktop
 		Path:   input.Path,
 		States: input.States,
 		Exact:  input.Exact,
+	}
+}
+
+func sessionSemanticFormFieldsInput(input SessionSemanticFormFieldsInput) desktopSemanticFormFieldsInput {
+	return desktopSemanticFormFieldsInput{
+		App:            input.App,
+		Ref:            input.Ref,
+		Path:           input.Path,
+		Depth:          input.Depth,
+		Limit:          input.Limit,
+		IncludeActions: input.IncludeActions,
+	}
+}
+
+func sessionSemanticFormFillInput(input SessionSemanticFormFillInput) desktopSemanticFormFillInput {
+	return desktopSemanticFormFillInput{
+		App:             input.App,
+		ScopeRef:        input.ScopeRef,
+		ScopePath:       input.ScopePath,
+		Depth:           input.Depth,
+		Preview:         input.Preview,
+		ContinueOnError: input.ContinueOnError,
+		Fields:          input.Fields,
 	}
 }
 
@@ -1278,6 +1352,74 @@ exec kwin_wayland --virtual --no-lockscreen
 	setValue.Category = "desktop"
 	setValue.SearchTerms = []string{"session set value", "session slider set", "session spinbox set"}
 
+	formFields := handler.TypedHandler[SessionSemanticFormFieldsInput, SessionSemanticFormFieldsOutput](
+		"session_form_fields",
+		"Derive fillable semantic form fields from an AT-SPI application subtree inside a tracked session.",
+		func(ctx context.Context, input SessionSemanticFormFieldsInput) (SessionSemanticFormFieldsOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticFormFieldsOutput{}, err
+			}
+			helper := func(ctx context.Context, args ...string) (any, string, error) {
+				return runDesktopSessionSemanticHelper(ctx, record, args...)
+			}
+			out, err := semanticBuildFormFields(ctx, helper, sessionSemanticFormFieldsInput(input))
+			if err != nil {
+				return SessionSemanticFormFieldsOutput{}, err
+			}
+			return SessionSemanticFormFieldsOutput{
+				Session:        record,
+				HelperPath:     out.HelperPath,
+				App:            out.App,
+				ScopeRef:       out.ScopeRef,
+				ScopePath:      out.ScopePath,
+				Depth:          out.Depth,
+				IncludeActions: out.IncludeActions,
+				Count:          out.Count,
+				Fields:         out.Fields,
+				Error:          out.Error,
+			}, nil
+		},
+	)
+	formFields.Category = "desktop"
+	formFields.SearchTerms = []string{"session form fields", "session form discovery", "session at-spi form"}
+
+	fillForm := handler.TypedHandler[SessionSemanticFormFillInput, SessionSemanticFormFillOutput](
+		"session_fill_form",
+		"Batch-resolve and fill semantic session form fields by label, ref, or path, with optional preview mode.",
+		func(ctx context.Context, input SessionSemanticFormFillInput) (SessionSemanticFormFillOutput, error) {
+			record, err := resolveDesktopSession(input.SessionID)
+			if err != nil {
+				return SessionSemanticFormFillOutput{}, err
+			}
+			helper := func(ctx context.Context, args ...string) (any, string, error) {
+				return runDesktopSessionSemanticHelper(ctx, record, args...)
+			}
+			out, err := semanticExecuteFormFill(ctx, helper, sessionSemanticFormFillInput(input))
+			if err != nil {
+				return SessionSemanticFormFillOutput{}, err
+			}
+			return SessionSemanticFormFillOutput{
+				Session:         record,
+				HelperPath:      out.HelperPath,
+				App:             out.App,
+				ScopeRef:        out.ScopeRef,
+				ScopePath:       out.ScopePath,
+				Depth:           out.Depth,
+				Preview:         out.Preview,
+				ContinueOnError: out.ContinueOnError,
+				Requested:       out.Requested,
+				Matched:         out.Matched,
+				Planned:         out.Planned,
+				Applied:         out.Applied,
+				Results:         out.Results,
+				Error:           out.Error,
+			}, nil
+		},
+	)
+	fillForm.Category = "desktop"
+	fillForm.SearchTerms = []string{"session form fill", "session batch fill", "fill session form", "session at-spi batch input"}
+
 	waitForElement := handler.TypedHandler[SessionSemanticWaitInput, SessionSemanticElementOutput](
 		"session_wait_for_element",
 		"Wait for a semantic element to appear or satisfy requested states inside a tracked session.",
@@ -1456,6 +1598,8 @@ exec kwin_wayland --virtual --no-lockscreen
 		readValue,
 		setText,
 		setValue,
+		formFields,
+		fillForm,
 		waitForElement,
 		clickElement,
 		invokeAction,

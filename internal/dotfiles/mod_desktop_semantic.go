@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -154,6 +155,96 @@ type desktopSemanticElementOutput struct {
 	ValueKind  string                    `json:"value_kind,omitempty"`
 	Element    map[string]any            `json:"element,omitempty"`
 	Error      string                    `json:"error,omitempty"`
+}
+
+type desktopSemanticFormFieldsInput struct {
+	App            string `json:"app" jsonschema:"required,description=Application name or unique substring"`
+	Ref            string `json:"ref,omitempty" jsonschema:"description=Optional semantic reference that scopes discovery to one subtree, such as ref_0_2_1"`
+	Path           string `json:"path,omitempty" jsonschema:"description=Optional child-index path that scopes discovery to one subtree, such as 0/2/1"`
+	Depth          int    `json:"depth,omitempty" jsonschema:"description=Max AT-SPI tree depth to inspect before deriving fields (default 8)"`
+	Limit          int    `json:"limit,omitempty" jsonschema:"description=Optional max number of form fields to return"`
+	IncludeActions bool   `json:"include_actions,omitempty" jsonschema:"description=Include action-oriented controls such as buttons and combo boxes in addition to editable fields"`
+}
+
+type semanticFormFillItemInput struct {
+	Name    string   `json:"name,omitempty" jsonschema:"description=Semantic field label, name, description, or placeholder text to match"`
+	Role    string   `json:"role,omitempty" jsonschema:"description=Optional exact AT-SPI role filter"`
+	Ref     string   `json:"ref,omitempty" jsonschema:"description=Optional semantic reference such as ref_0_2_1 from a previous semantic result"`
+	Path    string   `json:"path,omitempty" jsonschema:"description=Optional child-index path such as 0/2/1 from a previous semantic result"`
+	Exact   bool     `json:"exact,omitempty" jsonschema:"description=Require exact case-insensitive label or name matching"`
+	Text    *string  `json:"text,omitempty" jsonschema:"description=Text to write into an editable semantic field"`
+	Number  *float64 `json:"number,omitempty" jsonschema:"description=Numeric value to write into a slider, spinbox, or similar field"`
+	Checked *bool    `json:"checked,omitempty" jsonschema:"description=Desired toggle state for a checkbox, radio button, switch, or toggle button"`
+	Action  string   `json:"action,omitempty" jsonschema:"description=Explicit AT-SPI action name to invoke, such as activate, press, or select"`
+}
+
+type desktopSemanticFormFillInput struct {
+	App             string                      `json:"app" jsonschema:"required,description=Application name or unique substring"`
+	ScopeRef        string                      `json:"scope_ref,omitempty" jsonschema:"description=Optional semantic reference that scopes matching to one subtree, such as ref_0_2_1"`
+	ScopePath       string                      `json:"scope_path,omitempty" jsonschema:"description=Optional child-index path that scopes matching to one subtree, such as 0/2/1"`
+	Depth           int                         `json:"depth,omitempty" jsonschema:"description=Max AT-SPI tree depth to inspect before resolving form fields (default 8)"`
+	Preview         bool                        `json:"preview,omitempty" jsonschema:"description=When true, resolve targets and strategies without mutating the UI"`
+	ContinueOnError *bool                       `json:"continue_on_error,omitempty" jsonschema:"description=Continue filling remaining fields after an error. Defaults to true."`
+	Fields          []semanticFormFillItemInput `json:"fields" jsonschema:"required,description=Fields to fill or actions to invoke"`
+}
+
+type semanticFormField struct {
+	Name         string              `json:"name,omitempty"`
+	Description  string              `json:"description,omitempty"`
+	Role         string              `json:"role,omitempty"`
+	FieldType    string              `json:"field_type,omitempty"`
+	FillStrategy string              `json:"fill_strategy,omitempty"`
+	Ref          string              `json:"ref,omitempty"`
+	Path         string              `json:"path,omitempty"`
+	Value        any                 `json:"value,omitempty"`
+	ValueKind    string              `json:"value_kind,omitempty"`
+	Labels       []string            `json:"labels,omitempty"`
+	States       []string            `json:"states,omitempty"`
+	Actions      []string            `json:"actions,omitempty"`
+	Attributes   map[string]string   `json:"attributes,omitempty"`
+	Relations    map[string][]string `json:"relations,omitempty"`
+	Element      map[string]any      `json:"element,omitempty"`
+}
+
+type desktopSemanticFormFieldsOutput struct {
+	HelperPath     string              `json:"helper_path,omitempty"`
+	App            string              `json:"app"`
+	ScopeRef       string              `json:"scope_ref,omitempty"`
+	ScopePath      string              `json:"scope_path,omitempty"`
+	Depth          int                 `json:"depth"`
+	IncludeActions bool                `json:"include_actions"`
+	Count          int                 `json:"count"`
+	Fields         []semanticFormField `json:"fields,omitempty"`
+	Error          string              `json:"error,omitempty"`
+}
+
+type semanticFormFillItemOutput struct {
+	Request      semanticFormFillItemInput `json:"request"`
+	Matched      bool                      `json:"matched"`
+	Planned      bool                      `json:"planned,omitempty"`
+	Applied      bool                      `json:"applied,omitempty"`
+	Strategy     string                    `json:"strategy,omitempty"`
+	FieldType    string                    `json:"field_type,omitempty"`
+	Field        *semanticFormField        `json:"field,omitempty"`
+	Element      map[string]any            `json:"element,omitempty"`
+	CurrentValue any                       `json:"current_value,omitempty"`
+	Error        string                    `json:"error,omitempty"`
+}
+
+type desktopSemanticFormFillOutput struct {
+	HelperPath      string                       `json:"helper_path,omitempty"`
+	App             string                       `json:"app"`
+	ScopeRef        string                       `json:"scope_ref,omitempty"`
+	ScopePath       string                       `json:"scope_path,omitempty"`
+	Depth           int                          `json:"depth"`
+	Preview         bool                         `json:"preview"`
+	ContinueOnError bool                         `json:"continue_on_error"`
+	Requested       int                          `json:"requested"`
+	Matched         int                          `json:"matched"`
+	Planned         int                          `json:"planned"`
+	Applied         int                          `json:"applied"`
+	Results         []semanticFormFillItemOutput `json:"results,omitempty"`
+	Error           string                       `json:"error,omitempty"`
 }
 
 func dotfilesSemanticHelperPath() (string, error) {
@@ -410,6 +501,716 @@ func desktopResolveSemanticWindow(ctx context.Context, input desktopSemanticWind
 	return desktopSemanticQueryInput{}, helperPath, fmt.Errorf("[%s] title_contains, class, or app+ref/path is required", handler.ErrInvalidParam)
 }
 
+type semanticRunner func(ctx context.Context, args ...string) (any, string, error)
+
+func semanticStringSlice(v any) []string {
+	switch raw := v.(type) {
+	case []string:
+		out := make([]string, 0, len(raw))
+		for _, item := range raw {
+			if trimmed := strings.TrimSpace(item); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out
+	case []any:
+		out := make([]string, 0, len(raw))
+		for _, item := range raw {
+			if trimmed := strings.TrimSpace(stringValue(item)); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func semanticStringMapValue(v any) map[string]string {
+	switch raw := v.(type) {
+	case map[string]string:
+		if len(raw) == 0 {
+			return nil
+		}
+		out := make(map[string]string, len(raw))
+		for key, value := range raw {
+			if strings.TrimSpace(key) == "" {
+				continue
+			}
+			out[key] = strings.TrimSpace(value)
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	case map[string]any:
+		if len(raw) == 0 {
+			return nil
+		}
+		out := make(map[string]string, len(raw))
+		for key, value := range raw {
+			if strings.TrimSpace(key) == "" {
+				continue
+			}
+			out[key] = strings.TrimSpace(stringValue(value))
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func semanticStringSlicesMapValue(v any) map[string][]string {
+	raw, ok := v.(map[string]any)
+	if !ok || len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string][]string, len(raw))
+	for key, value := range raw {
+		items := semanticStringSlice(value)
+		if len(items) == 0 {
+			continue
+		}
+		out[key] = items
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func semanticNormalize(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func semanticRefToPath(ref string) string {
+	value := semanticNormalize(ref)
+	if value == "" {
+		return ""
+	}
+	if value == "ref_root" {
+		return ""
+	}
+	if strings.HasPrefix(value, "ref_") {
+		return strings.ReplaceAll(ref[4:], "_", "/")
+	}
+	return ""
+}
+
+func semanticElementPath(element map[string]any) string {
+	if element == nil {
+		return ""
+	}
+	if path := strings.TrimSpace(stringValue(element["path"])); path != "" {
+		return path
+	}
+	return semanticRefToPath(stringValue(element["ref"]))
+}
+
+func semanticElementChildren(element map[string]any) []map[string]any {
+	if element == nil {
+		return nil
+	}
+	return semanticMapSliceValue(element["children"])
+}
+
+func semanticLocateElement(root map[string]any, ref string, path string) map[string]any {
+	if root == nil {
+		return nil
+	}
+	targetPath := strings.TrimSpace(path)
+	if targetPath == "" {
+		targetPath = semanticRefToPath(ref)
+	}
+	if targetPath == "" {
+		return root
+	}
+	current := root
+	for _, raw := range strings.Split(targetPath, "/") {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		idx, err := strconv.Atoi(strings.TrimSpace(raw))
+		if err != nil {
+			return nil
+		}
+		children := semanticElementChildren(current)
+		if idx < 0 || idx >= len(children) {
+			return nil
+		}
+		current = children[idx]
+	}
+	return current
+}
+
+func semanticCollectElements(root map[string]any) []map[string]any {
+	if root == nil {
+		return nil
+	}
+	out := []map[string]any{root}
+	for _, child := range semanticElementChildren(root) {
+		out = append(out, semanticCollectElements(child)...)
+	}
+	return out
+}
+
+func semanticUniqueStringsPreserveOrder(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		key := semanticNormalize(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+func semanticRelationLabelValues(relations map[string][]string) []string {
+	if len(relations) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(relations))
+	for key := range relations {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	labels := make([]string, 0)
+	for _, key := range keys {
+		if !strings.Contains(semanticNormalize(key), "label") {
+			continue
+		}
+		labels = append(labels, relations[key]...)
+	}
+	return semanticUniqueStringsPreserveOrder(labels)
+}
+
+func semanticElementLabels(element map[string]any) []string {
+	if element == nil {
+		return nil
+	}
+	labels := []string{
+		stringValue(element["name"]),
+		stringValue(element["description"]),
+	}
+	relations := semanticStringSlicesMapValue(element["relations"])
+	labels = append(labels, semanticRelationLabelValues(relations)...)
+	attributes := semanticStringMapValue(element["attributes"])
+	for _, key := range []string{
+		"label",
+		"accessible-name",
+		"accessible_name",
+		"aria-label",
+		"title",
+		"placeholder",
+		"placeholder-text",
+		"placeholder_text",
+		"description",
+		"tooltip",
+		"tool-tip",
+		"help-text",
+	} {
+		if value := strings.TrimSpace(attributes[key]); value != "" {
+			labels = append(labels, value)
+		}
+	}
+	return semanticUniqueStringsPreserveOrder(labels)
+}
+
+func semanticRoleMatches(role string, want string) bool {
+	if strings.TrimSpace(want) == "" {
+		return true
+	}
+	return semanticNormalize(role) == semanticNormalize(want)
+}
+
+func semanticHasAction(actions []string, terms ...string) bool {
+	if len(actions) == 0 {
+		return false
+	}
+	for _, action := range actions {
+		normAction := semanticNormalize(action)
+		for _, term := range terms {
+			if strings.Contains(normAction, semanticNormalize(term)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func semanticFieldSummary(element map[string]any, includeActions bool) (semanticFormField, bool) {
+	field := semanticFormField{
+		Name:        stringValue(element["name"]),
+		Description: stringValue(element["description"]),
+		Role:        stringValue(element["role"]),
+		Ref:         stringValue(element["ref"]),
+		Path:        semanticElementPath(element),
+		Value:       element["value"],
+		ValueKind:   stringValue(element["value_kind"]),
+		Labels:      semanticElementLabels(element),
+		States:      semanticStringSlice(element["states"]),
+		Actions:     semanticStringSlice(element["actions"]),
+		Attributes:  semanticStringMapValue(element["attributes"]),
+		Relations:   semanticStringSlicesMapValue(element["relations"]),
+		Element:     element,
+	}
+
+	role := semanticNormalize(field.Role)
+	switch {
+	case field.ValueKind == "text",
+		role == "entry",
+		role == "password text",
+		role == "text",
+		role == "document text",
+		role == "search box":
+		field.FieldType = "text"
+		field.FillStrategy = "text"
+		return field, true
+	case field.ValueKind == "numeric",
+		role == "slider",
+		role == "spin button",
+		role == "spinbutton",
+		role == "dial",
+		role == "scroll bar",
+		role == "level bar":
+		field.FieldType = "numeric"
+		field.FillStrategy = "value"
+		return field, true
+	case role == "check box",
+		role == "check menu item",
+		role == "radio button",
+		role == "toggle button",
+		role == "switch":
+		field.FieldType = "toggle"
+		field.FillStrategy = "toggle"
+		return field, true
+	case includeActions && (role == "combo box" ||
+		role == "list box" ||
+		role == "push button" ||
+		role == "button" ||
+		role == "menu item" ||
+		semanticHasAction(field.Actions, "press", "activate", "click", "select", "open")):
+		field.FieldType = "action"
+		field.FillStrategy = "action"
+		return field, true
+	default:
+		return field, false
+	}
+}
+
+func semanticCollectFormFields(root map[string]any, includeActions bool, limit int) []semanticFormField {
+	elements := semanticCollectElements(root)
+	fields := make([]semanticFormField, 0)
+	for _, element := range elements {
+		field, ok := semanticFieldSummary(element, includeActions)
+		if !ok {
+			continue
+		}
+		fields = append(fields, field)
+		if limit > 0 && len(fields) >= limit {
+			break
+		}
+	}
+	return fields
+}
+
+func semanticMatchScore(values []string, needle string, exact bool) int {
+	target := semanticNormalize(needle)
+	if target == "" {
+		return 0
+	}
+	best := 0
+	for _, value := range values {
+		candidate := semanticNormalize(value)
+		if candidate == "" {
+			continue
+		}
+		switch {
+		case exact && candidate == target:
+			return 100
+		case exact:
+			continue
+		case candidate == target:
+			if best < 100 {
+				best = 100
+			}
+		case strings.HasPrefix(candidate, target):
+			if best < 80 {
+				best = 80
+			}
+		case strings.Contains(candidate, target):
+			if best < 60 {
+				best = 60
+			}
+		}
+	}
+	return best
+}
+
+func semanticResolveRequestElement(root map[string]any, fields []semanticFormField, request semanticFormFillItemInput) (*semanticFormField, map[string]any) {
+	if root == nil {
+		return nil, nil
+	}
+	if strings.TrimSpace(request.Ref) != "" || strings.TrimSpace(request.Path) != "" {
+		element := semanticLocateElement(root, request.Ref, request.Path)
+		if element == nil || !semanticRoleMatches(stringValue(element["role"]), request.Role) {
+			return nil, nil
+		}
+		field, ok := semanticFieldSummary(element, true)
+		if ok {
+			return &field, element
+		}
+		return nil, element
+	}
+
+	target := strings.TrimSpace(request.Name)
+	if target == "" {
+		return nil, nil
+	}
+
+	var bestField *semanticFormField
+	bestScore := 0
+	for i := range fields {
+		field := &fields[i]
+		if !semanticRoleMatches(field.Role, request.Role) {
+			continue
+		}
+		score := semanticMatchScore(field.Labels, target, request.Exact)
+		if score > bestScore {
+			bestScore = score
+			bestField = field
+		}
+	}
+	if bestField != nil {
+		return bestField, bestField.Element
+	}
+
+	elements := semanticCollectElements(root)
+	var bestElement map[string]any
+	for _, element := range elements {
+		if !semanticRoleMatches(stringValue(element["role"]), request.Role) {
+			continue
+		}
+		score := semanticMatchScore(semanticElementLabels(element), target, request.Exact)
+		if score > bestScore {
+			bestScore = score
+			bestElement = element
+		}
+	}
+	if bestElement == nil {
+		return nil, nil
+	}
+	field, ok := semanticFieldSummary(bestElement, true)
+	if ok {
+		return &field, bestElement
+	}
+	return nil, bestElement
+}
+
+func semanticResolveScope(root map[string]any, ref string, path string) (map[string]any, error) {
+	if root == nil {
+		return nil, fmt.Errorf("semantic tree is empty")
+	}
+	if strings.TrimSpace(ref) == "" && strings.TrimSpace(path) == "" {
+		return root, nil
+	}
+	element := semanticLocateElement(root, ref, path)
+	if element == nil {
+		return nil, fmt.Errorf("semantic scope not found for ref=%q path=%q", ref, path)
+	}
+	return element, nil
+}
+
+func semanticOperationForRequest(request semanticFormFillItemInput) (string, error) {
+	count := 0
+	op := ""
+	if request.Text != nil {
+		count++
+		op = "text"
+	}
+	if request.Number != nil {
+		count++
+		op = "number"
+	}
+	if request.Checked != nil {
+		count++
+		op = "checked"
+	}
+	if strings.TrimSpace(request.Action) != "" {
+		count++
+		op = "action"
+	}
+	switch {
+	case count == 0:
+		return "", fmt.Errorf("[%s] each form request needs one of text, number, checked, or action", handler.ErrInvalidParam)
+	case count > 1:
+		return "", fmt.Errorf("[%s] each form request can set only one of text, number, checked, or action", handler.ErrInvalidParam)
+	default:
+		return op, nil
+	}
+}
+
+func semanticElementCheckedState(element map[string]any) (bool, bool) {
+	role := semanticNormalize(stringValue(element["role"]))
+	states := semanticStringSlice(element["states"])
+	for _, state := range states {
+		switch semanticNormalize(state) {
+		case "checked", "selected", "pressed", "expanded", "on":
+			return true, true
+		}
+	}
+	attributes := semanticStringMapValue(element["attributes"])
+	for _, key := range []string{"checked", "selected", "pressed", "expanded", "toggle-state", "aria-checked"} {
+		switch semanticNormalize(attributes[key]) {
+		case "true", "1", "checked", "selected", "pressed", "expanded", "on":
+			return true, true
+		case "false", "0", "unchecked", "unselected", "off":
+			return false, true
+		}
+	}
+	switch role {
+	case "check box", "check menu item", "radio button", "toggle button", "switch":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+func semanticQueryForElement(app string, element map[string]any, role string) desktopSemanticQueryInput {
+	query := desktopSemanticQueryInput{
+		App:  app,
+		Role: strings.TrimSpace(role),
+		Ref:  strings.TrimSpace(stringValue(element["ref"])),
+		Path: semanticElementPath(element),
+	}
+	if query.Role == "" {
+		query.Role = stringValue(element["role"])
+	}
+	if strings.TrimSpace(query.Ref) == "" && strings.TrimSpace(query.Path) == "" {
+		query.Name = stringValue(element["name"])
+	}
+	return query
+}
+
+func semanticFetchTree(ctx context.Context, runner semanticRunner, app string, depth int) (map[string]any, string, int, error) {
+	if strings.TrimSpace(app) == "" {
+		return nil, "", 0, fmt.Errorf("[%s] app is required", handler.ErrInvalidParam)
+	}
+	if depth <= 0 {
+		depth = 8
+	}
+	parsed, helperPath, err := runner(ctx, "get_tree", "--app", app, "--depth", strconv.Itoa(depth))
+	if err != nil {
+		return nil, helperPath, depth, err
+	}
+	result := semanticMapValue(parsed)
+	if errText := semanticErrorValue(result); errText != "" {
+		return nil, helperPath, depth, fmt.Errorf("%s", errText)
+	}
+	return semanticMapValue(result["tree"]), helperPath, depth, nil
+}
+
+func semanticBuildFormFields(ctx context.Context, runner semanticRunner, input desktopSemanticFormFieldsInput) (desktopSemanticFormFieldsOutput, error) {
+	tree, helperPath, depth, err := semanticFetchTree(ctx, runner, input.App, input.Depth)
+	if err != nil {
+		return desktopSemanticFormFieldsOutput{}, err
+	}
+	scope, err := semanticResolveScope(tree, input.Ref, input.Path)
+	if err != nil {
+		return desktopSemanticFormFieldsOutput{}, err
+	}
+	fields := semanticCollectFormFields(scope, input.IncludeActions, input.Limit)
+	return desktopSemanticFormFieldsOutput{
+		HelperPath:     helperPath,
+		App:            input.App,
+		ScopeRef:       strings.TrimSpace(input.Ref),
+		ScopePath:      strings.TrimSpace(input.Path),
+		Depth:          depth,
+		IncludeActions: input.IncludeActions,
+		Count:          len(fields),
+		Fields:         fields,
+	}, nil
+}
+
+func semanticApplyFormRequest(ctx context.Context, runner semanticRunner, app string, request semanticFormFillItemInput, field *semanticFormField, element map[string]any, preview bool) (semanticFormFillItemOutput, string, error) {
+	result := semanticFormFillItemOutput{
+		Request:   request,
+		Matched:   element != nil,
+		FieldType: "",
+		Element:   element,
+	}
+	if field != nil {
+		fieldCopy := *field
+		result.Field = &fieldCopy
+		result.FieldType = field.FieldType
+		result.CurrentValue = field.Value
+	}
+	if element == nil {
+		result.Error = "semantic target not found"
+		return result, "", nil
+	}
+	if result.CurrentValue == nil {
+		result.CurrentValue = element["value"]
+	}
+
+	operation, err := semanticOperationForRequest(request)
+	if err != nil {
+		result.Error = err.Error()
+		return result, "", nil
+	}
+	query := semanticQueryForElement(app, element, request.Role)
+	args, err := semanticQueryArgs(query)
+	if err != nil {
+		result.Error = err.Error()
+		return result, "", nil
+	}
+
+	command := ""
+	switch operation {
+	case "text":
+		command = "set_text"
+		result.Strategy = "set_text"
+		args = append(args, "--text", *request.Text)
+	case "number":
+		command = "set_value"
+		result.Strategy = "set_value"
+		args = append(args, "--value", strconv.FormatFloat(*request.Number, 'f', -1, 64))
+	case "action":
+		command = "act"
+		result.Strategy = "action"
+		args = append(args, "--action", request.Action)
+	case "checked":
+		current, known := semanticElementCheckedState(element)
+		if known && current == *request.Checked {
+			result.Planned = true
+			result.Strategy = "toggle_noop"
+			return result, "", nil
+		}
+		if !*request.Checked && !known {
+			result.Error = "unable to safely infer current toggle state for an unchecked request"
+			return result, "", nil
+		}
+		command = "click"
+		result.Strategy = "toggle"
+	default:
+		result.Error = "unsupported semantic fill operation"
+		return result, "", nil
+	}
+
+	if preview {
+		result.Planned = true
+		return result, "", nil
+	}
+
+	parsed, helperPath, err := runner(ctx, append([]string{command}, args...)...)
+	if err != nil {
+		return result, helperPath, err
+	}
+	helperResult := semanticMapValue(parsed)
+	result.Element = semanticMapValue(helperResult["element"])
+	if result.Element == nil {
+		result.Element = element
+	}
+	if field != nil {
+		fieldCopy := *field
+		fieldCopy.Element = result.Element
+		fieldCopy.Value = helperResult["value"]
+		if fieldCopy.Value == nil {
+			fieldCopy.Value = result.Element["value"]
+		}
+		fieldCopy.ValueKind = stringValue(helperResult["value_kind"])
+		if fieldCopy.ValueKind == "" {
+			fieldCopy.ValueKind = stringValue(result.Element["value_kind"])
+		}
+		result.Field = &fieldCopy
+		result.FieldType = fieldCopy.FieldType
+		result.CurrentValue = fieldCopy.Value
+	} else {
+		result.CurrentValue = helperResult["value"]
+		if result.CurrentValue == nil {
+			result.CurrentValue = result.Element["value"]
+		}
+	}
+	if errText := semanticErrorValue(helperResult); errText != "" {
+		result.Error = errText
+		return result, helperPath, nil
+	}
+	result.Applied = boolValue(helperResult["updated"]) || boolValue(helperResult["invoked"]) || boolValue(helperResult["clicked"])
+	if operation == "checked" && result.Strategy == "toggle" && result.Error == "" && !result.Applied {
+		result.Applied = true
+	}
+	return result, helperPath, nil
+}
+
+func semanticExecuteFormFill(ctx context.Context, runner semanticRunner, input desktopSemanticFormFillInput) (desktopSemanticFormFillOutput, error) {
+	if len(input.Fields) == 0 {
+		return desktopSemanticFormFillOutput{}, fmt.Errorf("[%s] fields must not be empty", handler.ErrInvalidParam)
+	}
+	tree, helperPath, depth, err := semanticFetchTree(ctx, runner, input.App, input.Depth)
+	if err != nil {
+		return desktopSemanticFormFillOutput{}, err
+	}
+	scope, err := semanticResolveScope(tree, input.ScopeRef, input.ScopePath)
+	if err != nil {
+		return desktopSemanticFormFillOutput{}, err
+	}
+	fields := semanticCollectFormFields(scope, true, 0)
+	continueOnError := true
+	if input.ContinueOnError != nil {
+		continueOnError = *input.ContinueOnError
+	}
+
+	out := desktopSemanticFormFillOutput{
+		HelperPath:      helperPath,
+		App:             input.App,
+		ScopeRef:        strings.TrimSpace(input.ScopeRef),
+		ScopePath:       strings.TrimSpace(input.ScopePath),
+		Depth:           depth,
+		Preview:         input.Preview,
+		ContinueOnError: continueOnError,
+		Requested:       len(input.Fields),
+		Results:         make([]semanticFormFillItemOutput, 0, len(input.Fields)),
+	}
+
+	for _, request := range input.Fields {
+		field, element := semanticResolveRequestElement(scope, fields, request)
+		item, latestHelperPath, err := semanticApplyFormRequest(ctx, runner, input.App, request, field, element, input.Preview)
+		if latestHelperPath != "" {
+			out.HelperPath = latestHelperPath
+		}
+		if err != nil {
+			return out, err
+		}
+		out.Results = append(out.Results, item)
+		if item.Matched {
+			out.Matched++
+		}
+		if item.Planned {
+			out.Planned++
+		}
+		if item.Applied {
+			out.Applied++
+		}
+		if item.Error != "" && !continueOnError {
+			break
+		}
+	}
+	return out, nil
+}
+
 func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 	snapshot := handler.TypedHandler[EmptyInput, desktopSemanticSnapshotOutput](
 		"desktop_snapshot",
@@ -634,6 +1435,26 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 	setValue.Category = "desktop"
 	setValue.SearchTerms = []string{"set semantic value", "set slider", "set spinbox", "adjust accessible value"}
 
+	formFields := handler.TypedHandler[desktopSemanticFormFieldsInput, desktopSemanticFormFieldsOutput](
+		"desktop_form_fields",
+		"Derive fillable semantic form fields from an AT-SPI application subtree, including labels, strategies, and refs.",
+		func(ctx context.Context, input desktopSemanticFormFieldsInput) (desktopSemanticFormFieldsOutput, error) {
+			return semanticBuildFormFields(ctx, runDesktopSemanticHelper, input)
+		},
+	)
+	formFields.Category = "desktop"
+	formFields.SearchTerms = []string{"semantic form fields", "form discovery", "discover fields", "at-spi form"}
+
+	fillForm := handler.TypedHandler[desktopSemanticFormFillInput, desktopSemanticFormFillOutput](
+		"desktop_fill_form",
+		"Batch-resolve and fill semantic desktop form fields by label, ref, or path, with optional preview mode.",
+		func(ctx context.Context, input desktopSemanticFormFillInput) (desktopSemanticFormFillOutput, error) {
+			return semanticExecuteFormFill(ctx, runDesktopSemanticHelper, input)
+		},
+	)
+	fillForm.Category = "desktop"
+	fillForm.SearchTerms = []string{"semantic form fill", "batch fill fields", "fill desktop form", "at-spi batch input"}
+
 	click := handler.TypedHandler[desktopSemanticQueryInput, desktopSemanticElementOutput](
 		"desktop_click",
 		"Invoke the default clickable semantic action by ref, path, or by app plus name and optional role.",
@@ -783,6 +1604,8 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		readValue,
 		setText,
 		setValue,
+		formFields,
+		fillForm,
 		click,
 		act,
 		wait,
