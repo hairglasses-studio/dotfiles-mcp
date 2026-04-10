@@ -67,8 +67,10 @@ func TestShouldDeferDotfilesTool(t *testing.T) {
 		{"desktop", "screen_screenshot", false},
 		{"desktop", "desktop_find_text", false},
 		{"desktop", "desktop_snapshot", false},
+		{"desktop", "desktop_list_windows", false},
 		{"desktop", "desktop_act", false},
 		{"desktop", "desktop_find_all", false},
+		{"desktop", "desktop_focus_window", false},
 		{"desktop", "desktop_focus", false},
 		{"desktop", "desktop_read_value", false},
 		{"desktop", "desktop_set_text", false},
@@ -189,8 +191,10 @@ func TestRegisterDotfilesModules_DesktopProfile(t *testing.T) {
 		"screen_screenshot",
 		"desktop_find_text",
 		"desktop_snapshot",
+		"desktop_list_windows",
 		"desktop_act",
 		"desktop_find_all",
+		"desktop_focus_window",
 		"desktop_focus",
 		"desktop_read_value",
 		"desktop_set_text",
@@ -269,6 +273,7 @@ func TestToolStats(t *testing.T) {
 
 	reg := registry.NewToolRegistry()
 	registerDotfilesModules(reg, nil, nil, dotfilesMCPVersion)
+	expectedTotal := len(reg.GetAllToolDefinitions())
 
 	disc := &DotfilesDiscoveryModule{reg: reg}
 	tools := disc.Tools()
@@ -295,6 +300,9 @@ func TestToolStats(t *testing.T) {
 	}
 	if out.TotalTools == 0 {
 		t.Error("expected non-zero total tools")
+	}
+	if out.TotalTools != expectedTotal {
+		t.Errorf("total tools = %d, want %d", out.TotalTools, expectedTotal)
 	}
 	if out.ModuleCount == 0 {
 		t.Error("expected non-zero module count")

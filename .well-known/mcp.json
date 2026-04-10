@@ -245,8 +245,16 @@
       "description": "Focus a semantic element by ref, path, or by app plus name and optional role, using AT-SPI component focus or a focus action fallback."
     },
     {
+      "name": "desktop_focus_window",
+      "description": "Focus a top-level semantic desktop window by title, app/class substring, or a previously returned semantic ref/path."
+    },
+    {
       "name": "desktop_key",
       "description": "Send raw ydotool key events after a semantic target has focus."
+    },
+    {
+      "name": "desktop_list_windows",
+      "description": "List semantic desktop windows with their app identity, refs, bounds, and current value metadata."
     },
     {
       "name": "desktop_project_open",
@@ -1556,7 +1564,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 380,
+  "tool_count": 382,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [
