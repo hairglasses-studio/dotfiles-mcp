@@ -960,12 +960,16 @@ func TestDesktopSessionCommandFixtureFlows(t *testing.T) {
 
 func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
 	stateDir := t.TempDir()
+	binDir := t.TempDir()
 	logDir := t.TempDir()
 	runtimeDir := t.TempDir()
 	socketPath := filepath.Join(runtimeDir, "wayland-0")
 	envPath := filepath.Join(logDir, "session.env")
 	logPath := filepath.Join(logDir, "kwin.log")
 	appLogPath := filepath.Join(logDir, "app.log")
+	origPath := os.Getenv("PATH")
+
+	writeSemanticFixturePython(t, binDir)
 
 	if err := os.WriteFile(socketPath, []byte("socket"), 0o600); err != nil {
 		t.Fatalf("write socket fixture: %v", err)
@@ -981,6 +985,7 @@ func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
 	}
 
 	t.Setenv("XDG_STATE_HOME", stateDir)
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
 
 	newest := saveTestDesktopSessionRecord(t, desktopSessionRecord{
 		ID:                        "session-inspect-newest",
@@ -1021,6 +1026,9 @@ func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
 	if listed.Sessions[0].SessionID != newest.ID || listed.Sessions[0].ResolvedStatus != "connected" {
 		t.Fatalf("unexpected first session list entry: %#v", listed.Sessions[0])
 	}
+	if !listed.Sessions[0].SemanticProbeReady || listed.Sessions[0].SemanticAppCount != 1 {
+		t.Fatalf("expected semantic probe readiness in session list entry, got %#v", listed.Sessions[0])
+	}
 
 	statusResult := callDesktopSessionTool(t, "session_status", map[string]any{
 		"session_id": newest.ID,
@@ -1034,6 +1042,9 @@ func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
 	}
 	if !status.HyprlandBacked || !status.SocketPresent || !status.DBUSReady || !status.ATSPIReady {
 		t.Fatalf("expected ready session status, got %#v", status)
+	}
+	if !status.SemanticProbeReady || status.SemanticAppCount != 1 || strings.TrimSpace(status.SemanticProbeError) != "" {
+		t.Fatalf("expected semantic probe details in session status output, got %#v", status)
 	}
 	if status.AppLogCount != 1 || len(status.AppLogs) != 1 {
 		t.Fatalf("expected one app log in status output, got %#v", status)
@@ -1052,6 +1063,9 @@ func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
 	waitOut := unmarshalSessionWaitReadyResult(t, waitReadyResult)
 	if !waitOut.Ready || waitOut.Status.ResolvedStatus != "connected" || waitOut.Timeout != 1 {
 		t.Fatalf("unexpected session wait-ready output: %#v", waitOut)
+	}
+	if !waitOut.Status.SemanticProbeReady || waitOut.Status.SemanticAppCount != 1 {
+		t.Fatalf("expected semantic probe readiness in wait-ready output, got %#v", waitOut)
 	}
 
 	logResult := callDesktopSessionTool(t, "session_read_log", map[string]any{

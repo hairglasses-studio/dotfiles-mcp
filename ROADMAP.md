@@ -24,6 +24,8 @@ Tracked-session workflows now expose `session_list`, `session_wait_ready`, `sess
 
 Name-based semantic targeting now resolves relation labels, placeholder text, descriptions, and common ARIA/accessible attributes before falling back to raw AT-SPI names, which materially improves Electron/Chromium-heavy surfaces without changing the public tool inventory.
 
+Session status and readiness inspection now include semantic probe readiness, visible app counts, and probe errors so KWin-backed and other tracked sessions can be triaged for semantic targetability before deeper automation attempts.
+
 ## Planned
 
 ### Phase 2 — Product Expansion

@@ -94,6 +94,7 @@ claude mcp call dotfiles session_wait_ready '{"session_id":"session-123","timeou
 claude mcp call dotfiles session_status '{"session_id":"session-123"}'
 claude mcp call dotfiles session_list_apps '{"session_id":"session-123"}'
 claude mcp call dotfiles session_read_log '{"session_id":"session-123","lines":40}'
+# session_status and session_wait_ready now report semantic probe readiness and visible app counts when AT-SPI is reachable
 
 # Check desktop rice health
 claude mcp call dotfiles dotfiles_rice_check '{}'
