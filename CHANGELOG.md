@@ -4,6 +4,13 @@ All notable changes to dotfiles-mcp will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- GitHub Stars workflow module for listing stars, managing GitHub star folders, auditing taxonomy drift, syncing list membership, and installing the global Codex MCP entries
+- `cmd/github-starsctl` CLI wrapper for the GitHub Stars workflow
+
 ## [v0.1.0] - 2026-04-03
 
 ### Added

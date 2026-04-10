@@ -338,6 +338,7 @@ func registerDotfilesModules(reg *registry.ToolRegistry, resReg *resources.Resou
 func dotfilesModules() []registry.ToolModule {
 	return []registry.ToolModule{
 		&DotfilesModule{},
+		&GitHubStarsModule{},
 		&HyprlandModule{},
 		&ShaderModule{},
 		&InputModule{},
