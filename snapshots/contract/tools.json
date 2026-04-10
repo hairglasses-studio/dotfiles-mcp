@@ -1806,6 +1806,55 @@
     "deferred": true
   },
   {
+    "name": "kitty_close_tab",
+    "description": "Close the active or matched kitty tabs.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_close_window",
+    "description": "Close the active or matched kitty windows.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_focus_tab",
+    "description": "Focus the active window in a matched kitty tab.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_focus_window",
+    "description": "Focus the active or matched kitty window.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_get_text",
+    "description": "Read plain or ANSI-formatted text from the active or matched kitty window.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_last_used_layout",
+    "description": "Restore the previous kitty layout for the active or matched tabs.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_launch",
+    "description": "Launch a new kitty window, tab, overlay, background task, or OS window.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "kitty_list_tabs",
     "description": "List kitty tabs with OS window, title, layout, focus, and window count.",
     "category": "",
@@ -1827,8 +1876,29 @@
     "deferred": true
   },
   {
+    "name": "kitty_resize_os_window",
+    "description": "Resize or toggle state for a kitty OS window.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_resize_window",
+    "description": "Resize a kitty pane within the current layout.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "kitty_run_remote",
     "description": "Run an arbitrary kitty remote-control subcommand when the dedicated tools do not cover the exact action.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_send_key",
+    "description": "Send key chords directly to the active or matched kitty windows.",
     "category": "",
     "is_write": false,
     "deferred": true
@@ -1857,6 +1927,13 @@
   {
     "name": "kitty_set_opacity",
     "description": "Set the kitty background opacity for the active, matched, or all windows.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
+    "name": "kitty_set_tab_title",
+    "description": "Set or reset the title of the active or matched kitty tabs.",
     "category": "",
     "is_write": false,
     "deferred": true

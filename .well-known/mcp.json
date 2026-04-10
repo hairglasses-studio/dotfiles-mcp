@@ -837,6 +837,34 @@
       "description": "Send a signal to a process. Supports TERM, KILL, HUP, INT, USR1, USR2, STOP, CONT."
     },
     {
+      "name": "kitty_close_tab",
+      "description": "Close the active or matched kitty tabs."
+    },
+    {
+      "name": "kitty_close_window",
+      "description": "Close the active or matched kitty windows."
+    },
+    {
+      "name": "kitty_focus_tab",
+      "description": "Focus the active window in a matched kitty tab."
+    },
+    {
+      "name": "kitty_focus_window",
+      "description": "Focus the active or matched kitty window."
+    },
+    {
+      "name": "kitty_get_text",
+      "description": "Read plain or ANSI-formatted text from the active or matched kitty window."
+    },
+    {
+      "name": "kitty_last_used_layout",
+      "description": "Restore the previous kitty layout for the active or matched tabs."
+    },
+    {
+      "name": "kitty_launch",
+      "description": "Launch a new kitty window, tab, overlay, background task, or OS window."
+    },
+    {
       "name": "kitty_list_tabs",
       "description": "List kitty tabs with OS window, title, layout, focus, and window count."
     },
@@ -849,8 +877,20 @@
       "description": "Reload one or more kitty config files, optionally with transient overrides."
     },
     {
+      "name": "kitty_resize_os_window",
+      "description": "Resize or toggle state for a kitty OS window."
+    },
+    {
+      "name": "kitty_resize_window",
+      "description": "Resize a kitty pane within the current layout."
+    },
+    {
       "name": "kitty_run_remote",
       "description": "Run an arbitrary kitty remote-control subcommand when the dedicated tools do not cover the exact action."
+    },
+    {
+      "name": "kitty_send_key",
+      "description": "Send key chords directly to the active or matched kitty windows."
     },
     {
       "name": "kitty_send_text",
@@ -867,6 +907,10 @@
     {
       "name": "kitty_set_opacity",
       "description": "Set the kitty background opacity for the active, matched, or all windows."
+    },
+    {
+      "name": "kitty_set_tab_title",
+      "description": "Set or reset the title of the active or matched kitty tabs."
     },
     {
       "name": "kitty_set_theme",
@@ -1564,7 +1608,7 @@
     "fleet-management",
     "publish-mirror"
   ],
-  "tool_count": 382,
+  "tool_count": 393,
   "resource_count": 24,
   "prompt_count": 12,
   "categories": [
