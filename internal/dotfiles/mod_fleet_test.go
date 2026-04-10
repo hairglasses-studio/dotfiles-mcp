@@ -155,6 +155,12 @@ func TestFleetAudit_WithGoRepo(t *testing.T) {
 	if repo.TestCount < 1 {
 		t.Errorf("test_count = %d, want >= 1", repo.TestCount)
 	}
+	if repo.LocalBaselineStatus != "unknown" {
+		t.Errorf("local_baseline_status = %q, want unknown without refresh cache", repo.LocalBaselineStatus)
+	}
+	if repo.SignalVerdict != "unknown" {
+		t.Errorf("signal_verdict = %q, want unknown without local baseline or remote CI signal", repo.SignalVerdict)
+	}
 }
 
 func TestFleetAudit_WithNodeRepo(t *testing.T) {
@@ -298,6 +304,120 @@ func TestFleetAudit_MakefileInclude(t *testing.T) {
 	}
 	if !out.Repos[0].HasPipelineMk {
 		t.Error("has_pipeline_mk should be true when Makefile includes pipeline.mk")
+	}
+}
+
+func TestFleetBaselineRefreshAndAudit_WorkflowGovernance(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "workspace"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	repoDir := filepath.Join(dir, "test-go-repo")
+	if err := os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(repoDir, ".github", "workflows"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "go.mod"), []byte("module example.com/test\n\ngo 1.26.1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "main.go"), []byte("package main\nfunc main() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "main_test.go"), []byte("package main\nimport \"testing\"\nfunc TestOK(t *testing.T) {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, ".github", "workflows", "go.yml"), []byte("name: go\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{
+  "version": 2,
+  "repos": [
+    {
+      "name": "test-go-repo",
+      "scope": "active_operator",
+      "lifecycle": "canonical",
+      "language": "Go",
+      "baseline_profile": "go_test",
+      "workflow_policy": "repo_owned",
+      "workflow_family": "go-ci"
+    }
+  ]
+}`
+	if err := os.WriteFile(filepath.Join(dir, "workspace", "manifest.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, args := range [][]string{
+		{"git", "init"},
+		{"git", "config", "user.email", "test@test.com"},
+		{"git", "config", "user.name", "Test"},
+		{"git", "add", "-A"},
+		{"git", "commit", "-m", "init"},
+		{"git", "branch", "-m", "main"},
+	} {
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = repoDir
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+	}
+
+	m := &DotfilesModule{}
+
+	refresh := findTool(t, m, "dotfiles_fleet_baseline_refresh")
+	refreshReq := registry.CallToolRequest{}
+	refreshReq.Params.Arguments = map[string]any{
+		"local_dir": dir,
+	}
+	refreshResult, err := refresh.Handler(context.Background(), refreshReq)
+	if err != nil {
+		t.Fatalf("refresh handler error: %v", err)
+	}
+	if refreshResult == nil || refreshResult.IsError {
+		t.Fatal("expected successful refresh result")
+	}
+	var refreshOut FleetBaselineRefreshOutput
+	if err := json.Unmarshal([]byte(extractText(t, refreshResult)), &refreshOut); err != nil {
+		t.Fatalf("unmarshal refresh: %v", err)
+	}
+	if refreshOut.Checked != 1 {
+		t.Fatalf("checked = %d, want 1", refreshOut.Checked)
+	}
+	if refreshOut.Repos[0].LocalBaselineStatus != "pass" {
+		t.Fatalf("local_baseline_status = %q, want pass", refreshOut.Repos[0].LocalBaselineStatus)
+	}
+
+	if err := os.WriteFile(filepath.Join(repoDir, ".github", "workflows", "go.yml"), []byte("name: go\n# drift\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	audit := findTool(t, m, "dotfiles_fleet_audit")
+	auditReq := registry.CallToolRequest{}
+	auditReq.Params.Arguments = map[string]any{
+		"local_dir": dir,
+	}
+	auditResult, err := audit.Handler(context.Background(), auditReq)
+	if err != nil {
+		t.Fatalf("audit handler error: %v", err)
+	}
+	if auditResult == nil || auditResult.IsError {
+		t.Fatal("expected successful audit result")
+	}
+	var auditOut FleetAuditOutput
+	if err := json.Unmarshal([]byte(extractText(t, auditResult)), &auditOut); err != nil {
+		t.Fatalf("unmarshal audit: %v", err)
+	}
+	if auditOut.Governance != 1 {
+		t.Fatalf("governance = %d, want 1", auditOut.Governance)
+	}
+	if auditOut.Repos[0].WorkflowStatus != "repo_owned_drift" {
+		t.Fatalf("workflow_status = %q, want repo_owned_drift", auditOut.Repos[0].WorkflowStatus)
+	}
+	if auditOut.Repos[0].SignalVerdict != "governance" {
+		t.Fatalf("signal_verdict = %q, want governance", auditOut.Repos[0].SignalVerdict)
 	}
 }
 

@@ -33,7 +33,7 @@ Or use the pipeline script directly:
 
 dotfiles-mcp is a single-binary MCP server with a discovery-first contract. The canonical source of truth lives at `dotfiles/mcp/dotfiles-mcp` inside the shared `hairglasses-studio/dotfiles` repo. This standalone repo remains a publish mirror for installation and discovery, with its exact public surface committed under `snapshots/contract/` and `.well-known/mcp.json`.
 
-Current mirror counts should always come from the checked-in contract bundle, not hand-maintained prose. At the time of this tranche the mirror bundle exposes `278` tools, `32` modules, `8` resources, and `4` prompts.
+Current mirror counts should always come from the checked-in contract bundle, not hand-maintained prose.
 
 Focus paths:
 

@@ -1,12 +1,10 @@
-// mod_shader.go — Ghostty shader pipeline tools (migrated from shader-mcp)
+// mod_shader.go — Terminal shader pipeline tools (kitty via CRTty + Kitty themes)
 package dotfiles
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,11 +23,10 @@ import (
 // ---------------------------------------------------------------------------
 
 func shadersDir() string {
-	// Prefer DOTFILES_DIR if set, otherwise follow the symlink at ~/.config/ghostty/shaders
 	if d := os.Getenv("DOTFILES_DIR"); d != "" {
-		return filepath.Join(d, "ghostty", "shaders")
+		return filepath.Join(d, "kitty", "shaders", "crtty")
 	}
-	return filepath.Join(os.Getenv("HOME"), ".config", "ghostty", "shaders")
+	return filepath.Join(os.Getenv("HOME"), "hairglasses-studio", "dotfiles", "kitty", "shaders", "crtty")
 }
 
 func wallpaperShadersDir() string {
@@ -46,8 +43,11 @@ func wallpaperScript() string {
 	return filepath.Join(os.Getenv("HOME"), "hairglasses-studio", "dotfiles", "scripts", "shader-wallpaper.sh")
 }
 
-func ghosttyConfig() string {
-	return filepath.Join(os.Getenv("HOME"), ".config", "ghostty", "config")
+func kittyPlaylistScript() string {
+	if d := os.Getenv("DOTFILES_DIR"); d != "" {
+		return filepath.Join(d, "scripts", "kitty-shader-playlist.sh")
+	}
+	return filepath.Join(os.Getenv("HOME"), "hairglasses-studio", "dotfiles", "scripts", "kitty-shader-playlist.sh")
 }
 
 // ---------------------------------------------------------------------------
@@ -108,99 +108,92 @@ func findShader(name string) (string, error) {
 	return p, nil
 }
 
-// atomicSetShader replaces the custom-shader line in the Ghostty config
-// using temp-file + rename for atomic writes. Also detects whether the
-// shader uses animation uniforms and sets custom-shader-animation accordingly.
-// Optionally logs the change to the JSONL history.
+// atomicSetShader applies a shader via kitty-shader-playlist.sh set <name>.
+// Logs the change to the JSONL history.
 func atomicSetShader(shaderPath string, source ...string) error {
-	cfgPath := ghosttyConfig()
-
-	// Detect animation need.
-	anim := "false"
-	if data, err := os.ReadFile(shaderPath); err == nil {
-		s := string(data)
-		if strings.Contains(s, "ghostty_time") || strings.Contains(s, "iTime") || strings.Contains(s, "u_time") {
-			anim = "true"
-		}
+	name := strings.TrimSuffix(filepath.Base(shaderPath), ".glsl")
+	if _, err := runKittyPlaylist("set", name); err != nil {
+		return err
 	}
 
-	f, err := os.Open(cfgPath)
-	if err != nil {
-		return fmt.Errorf("open config: %w", err)
-	}
-	defer f.Close()
-
-	tmp, err := os.CreateTemp(filepath.Dir(cfgPath), "ghostty-config-*.tmp")
-	if err != nil {
-		return fmt.Errorf("create temp: %w", err)
-	}
-	tmpPath := tmp.Name()
-
-	scanner := bufio.NewScanner(f)
-	w := bufio.NewWriter(tmp)
-	for scanner.Scan() {
-		line := scanner.Text()
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case strings.HasPrefix(trimmed, "custom-shader =") || strings.HasPrefix(trimmed, "# custom-shader ="):
-			fmt.Fprintf(w, "custom-shader = %s\n", shaderPath)
-		case strings.HasPrefix(trimmed, "custom-shader-animation ="):
-			fmt.Fprintf(w, "custom-shader-animation = %s\n", anim)
-		default:
-			fmt.Fprintln(w, line)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
-		return fmt.Errorf("scan config: %w", err)
-	}
-	if err := w.Flush(); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
-		return fmt.Errorf("flush: %w", err)
-	}
-	tmp.Close()
-
-	// Preserve original permissions.
-	if info, err := os.Stat(cfgPath); err == nil {
-		os.Chmod(tmpPath, info.Mode())
-	}
-
-	if err := os.Rename(tmpPath, cfgPath); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("rename: %w", err)
-	}
-
-	// Log to JSONL history
 	src := "mcp:shader_set"
 	if len(source) > 0 && source[0] != "" {
 		src = source[0]
 	}
 	_ = appendShaderHistory(ShaderHistoryEntry{
 		Action: "set",
-		Shader: strings.TrimSuffix(filepath.Base(shaderPath), ".glsl"),
+		Shader: name,
 		Source: src,
 	})
 	return nil
 }
 
-// readActiveShader reads the current custom-shader value from the Ghostty config.
-func readActiveShader() (string, error) {
-	data, err := os.ReadFile(ghosttyConfig())
+func runKittyPlaylist(args ...string) (string, error) {
+	cmdArgs := append([]string{kittyPlaylistScript()}, args...)
+	cmd := exec.Command("bash", cmdArgs...)
+	out, err := cmd.CombinedOutput()
+	output := strings.TrimSpace(string(out))
 	if err != nil {
-		return "", fmt.Errorf("read config: %w", err)
+		if output == "" {
+			return "", fmt.Errorf("kitty-shader-playlist %s: %w", strings.Join(args, " "), err)
+		}
+		return "", fmt.Errorf("kitty-shader-playlist %s: %s: %w", strings.Join(args, " "), output, err)
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "custom-shader =") {
-			parts := strings.SplitN(trimmed, "=", 2)
-			if len(parts) == 2 {
-				return strings.TrimSpace(parts[1]), nil
-			}
+	return output, nil
+}
+
+// readActiveShader reads the current shader from kitty-shader-playlist.sh current.
+func readActiveShader() (string, error) {
+	out, err := runKittyPlaylist("current")
+	if err != nil {
+		return "", nil
+	}
+	name := strings.TrimSpace(out)
+	if name == "" {
+		return "", nil
+	}
+	// Return the full path to the source GLSL for compatibility
+	p := filepath.Join(shadersDir(), name+".glsl")
+	if _, err := os.Stat(p); err == nil {
+		return p, nil
+	}
+	return name, nil
+}
+
+func readKittyStateValue(name string) string {
+	data, err := os.ReadFile(filepath.Join(playlistStateDir(), name))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+func readActiveTheme() string {
+	return readKittyStateValue("current-theme")
+}
+
+func readVisualLabel() string {
+	return readKittyStateValue("current-label")
+}
+
+func playlistPositionForShader(playlist, shader string) (int, int, error) {
+	if playlist == "" {
+		return 0, 0, nil
+	}
+	shaders, err := loadPlaylist(playlist)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(shaders) == 0 {
+		return 0, 0, nil
+	}
+	target := strings.TrimSuffix(filepath.Base(shader), ".glsl")
+	for idx, entry := range shaders {
+		if strings.TrimSuffix(filepath.Base(entry), ".glsl") == target {
+			return idx + 1, len(shaders), nil
 		}
 	}
-	return "", fmt.Errorf("no custom-shader line found in config")
+	return 0, len(shaders), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -240,11 +233,14 @@ func loadManifest() (map[string]ShaderMeta, error) {
 // ---------------------------------------------------------------------------
 
 func playlistsDir() string {
-	return filepath.Join(shadersDir(), "playlists")
+	if d := os.Getenv("DOTFILES_DIR"); d != "" {
+		return filepath.Join(d, "kitty", "shaders", "playlists")
+	}
+	return filepath.Join(os.Getenv("HOME"), "hairglasses-studio", "dotfiles", "kitty", "shaders", "playlists")
 }
 
 func playlistStateDir() string {
-	return filepath.Join(os.Getenv("HOME"), ".local", "state", "ghostty")
+	return filepath.Join(os.Getenv("HOME"), ".local", "state", "kitty-shaders")
 }
 
 // activePlaylistName returns the currently configured auto-rotate playlist.
@@ -287,22 +283,18 @@ func writePlaylistIndex(playlist string, idx int) error {
 	return os.WriteFile(filepath.Join(dir, playlist+".idx"), []byte(strconv.Itoa(idx)), 0o644)
 }
 
-// readAnimationState reads the current custom-shader-animation value from Ghostty config.
+// readAnimationState detects whether the active shader uses time-based animation.
 func readAnimationState() bool {
-	data, err := os.ReadFile(ghosttyConfig())
+	active, err := readActiveShader()
+	if err != nil || active == "" {
+		return false
+	}
+	data, err := os.ReadFile(active)
 	if err != nil {
 		return false
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "custom-shader-animation =") {
-			parts := strings.SplitN(trimmed, "=", 2)
-			if len(parts) == 2 {
-				return strings.TrimSpace(parts[1]) == "true"
-			}
-		}
-	}
-	return false
+	s := string(data)
+	return strings.Contains(s, "iTime") || strings.Contains(s, "u_time") || strings.Contains(s, "ghostty_time")
 }
 
 // listPlaylists returns available playlist names (without .txt extension).
@@ -368,13 +360,20 @@ type ShaderSetInput struct {
 type ShaderSetOutput struct {
 	Applied string `json:"applied"`
 	Path    string `json:"path"`
+	Theme   string `json:"theme,omitempty"`
+	Label   string `json:"label,omitempty"`
 }
 
 type ShaderRandomInput struct{}
 
 type ShaderRandomOutput struct {
-	Applied string `json:"applied"`
-	Path    string `json:"path"`
+	Applied  string `json:"applied"`
+	Path     string `json:"path"`
+	Theme    string `json:"theme,omitempty"`
+	Label    string `json:"label,omitempty"`
+	Playlist string `json:"playlist,omitempty"`
+	Position int    `json:"position,omitempty"`
+	Total    int    `json:"total,omitempty"`
 }
 
 type ShaderTestInput struct {
@@ -398,6 +397,9 @@ type ShaderGetStateInput struct{}
 type ShaderGetStateOutput struct {
 	ActiveShader string `json:"active_shader"`
 	ShaderName   string `json:"shader_name"`
+	ActiveTheme  string `json:"active_theme,omitempty"`
+	VisualLabel  string `json:"visual_label,omitempty"`
+	Playlist     string `json:"playlist,omitempty"`
 }
 
 type ShaderMetaInput struct {
@@ -453,6 +455,8 @@ type ShaderCycleInput struct {
 type ShaderCycleOutput struct {
 	Applied  string `json:"applied"`
 	Path     string `json:"path"`
+	Theme    string `json:"theme,omitempty"`
+	Label    string `json:"label,omitempty"`
 	Playlist string `json:"playlist"`
 	Position int    `json:"position"`
 	Total    int    `json:"total"`
@@ -463,6 +467,8 @@ type ShaderStatusInput struct{}
 type ShaderStatusOutput struct {
 	ActiveShader string `json:"active_shader"`
 	ShaderName   string `json:"shader_name"`
+	ActiveTheme  string `json:"active_theme,omitempty"`
+	VisualLabel  string `json:"visual_label,omitempty"`
 	Animation    bool   `json:"animation"`
 	Playlist     string `json:"playlist,omitempty"`
 	Position     int    `json:"position,omitempty"`
@@ -518,7 +524,7 @@ type ShaderHistoryEntry struct {
 }
 
 func shaderHistoryPath() string {
-	return filepath.Join(os.Getenv("HOME"), ".local", "state", "ghostty", "shader-history.jsonl")
+	return filepath.Join(os.Getenv("HOME"), ".local", "state", "kitty-shaders", "shader-history.jsonl")
 }
 
 func appendShaderHistory(entry ShaderHistoryEntry) error {
@@ -636,6 +642,37 @@ type ShaderAuditTrailOutput struct {
 	Count   int                  `json:"count"`
 }
 
+type currentVisualState struct {
+	ActiveShader string
+	ShaderName   string
+	ActiveTheme  string
+	VisualLabel  string
+	Playlist     string
+	Position     int
+	Total        int
+}
+
+func readCurrentVisualState() (currentVisualState, error) {
+	state := currentVisualState{
+		ActiveTheme: readActiveTheme(),
+		VisualLabel: readVisualLabel(),
+		Playlist:    activePlaylistName(),
+	}
+	active, err := readActiveShader()
+	if err != nil {
+		return state, err
+	}
+	state.ActiveShader = active
+	state.ShaderName = strings.TrimSuffix(filepath.Base(active), ".glsl")
+	if state.ShaderName != "" {
+		if position, total, err := playlistPositionForShader(state.Playlist, state.ShaderName); err == nil {
+			state.Position = position
+			state.Total = total
+		}
+	}
+	return state, nil
+}
+
 // ---------------------------------------------------------------------------
 // Module
 // ---------------------------------------------------------------------------
@@ -655,7 +692,7 @@ type ShaderModule struct {
 }
 
 func (m *ShaderModule) Name() string        { return "shader" }
-func (m *ShaderModule) Description() string { return "Ghostty shader pipeline tools" }
+func (m *ShaderModule) Description() string { return "Terminal shader pipeline tools (kitty)" }
 
 func (m *ShaderModule) getManifest() map[string]ShaderMeta {
 	m.manifestOnce.Do(func() {
@@ -677,7 +714,7 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 		// ── shader_list ────────────────────────────────
 		handler.TypedHandler[ShaderListInput, ShaderListOutput](
 			"shader_list",
-			"List all GLSL shaders in the Ghostty shaders directory. Optionally filter by category.",
+			"List all GLSL shaders in the source shaders directory. Optionally filter by category.",
 			func(_ context.Context, input ShaderListInput) (ShaderListOutput, error) {
 				files, err := listGLSL()
 				if err != nil {
@@ -714,7 +751,7 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 		// ── shader_set ────────────────────────────────
 		handler.TypedHandler[ShaderSetInput, ShaderSetOutput](
 			"shader_set",
-			"Apply a shader to Ghostty by updating the config with an atomic write. Ghostty auto-reloads.",
+			"Apply a CRTty shader to kitty via kitty-shader-playlist.sh.",
 			func(_ context.Context, input ShaderSetInput) (ShaderSetOutput, error) {
 				p, err := findShader(input.Name)
 				if err != nil {
@@ -723,9 +760,15 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 				if err := atomicSetShader(p); err != nil {
 					return ShaderSetOutput{}, fmt.Errorf("failed to apply shader: %w", err)
 				}
+				state, err := readCurrentVisualState()
+				if err != nil {
+					return ShaderSetOutput{}, err
+				}
 				return ShaderSetOutput{
 					Applied: strings.TrimSuffix(filepath.Base(p), ".glsl"),
 					Path:    p,
+					Theme:   state.ActiveTheme,
+					Label:   state.VisualLabel,
 				}, nil
 			},
 		),
@@ -733,23 +776,33 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 		// ── shader_random ─────────────────────────────
 		handler.TypedHandler[ShaderRandomInput, ShaderRandomOutput](
 			"shader_random",
-			"Pick a random shader and apply it to Ghostty.",
+			"Pick a random paired Kitty visual from the active playlist and apply it.",
 			func(_ context.Context, _ ShaderRandomInput) (ShaderRandomOutput, error) {
-				files, err := listGLSL()
+				playlist := activePlaylistName()
+				if _, err := runKittyPlaylist("random", playlist); err != nil {
+					return ShaderRandomOutput{}, fmt.Errorf("failed to apply random kitty visual: %w", err)
+				}
+				state, err := readCurrentVisualState()
 				if err != nil {
 					return ShaderRandomOutput{}, err
 				}
-				if len(files) == 0 {
-					return ShaderRandomOutput{}, fmt.Errorf("no shaders found")
-				}
-				pick := files[rand.IntN(len(files))]
-				p := filepath.Join(shadersDir(), pick)
-				if err := atomicSetShader(p, "mcp:shader_random"); err != nil {
-					return ShaderRandomOutput{}, fmt.Errorf("failed to apply shader: %w", err)
-				}
+				_ = appendShaderHistory(ShaderHistoryEntry{
+					Action: "random",
+					Shader: state.ShaderName,
+					Source: "mcp:shader_random",
+					Details: map[string]string{
+						"playlist": playlist,
+						"theme":    state.ActiveTheme,
+					},
+				})
 				return ShaderRandomOutput{
-					Applied: strings.TrimSuffix(pick, ".glsl"),
-					Path:    p,
+					Applied:  state.ShaderName,
+					Path:     state.ActiveShader,
+					Theme:    state.ActiveTheme,
+					Label:    state.VisualLabel,
+					Playlist: playlist,
+					Position: state.Position,
+					Total:    state.Total,
 				}, nil
 			},
 		),
@@ -806,16 +859,18 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 		// ── shader_get_state ──────────────────────────
 		handler.TypedHandler[ShaderGetStateInput, ShaderGetStateOutput](
 			"shader_get_state",
-			"Read the currently active shader from the Ghostty config.",
+			"Read the current Kitty shader and theme state from kitty-shader-playlist state files.",
 			func(_ context.Context, _ ShaderGetStateInput) (ShaderGetStateOutput, error) {
-				active, err := readActiveShader()
+				state, err := readCurrentVisualState()
 				if err != nil {
-					return ShaderGetStateOutput{}, nil
+					return ShaderGetStateOutput{}, err
 				}
-				name := strings.TrimSuffix(filepath.Base(active), ".glsl")
 				return ShaderGetStateOutput{
-					ActiveShader: active,
-					ShaderName:   name,
+					ActiveShader: state.ActiveShader,
+					ShaderName:   state.ShaderName,
+					ActiveTheme:  state.ActiveTheme,
+					VisualLabel:  state.VisualLabel,
+					Playlist:     state.Playlist,
 				}, nil
 			},
 		),
@@ -926,50 +981,40 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 		// ── shader_cycle ──────────────────────────────
 		handler.TypedHandler[ShaderCycleInput, ShaderCycleOutput](
 			"shader_cycle",
-			"Advance the shader playlist (next/prev). Reads current playlist state, advances position, and applies the next shader.",
+			"Advance the active Kitty visual playlist (next/prev) via kitty-shader-playlist.sh.",
 			func(_ context.Context, input ShaderCycleInput) (ShaderCycleOutput, error) {
+				direction := input.Direction
+				if direction == "" {
+					direction = "next"
+				}
 				playlist := input.Playlist
 				if playlist == "" {
 					playlist = activePlaylistName()
 				}
-
-				shaders, err := loadPlaylist(playlist)
+				if _, err := runKittyPlaylist(direction, playlist); err != nil {
+					return ShaderCycleOutput{}, fmt.Errorf("failed to apply kitty visual: %w", err)
+				}
+				state, err := readCurrentVisualState()
 				if err != nil {
-					return ShaderCycleOutput{}, fmt.Errorf("[%s] %w", handler.ErrNotFound, err)
+					return ShaderCycleOutput{}, err
 				}
-				if len(shaders) == 0 {
-					return ShaderCycleOutput{}, fmt.Errorf("playlist %s is empty", playlist)
-				}
-
-				idx, _ := readPlaylistIndex(playlist)
-
-				switch input.Direction {
-				case "prev":
-					idx = (idx - 1 + len(shaders)) % len(shaders)
-				default: // "next" or empty
-					idx = (idx + 1) % len(shaders)
-				}
-
-				pick := shaders[idx]
-				p, err := findShader(pick)
-				if err != nil {
-					return ShaderCycleOutput{}, fmt.Errorf("shader %s from playlist %s not found: %w", pick, playlist, err)
-				}
-
-				if err := atomicSetShader(p, "mcp:shader_cycle:"+playlist); err != nil {
-					return ShaderCycleOutput{}, fmt.Errorf("failed to apply shader: %w", err)
-				}
-
-				if err := writePlaylistIndex(playlist, idx); err != nil {
-					return ShaderCycleOutput{}, fmt.Errorf("failed to save playlist index: %w", err)
-				}
-
+				_ = appendShaderHistory(ShaderHistoryEntry{
+					Action: "cycle",
+					Shader: state.ShaderName,
+					Source: "mcp:shader_cycle:" + playlist,
+					Details: map[string]string{
+						"direction": direction,
+						"theme":     state.ActiveTheme,
+					},
+				})
 				return ShaderCycleOutput{
-					Applied:  strings.TrimSuffix(filepath.Base(p), ".glsl"),
-					Path:     p,
+					Applied:  state.ShaderName,
+					Path:     state.ActiveShader,
+					Theme:    state.ActiveTheme,
+					Label:    state.VisualLabel,
 					Playlist: playlist,
-					Position: idx + 1,
-					Total:    len(shaders),
+					Position: state.Position,
+					Total:    state.Total,
 				}, nil
 			},
 		),
@@ -977,29 +1022,21 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 		// ── shader_status ─────────────────────────────
 		handler.TypedHandler[ShaderStatusInput, ShaderStatusOutput](
 			"shader_status",
-			"Rich status: current shader, animation state, active playlist, position, and auto-rotate timer status.",
+			"Rich status: current shader, Kitty theme, visual label, animation state, playlist position, and auto-rotate timer status.",
 			func(_ context.Context, _ ShaderStatusInput) (ShaderStatusOutput, error) {
-				active, err := readActiveShader()
+				state, err := readCurrentVisualState()
 				if err != nil {
 					return ShaderStatusOutput{}, err
 				}
-				name := strings.TrimSuffix(filepath.Base(active), ".glsl")
-				anim := readAnimationState()
-
 				out := ShaderStatusOutput{
-					ActiveShader: active,
-					ShaderName:   name,
-					Animation:    anim,
-				}
-
-				// Playlist info
-				playlist := activePlaylistName()
-				shaders, plErr := loadPlaylist(playlist)
-				if plErr == nil && len(shaders) > 0 {
-					out.Playlist = playlist
-					idx, _ := readPlaylistIndex(playlist)
-					out.Position = idx + 1
-					out.Total = len(shaders)
+					ActiveShader: state.ActiveShader,
+					ShaderName:   state.ShaderName,
+					ActiveTheme:  state.ActiveTheme,
+					VisualLabel:  state.VisualLabel,
+					Animation:    readAnimationState(),
+					Playlist:     state.Playlist,
+					Position:     state.Position,
+					Total:        state.Total,
 				}
 
 				// Check systemd timer
@@ -1100,18 +1137,31 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 					if len(shaders) == 0 {
 						return ShaderPlaylistOutput{}, fmt.Errorf("playlist %s is empty", input.Name)
 					}
-					pick := shaders[rand.IntN(len(shaders))]
-					p, err := findShader(pick)
+					if _, err := runKittyPlaylist("random", input.Name); err != nil {
+						return ShaderPlaylistOutput{}, fmt.Errorf("failed to apply kitty visual: %w", err)
+					}
+					state, err := readCurrentVisualState()
 					if err != nil {
 						return ShaderPlaylistOutput{}, err
 					}
-					if err := atomicSetShader(p, "mcp:shader_playlist:"+input.Name); err != nil {
-						return ShaderPlaylistOutput{}, fmt.Errorf("failed to apply shader: %w", err)
-					}
+					_ = appendShaderHistory(ShaderHistoryEntry{
+						Action: "random",
+						Shader: state.ShaderName,
+						Source: "mcp:shader_playlist:" + input.Name,
+						Details: map[string]string{
+							"playlist": input.Name,
+							"theme":    state.ActiveTheme,
+						},
+					})
 					return ShaderPlaylistOutput{
 						Applied: &ShaderRandomOutput{
-							Applied: strings.TrimSuffix(filepath.Base(p), ".glsl"),
-							Path:    p,
+							Applied:  state.ShaderName,
+							Path:     state.ActiveShader,
+							Theme:    state.ActiveTheme,
+							Label:    state.VisualLabel,
+							Playlist: input.Name,
+							Position: state.Position,
+							Total:    state.Total,
 						},
 					}, nil
 				}
@@ -1129,39 +1179,14 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 		// ── shader_hot_reload ─────────────────────────
 		handler.TypedHandler[ShaderHotReloadInput, ShaderHotReloadOutput](
 			"shader_hot_reload",
-			"Force Ghostty to reload its config. Touches the config file to trigger inotify; falls back to SIGUSR1.",
+			"Force kitty to reload shader config via SIGUSR1.",
 			func(_ context.Context, _ ShaderHotReloadInput) (ShaderHotReloadOutput, error) {
-				cfgPath := ghosttyConfig()
-
-				// Method 1: re-write config atomically (new inode triggers inotify)
-				data, err := os.ReadFile(cfgPath)
-				if err != nil {
-					return ShaderHotReloadOutput{}, fmt.Errorf("read config: %w", err)
+				// Send SIGUSR1 to kitty to reload config
+				cmd := exec.Command("pkill", "-USR1", "kitty")
+				if err := cmd.Run(); err != nil {
+					return ShaderHotReloadOutput{}, fmt.Errorf("SIGUSR1 to kitty failed: %w", err)
 				}
-				tmp, err := os.CreateTemp(filepath.Dir(cfgPath), "ghostty-reload-*.tmp")
-				if err != nil {
-					return ShaderHotReloadOutput{}, fmt.Errorf("create temp: %w", err)
-				}
-				tmpPath := tmp.Name()
-				if _, err := tmp.Write(data); err != nil {
-					tmp.Close()
-					os.Remove(tmpPath)
-					return ShaderHotReloadOutput{}, err
-				}
-				tmp.Close()
-				if info, statErr := os.Stat(cfgPath); statErr == nil {
-					os.Chmod(tmpPath, info.Mode())
-				}
-				if err := os.Rename(tmpPath, cfgPath); err != nil {
-					os.Remove(tmpPath)
-					// Fallback: SIGUSR1
-					cmd := exec.Command("pkill", "-USR1", "ghostty")
-					if err := cmd.Run(); err != nil {
-						return ShaderHotReloadOutput{}, fmt.Errorf("both touch and SIGUSR1 failed")
-					}
-					return ShaderHotReloadOutput{Reloaded: true, Method: "sigusr1"}, nil
-				}
-				return ShaderHotReloadOutput{Reloaded: true, Method: "touch"}, nil
+				return ShaderHotReloadOutput{Reloaded: true, Method: "sigusr1"}, nil
 			},
 		),
 

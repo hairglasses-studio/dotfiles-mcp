@@ -12,6 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `cmd/github-starsctl` CLI wrapper for the GitHub Stars workflow
 - Active standalone CI, release, publish-guard, and server-card validation workflows
 - `make contract-diff` and `make canonical-drift` plus supporting scripts for mirror surface and canonical drift reporting
+- Expanded standalone-only Hyprland IPC, Kitty runtime, and Arch Linux research-first surfaces
+- Contract-diff publication in GitHub workflow step summaries for publish and release runs
+
+### Changed
+
+- Carried forward the remaining canonical notification history, fleet baseline refresh, fleet audit, and shader workflow definitions so canonical drift is now limited to intentional mirror-only extensions
+- Removed the stale hard-coded tool-count assertion from CI and now treat the committed contract bundle plus `make publish-check` as the authoritative public-surface guard
 
 ## [v0.1.0] - 2026-04-03
 

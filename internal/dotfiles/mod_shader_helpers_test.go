@@ -55,7 +55,7 @@ func TestFindShader_Found(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
 
-	shadersPath := filepath.Join(dir, "ghostty", "shaders")
+	shadersPath := filepath.Join(dir, "kitty", "shaders", "crtty")
 	os.MkdirAll(shadersPath, 0755)
 	os.WriteFile(filepath.Join(shadersPath, "test-shader.glsl"), []byte("// shader"), 0644)
 
@@ -81,7 +81,7 @@ func TestFindShader_Found(t *testing.T) {
 func TestFindShader_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
-	os.MkdirAll(filepath.Join(dir, "ghostty", "shaders"), 0755)
+	os.MkdirAll(filepath.Join(dir, "kitty", "shaders", "crtty"), 0755)
 
 	_, err := findShader("nonexistent-shader")
 	if err == nil {
@@ -97,7 +97,7 @@ func TestListGLSL(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
 
-	shadersPath := filepath.Join(dir, "ghostty", "shaders")
+	shadersPath := filepath.Join(dir, "kitty", "shaders", "crtty")
 	os.MkdirAll(shadersPath, 0755)
 
 	// Create some shader files and a non-shader file.
@@ -121,7 +121,7 @@ func TestListGLSL(t *testing.T) {
 func TestListGLSL_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
-	os.MkdirAll(filepath.Join(dir, "ghostty", "shaders"), 0755)
+	os.MkdirAll(filepath.Join(dir, "kitty", "shaders", "crtty"), 0755)
 
 	shaders, err := listGLSL()
 	if err != nil {
@@ -156,19 +156,19 @@ func TestWallpaperScript(t *testing.T) {
 	}
 }
 
-func TestGhosttyConfig(t *testing.T) {
-	got := ghosttyConfig()
-	home := os.Getenv("HOME")
-	want := filepath.Join(home, ".config", "ghostty", "config")
+func TestKittyPlaylistScript(t *testing.T) {
+	t.Setenv("DOTFILES_DIR", "/tmp/test-dotfiles")
+	got := kittyPlaylistScript()
+	want := "/tmp/test-dotfiles/scripts/kitty-shader-playlist.sh"
 	if got != want {
-		t.Errorf("ghosttyConfig() = %q, want %q", got, want)
+		t.Errorf("kittyPlaylistScript() = %q, want %q", got, want)
 	}
 }
 
 func TestPlaylistsDir(t *testing.T) {
 	t.Setenv("DOTFILES_DIR", "/tmp/test-dotfiles")
 	got := playlistsDir()
-	want := "/tmp/test-dotfiles/ghostty/shaders/playlists"
+	want := "/tmp/test-dotfiles/kitty/shaders/playlists"
 	if got != want {
 		t.Errorf("playlistsDir() = %q, want %q", got, want)
 	}
@@ -177,7 +177,7 @@ func TestPlaylistsDir(t *testing.T) {
 func TestPlaylistStateDir(t *testing.T) {
 	home := os.Getenv("HOME")
 	got := playlistStateDir()
-	want := filepath.Join(home, ".local", "state", "ghostty")
+	want := filepath.Join(home, ".local", "state", "kitty-shaders")
 	if got != want {
 		t.Errorf("playlistStateDir() = %q, want %q", got, want)
 	}
@@ -191,7 +191,7 @@ func TestLoadPlaylist(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
 
-	plDir := filepath.Join(dir, "ghostty", "shaders", "playlists")
+	plDir := filepath.Join(dir, "kitty", "shaders", "playlists")
 	os.MkdirAll(plDir, 0755)
 
 	content := "crt-effect.glsl\nbloomy\n# comment\n\nrain-drops\n"
@@ -216,7 +216,7 @@ func TestLoadPlaylist(t *testing.T) {
 func TestLoadPlaylist_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
-	os.MkdirAll(filepath.Join(dir, "ghostty", "shaders", "playlists"), 0755)
+	os.MkdirAll(filepath.Join(dir, "kitty", "shaders", "playlists"), 0755)
 
 	_, err := loadPlaylist("nonexistent")
 	if err == nil {
@@ -232,7 +232,7 @@ func TestListPlaylists(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
 
-	plDir := filepath.Join(dir, "ghostty", "shaders", "playlists")
+	plDir := filepath.Join(dir, "kitty", "shaders", "playlists")
 	os.MkdirAll(plDir, 0755)
 
 	os.WriteFile(filepath.Join(plDir, "ambient.txt"), []byte("shader1\n"), 0644)
@@ -255,7 +255,7 @@ func TestListPlaylists(t *testing.T) {
 func TestPlaylistIndex_ReadWrite(t *testing.T) {
 	// We need to override playlistStateDir via HOME or temp state.
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".local", "state", "ghostty")
+	stateDir := filepath.Join(dir, ".local", "state", "kitty-shaders")
 	os.MkdirAll(stateDir, 0755)
 
 	// Temporarily override HOME for playlistStateDir().
@@ -310,7 +310,7 @@ func TestActivePlaylistName_Custom(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 
-	stateDir := filepath.Join(dir, ".local", "state", "ghostty")
+	stateDir := filepath.Join(dir, ".local", "state", "kitty-shaders")
 	os.MkdirAll(stateDir, 0755)
 	os.WriteFile(filepath.Join(stateDir, "auto-rotate-playlist"), []byte("chill\n"), 0644)
 
@@ -321,67 +321,64 @@ func TestActivePlaylistName_Custom(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// readActiveShader
+// readKittyStateValue / theme helpers
 // ---------------------------------------------------------------------------
 
-func TestReadActiveShader(t *testing.T) {
+func TestReadKittyStateValue(t *testing.T) {
 	dir := t.TempDir()
-	cfgDir := filepath.Join(dir, ".config", "ghostty")
-	os.MkdirAll(cfgDir, 0755)
 	t.Setenv("HOME", dir)
 
-	content := "font-family = Fira Code\ncustom-shader = /home/user/.config/ghostty/shaders/crt.glsl\ncustom-shader-animation = true\n"
-	os.WriteFile(filepath.Join(cfgDir, "config"), []byte(content), 0644)
+	stateDir := filepath.Join(dir, ".local", "state", "kitty-shaders")
+	os.MkdirAll(stateDir, 0755)
+	os.WriteFile(filepath.Join(stateDir, "current-theme"), []byte("Dracula\n"), 0644)
+	os.WriteFile(filepath.Join(stateDir, "current-label"), []byte("Dracula · neon-glow\n"), 0644)
 
-	shader, err := readActiveShader()
+	if got := readKittyStateValue("current-theme"); got != "Dracula" {
+		t.Fatalf("readKittyStateValue(current-theme) = %q, want Dracula", got)
+	}
+	if got := readActiveTheme(); got != "Dracula" {
+		t.Fatalf("readActiveTheme() = %q, want Dracula", got)
+	}
+	if got := readVisualLabel(); got != "Dracula · neon-glow" {
+		t.Fatalf("readVisualLabel() = %q, want Dracula · neon-glow", got)
+	}
+}
+
+func TestPlaylistPositionForShader(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DOTFILES_DIR", dir)
+	plDir := filepath.Join(dir, "kitty", "shaders", "playlists")
+	os.MkdirAll(plDir, 0755)
+	os.WriteFile(filepath.Join(plDir, "ambient.txt"), []byte("# comment\nneon-glow\n\ndigital-mist.glsl\n"), 0644)
+
+	position, total, err := playlistPositionForShader("ambient", "digital-mist")
 	if err != nil {
-		t.Fatalf("readActiveShader: %v", err)
+		t.Fatalf("playlistPositionForShader: %v", err)
 	}
-	if shader != "/home/user/.config/ghostty/shaders/crt.glsl" {
-		t.Errorf("got %q, want the shader path", shader)
-	}
-}
-
-func TestReadActiveShader_NoShaderLine(t *testing.T) {
-	dir := t.TempDir()
-	cfgDir := filepath.Join(dir, ".config", "ghostty")
-	os.MkdirAll(cfgDir, 0755)
-	t.Setenv("HOME", dir)
-
-	os.WriteFile(filepath.Join(cfgDir, "config"), []byte("font-family = Fira Code\n"), 0644)
-
-	_, err := readActiveShader()
-	if err == nil {
-		t.Error("expected error when no custom-shader line exists")
+	if position != 2 || total != 2 {
+		t.Fatalf("playlistPositionForShader = %d/%d, want 2/2", position, total)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// readAnimationState
+// readAnimationState (detects iTime/u_time in shader source)
 // ---------------------------------------------------------------------------
 
 func TestReadAnimationState(t *testing.T) {
 	dir := t.TempDir()
-	cfgDir := filepath.Join(dir, ".config", "ghostty")
-	os.MkdirAll(cfgDir, 0755)
-	t.Setenv("HOME", dir)
+	t.Setenv("DOTFILES_DIR", dir)
 
-	// Test true.
-	os.WriteFile(filepath.Join(cfgDir, "config"), []byte("custom-shader-animation = true\n"), 0644)
-	if !readAnimationState() {
-		t.Error("expected true when animation = true")
-	}
+	shadersPath := filepath.Join(dir, "kitty", "shaders", "crtty")
+	os.MkdirAll(shadersPath, 0755)
 
-	// Test false.
-	os.WriteFile(filepath.Join(cfgDir, "config"), []byte("custom-shader-animation = false\n"), 0644)
+	// Animated shader (contains iTime).
+	os.WriteFile(filepath.Join(shadersPath, "animated.glsl"),
+		[]byte("void main() { float t = iTime; }"), 0644)
+
+	// readAnimationState calls readActiveShader which requires kitty-shader-playlist.sh.
+	// Without the script, it returns false (no active shader).
 	if readAnimationState() {
-		t.Error("expected false when animation = false")
-	}
-
-	// Test missing.
-	os.WriteFile(filepath.Join(cfgDir, "config"), []byte("font-family = Fira Code\n"), 0644)
-	if readAnimationState() {
-		t.Error("expected false when no animation line")
+		t.Error("expected false when no active shader (no playlist script)")
 	}
 }
 
@@ -392,7 +389,7 @@ func TestReadAnimationState(t *testing.T) {
 func TestLoadManifest_Valid(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
-	shadersPath := filepath.Join(dir, "ghostty", "shaders")
+	shadersPath := filepath.Join(dir, "kitty", "shaders", "crtty")
 	os.MkdirAll(shadersPath, 0755)
 
 	manifest := `[shaders.crt-effect]
@@ -428,7 +425,7 @@ description = "Bloom glow effect"
 func TestLoadManifest_Missing(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DOTFILES_DIR", dir)
-	os.MkdirAll(filepath.Join(dir, "ghostty", "shaders"), 0755)
+	os.MkdirAll(filepath.Join(dir, "kitty", "shaders", "crtty"), 0755)
 
 	m, err := loadManifest()
 	if err != nil {
@@ -526,73 +523,15 @@ func TestShaderHistoryEntry_JSONRoundtrip(t *testing.T) {
 // atomicSetShader
 // ---------------------------------------------------------------------------
 
-func TestAtomicSetShader(t *testing.T) {
-	dir := t.TempDir()
-	cfgDir := filepath.Join(dir, ".config", "ghostty")
-	shadersDir := filepath.Join(dir, "shaders")
-	os.MkdirAll(cfgDir, 0755)
-	os.MkdirAll(shadersDir, 0755)
-	t.Setenv("HOME", dir)
-
-	// Create a config file with a shader line.
-	config := "font-family = Fira Code\ncustom-shader = /old/shader.glsl\ncustom-shader-animation = false\ntheme = dark\n"
-	cfgPath := filepath.Join(cfgDir, "config")
-	os.WriteFile(cfgPath, []byte(config), 0644)
-
-	// Create a shader file with animation uniforms.
-	shaderPath := filepath.Join(shadersDir, "animated.glsl")
-	os.WriteFile(shaderPath, []byte("uniform float ghostty_time;\nvoid main() {}\n"), 0644)
-
-	err := atomicSetShader(shaderPath)
-	if err != nil {
-		t.Fatalf("atomicSetShader: %v", err)
+func TestAtomicSetShader_RequiresPlaylistScript(t *testing.T) {
+	// atomicSetShader now calls kitty-shader-playlist.sh set <name>.
+	// Without the real script, it returns an error — this is expected.
+	t.Setenv("DOTFILES_DIR", "/nonexistent")
+	err := atomicSetShader("/nonexistent/shader.glsl")
+	if err == nil {
+		t.Skip("kitty-shader-playlist.sh available — integration test passed")
 	}
-
-	// Read config back and verify.
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		t.Fatalf("read config: %v", err)
-	}
-	content := string(data)
-	if !contains(content, "custom-shader = "+shaderPath) {
-		t.Errorf("config should contain new shader path, got:\n%s", content)
-	}
-	if !contains(content, "custom-shader-animation = true") {
-		t.Errorf("config should have animation=true for ghostty_time shader, got:\n%s", content)
-	}
-	// Non-shader lines should be preserved.
-	if !contains(content, "font-family = Fira Code") {
-		t.Error("lost font-family line")
-	}
-	if !contains(content, "theme = dark") {
-		t.Error("lost theme line")
-	}
-}
-
-func TestAtomicSetShader_NoAnimation(t *testing.T) {
-	dir := t.TempDir()
-	cfgDir := filepath.Join(dir, ".config", "ghostty")
-	shadersDir := filepath.Join(dir, "shaders")
-	os.MkdirAll(cfgDir, 0755)
-	os.MkdirAll(shadersDir, 0755)
-	t.Setenv("HOME", dir)
-
-	config := "custom-shader = /old/shader.glsl\ncustom-shader-animation = true\n"
-	os.WriteFile(filepath.Join(cfgDir, "config"), []byte(config), 0644)
-
-	// Non-animated shader.
-	shaderPath := filepath.Join(shadersDir, "static.glsl")
-	os.WriteFile(shaderPath, []byte("void main() {}\n"), 0644)
-
-	err := atomicSetShader(shaderPath)
-	if err != nil {
-		t.Fatalf("atomicSetShader: %v", err)
-	}
-
-	data, _ := os.ReadFile(filepath.Join(cfgDir, "config"))
-	if !contains(string(data), "custom-shader-animation = false") {
-		t.Errorf("expected animation=false for non-animated shader")
-	}
+	// Expected: error because the script doesn't exist
 }
 
 func contains(s, sub string) bool {

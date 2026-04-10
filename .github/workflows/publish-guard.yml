@@ -19,6 +19,16 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y jq
       - name: Run publish surface checks
         run: make publish-check
+      - name: Summarize contract diff
+        run: |
+          make contract-diff > .contract-diff.md
+          cat .contract-diff.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload contract diff
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-diff-${{ github.sha }}
+          path: .contract-diff.md
+          retention-days: 14
 
   host-smoke:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
