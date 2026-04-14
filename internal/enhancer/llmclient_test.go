@@ -192,35 +192,32 @@ func TestNewLLMClient_NoAPIKey(t *testing.T) {
 	}
 }
 
-func TestNewLLMClient_LocalOllamaUsesDummyKey(t *testing.T) {
-	t.Setenv("OLLAMA_API_KEY", "")
-	t.Setenv("OLLAMA_CHAT_MODEL", "")
-
+func TestNewLLMClient_UsesConfiguredAnthropicKeyAndDefaultModel(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "anthropic-test-key")
 	client := NewLLMClient(LLMConfig{
-		APIKeyEnv: "OLLAMA_API_KEY",
-		BaseURL:   "http://127.0.0.1:11434",
+		APIKeyEnv: "ANTHROPIC_API_KEY",
 	})
 	if client == nil {
-		t.Fatal("expected local Ollama client")
+		t.Fatal("expected configured Anthropic client")
 	}
-	if client.APIKey != "ollama" {
-		t.Fatalf("client.APIKey = %q, want %q", client.APIKey, "ollama")
+	if client.APIKey != "anthropic-test-key" {
+		t.Fatalf("client.APIKey = %q, want %q", client.APIKey, "anthropic-test-key")
 	}
-	if client.Model != "code-primary" {
-		t.Fatalf("client.Model = %q, want %q", client.Model, "code-primary")
+	if client.Model != "claude-sonnet-4-6" {
+		t.Fatalf("client.Model = %q, want %q", client.Model, "claude-sonnet-4-6")
 	}
 }
 
-func TestNewLLMClient_LocalOllamaBaseURLFromEnv(t *testing.T) {
-	t.Setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434/")
+func TestNewLLMClient_DefaultsToAnthropicBaseURL(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "anthropic-test-key")
 
 	client := NewLLMClient(LLMConfig{
-		APIKeyEnv: "OLLAMA_API_KEY",
+		APIKeyEnv: "ANTHROPIC_API_KEY",
 	})
 	if client == nil {
-		t.Fatal("expected local Ollama client")
+		t.Fatal("expected Anthropic client")
 	}
-	if client.BaseURL != "http://127.0.0.1:11434" {
-		t.Fatalf("client.BaseURL = %q, want %q", client.BaseURL, "http://127.0.0.1:11434")
+	if client.BaseURL != "https://api.anthropic.com" {
+		t.Fatalf("client.BaseURL = %q, want %q", client.BaseURL, "https://api.anthropic.com")
 	}
 }
