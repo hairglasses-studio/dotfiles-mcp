@@ -77,51 +77,6 @@ func unmarshalSessionWindowsResult(t *testing.T, result *registry.CallToolResult
 	return out
 }
 
-func unmarshalSessionListResult(t *testing.T, result *registry.CallToolResult) SessionListOutput {
-	t.Helper()
-	var out SessionListOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
-		t.Fatalf("unmarshal session list output: %v", err)
-	}
-	return out
-}
-
-func unmarshalSessionStatusResult(t *testing.T, result *registry.CallToolResult) SessionStatusOutput {
-	t.Helper()
-	var out SessionStatusOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
-		t.Fatalf("unmarshal session status output: %v", err)
-	}
-	return out
-}
-
-func unmarshalSessionLogResult(t *testing.T, result *registry.CallToolResult) SessionLogOutput {
-	t.Helper()
-	var out SessionLogOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
-		t.Fatalf("unmarshal session log output: %v", err)
-	}
-	return out
-}
-
-func unmarshalSessionAppsResult(t *testing.T, result *registry.CallToolResult) SessionAppsOutput {
-	t.Helper()
-	var out SessionAppsOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
-		t.Fatalf("unmarshal session apps output: %v", err)
-	}
-	return out
-}
-
-func unmarshalSessionWaitReadyResult(t *testing.T, result *registry.CallToolResult) SessionWaitReadyOutput {
-	t.Helper()
-	var out SessionWaitReadyOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
-		t.Fatalf("unmarshal session wait-ready output: %v", err)
-	}
-	return out
-}
-
 func callDesktopSemanticTool(t *testing.T, name string, args map[string]any) *registry.CallToolResult {
 	t.Helper()
 	td := findModuleTool(t, &DesktopSemanticModule{}, name)
@@ -149,7 +104,7 @@ case "$cmd" in
     printf '%s\n' '{"windows":[{"name":"Fixture Window","ref":"ref_0","path":"0","bounds":{"x":10,"y":20,"width":800,"height":600},"app":{"name":"Fixture App"}}]}'
     ;;
   get_tree)
-    printf '%s\n' '{"tree":{"name":"Fixture Window","role":"frame","ref":"ref_0","path":"0","children":[{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0","actions":["press"]},{"name":"","role":"entry","ref":"ref_0_1","path":"0/1","value":"fixture-text","value_kind":"text","relations":{"labelled by":["Full Name"]},"attributes":{"placeholder":"Type full name"}},{"name":"Volume","role":"slider","ref":"ref_0_2","path":"0/2","value":5,"value_kind":"numeric"},{"name":"Accept Terms","role":"check box","ref":"ref_0_3","path":"0/3"},{"name":"Submit","role":"push button","ref":"ref_0_4","path":"0/4","actions":["press"]}]}}'
+    printf '%s\n' '{"tree":{"name":"Fixture Window","role":"frame","ref":"ref_0","path":"0","children":[{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"},{"name":"Name","role":"entry","ref":"ref_0_1","path":"0/1","value":"fixture-text","value_kind":"text"}]}}'
     ;;
   find)
     printf '%s\n' '{"matched":true,"element":{"name":"Save","role":"push button","ref":"ref_0_0","path":"0/0"}}'
@@ -523,8 +478,7 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 
 	findResult := callDesktopSemanticTool(t, "desktop_find", map[string]any{
 		"app":  "Fixture App",
-		"name": "Full Name",
-		"role": "entry",
+		"name": "Save",
 	})
 	if findResult == nil || findResult.IsError {
 		t.Fatalf("expected successful desktop_find result, got %q", extractTextFromResult(t, findResult))
@@ -533,7 +487,7 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, findResult)), &found); err != nil {
 		t.Fatalf("unmarshal desktop find output: %v", err)
 	}
-	if !found.Matched || stringValue(found.Element["role"]) != "entry" || found.Query.Path != "0/1" {
+	if !found.Matched || stringValue(found.Element["name"]) != "Save" {
 		t.Fatalf("unexpected desktop_find output: %#v", found)
 	}
 
@@ -553,7 +507,7 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 
 	readValueResult := callDesktopSemanticTool(t, "desktop_read_value", map[string]any{
 		"app":  "Fixture App",
-		"name": "Full Name",
+		"name": "Name",
 	})
 	if readValueResult == nil || readValueResult.IsError {
 		t.Fatalf("expected successful desktop_read_value result, got %q", extractTextFromResult(t, readValueResult))
@@ -562,13 +516,13 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, readValueResult)), &read); err != nil {
 		t.Fatalf("unmarshal desktop read value output: %v", err)
 	}
-	if read.ValueKind != "text" || read.Value != "fixture-text" || read.Query.Path != "0/1" {
+	if read.ValueKind != "text" || read.Value != "fixture-text" {
 		t.Fatalf("unexpected read value output: %#v", read)
 	}
 
 	setTextResult := callDesktopSemanticTool(t, "desktop_set_text", map[string]any{
 		"app":  "Fixture App",
-		"name": "Full Name",
+		"name": "Name",
 		"text": "patched",
 	})
 	if setTextResult == nil || setTextResult.IsError {
@@ -578,103 +532,8 @@ func TestDesktopSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, setTextResult)), &updated); err != nil {
 		t.Fatalf("unmarshal desktop set text output: %v", err)
 	}
-	if !updated.Updated || updated.Value != "patched" || updated.Query.Path != "0/1" {
+	if !updated.Updated || updated.Value != "patched" {
 		t.Fatalf("unexpected set text output: %#v", updated)
-	}
-
-	waitResult := callDesktopSemanticTool(t, "desktop_wait_for_element", map[string]any{
-		"app":     "Fixture App",
-		"name":    "Type full name",
-		"role":    "entry",
-		"timeout": 1,
-	})
-	if waitResult == nil || waitResult.IsError {
-		t.Fatalf("expected successful desktop_wait_for_element result, got %q", extractTextFromResult(t, waitResult))
-	}
-	var waited desktopSemanticElementOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, waitResult)), &waited); err != nil {
-		t.Fatalf("unmarshal desktop wait output: %v", err)
-	}
-	if !waited.Matched || stringValue(waited.Element["role"]) != "entry" || waited.Query.Path != "0/1" {
-		t.Fatalf("unexpected desktop wait output: %#v", waited)
-	}
-}
-
-func TestDesktopSemanticFormTools(t *testing.T) {
-	stateDir := t.TempDir()
-	binDir := t.TempDir()
-	origPath := os.Getenv("PATH")
-
-	writeSemanticFixturePython(t, binDir)
-
-	t.Setenv("XDG_STATE_HOME", stateDir)
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
-	t.Setenv("WAYLAND_DISPLAY", "wayland-fixture")
-	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/fixture-bus")
-
-	formFieldsResult := callDesktopSemanticTool(t, "desktop_form_fields", map[string]any{
-		"app":             "Fixture App",
-		"include_actions": true,
-	})
-	if formFieldsResult == nil || formFieldsResult.IsError {
-		t.Fatalf("expected successful desktop_form_fields result, got %q", extractTextFromResult(t, formFieldsResult))
-	}
-	var fieldsOut desktopSemanticFormFieldsOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, formFieldsResult)), &fieldsOut); err != nil {
-		t.Fatalf("unmarshal desktop form fields output: %v", err)
-	}
-	if fieldsOut.Count < 5 {
-		t.Fatalf("expected at least 5 semantic form fields, got %#v", fieldsOut)
-	}
-	foundLabeledEntry := false
-	for _, field := range fieldsOut.Fields {
-		if field.FieldType == "text" && containsString(field.Labels, "Full Name") {
-			foundLabeledEntry = true
-		}
-	}
-	if !foundLabeledEntry {
-		t.Fatalf("expected labelled text field in semantic form fields, got %#v", fieldsOut.Fields)
-	}
-
-	previewResult := callDesktopSemanticTool(t, "desktop_fill_form", map[string]any{
-		"app":     "Fixture App",
-		"preview": true,
-		"fields": []map[string]any{
-			{"name": "Full Name", "text": "patched"},
-			{"name": "Volume", "number": 42},
-			{"name": "Accept Terms", "checked": true},
-			{"name": "Submit", "action": "press"},
-		},
-	})
-	if previewResult == nil || previewResult.IsError {
-		t.Fatalf("expected successful desktop_fill_form preview result, got %q", extractTextFromResult(t, previewResult))
-	}
-	var previewOut desktopSemanticFormFillOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, previewResult)), &previewOut); err != nil {
-		t.Fatalf("unmarshal desktop fill form preview output: %v", err)
-	}
-	if !previewOut.Preview || previewOut.Planned != 4 || previewOut.Applied != 0 {
-		t.Fatalf("unexpected desktop fill form preview output: %#v", previewOut)
-	}
-
-	fillResult := callDesktopSemanticTool(t, "desktop_fill_form", map[string]any{
-		"app": "Fixture App",
-		"fields": []map[string]any{
-			{"name": "Full Name", "text": "patched"},
-			{"name": "Volume", "number": 42},
-			{"name": "Accept Terms", "checked": true},
-			{"name": "Submit", "action": "press"},
-		},
-	})
-	if fillResult == nil || fillResult.IsError {
-		t.Fatalf("expected successful desktop_fill_form result, got %q", extractTextFromResult(t, fillResult))
-	}
-	var fillOut desktopSemanticFormFillOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, fillResult)), &fillOut); err != nil {
-		t.Fatalf("unmarshal desktop fill form output: %v", err)
-	}
-	if fillOut.Matched != 4 || fillOut.Applied != 4 {
-		t.Fatalf("unexpected desktop fill form output: %#v", fillOut)
 	}
 }
 
@@ -709,22 +568,10 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 		t.Fatalf("unexpected session window output: %#v", listed)
 	}
 
-	listAppsResult := callDesktopSessionTool(t, "session_list_apps", map[string]any{
-		"session_id": record.ID,
-	})
-	if listAppsResult == nil || listAppsResult.IsError {
-		t.Fatalf("expected successful session_list_apps result, got %q", extractTextFromResult(t, listAppsResult))
-	}
-	appsOut := unmarshalSessionAppsResult(t, listAppsResult)
-	if appsOut.Count != 1 || stringValue(appsOut.Apps[0]["name"]) != "Fixture App" {
-		t.Fatalf("unexpected session apps output: %#v", appsOut)
-	}
-
 	findResult := callDesktopSessionTool(t, "session_find_ui_element", map[string]any{
 		"session_id": record.ID,
 		"app":        "Fixture App",
-		"name":       "Full Name",
-		"role":       "entry",
+		"name":       "Save",
 	})
 	if findResult == nil || findResult.IsError {
 		t.Fatalf("expected successful session_find_ui_element result, got %q", extractTextFromResult(t, findResult))
@@ -733,14 +580,14 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, findResult)), &found); err != nil {
 		t.Fatalf("unmarshal session find output: %v", err)
 	}
-	if !found.Matched || stringValue(found.Element["role"]) != "entry" || found.Query.Path != "0/1" {
+	if !found.Matched || stringValue(found.Element["name"]) != "Save" {
 		t.Fatalf("unexpected session semantic find output: %#v", found)
 	}
 
 	setTextResult := callDesktopSessionTool(t, "session_set_text", map[string]any{
 		"session_id": record.ID,
 		"app":        "Fixture App",
-		"name":       "Full Name",
+		"name":       "Name",
 		"text":       "patched",
 	})
 	if setTextResult == nil || setTextResult.IsError {
@@ -750,26 +597,8 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 	if err := json.Unmarshal([]byte(extractTextFromResult(t, setTextResult)), &updated); err != nil {
 		t.Fatalf("unmarshal session set text output: %v", err)
 	}
-	if !updated.Updated || updated.Value != "patched" || updated.Query.Path != "0/1" {
+	if !updated.Updated || updated.Value != "patched" {
 		t.Fatalf("unexpected session set text output: %#v", updated)
-	}
-
-	waitResult := callDesktopSessionTool(t, "session_wait_for_element", map[string]any{
-		"session_id": record.ID,
-		"app":        "Fixture App",
-		"name":       "Type full name",
-		"role":       "entry",
-		"timeout":    1,
-	})
-	if waitResult == nil || waitResult.IsError {
-		t.Fatalf("expected successful session_wait_for_element result, got %q", extractTextFromResult(t, waitResult))
-	}
-	var waited SessionSemanticElementOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, waitResult)), &waited); err != nil {
-		t.Fatalf("unmarshal session wait output: %v", err)
-	}
-	if !waited.Matched || stringValue(waited.Element["role"]) != "entry" || waited.Query.Path != "0/1" {
-		t.Fatalf("unexpected session wait output: %#v", waited)
 	}
 
 	clickResult := callDesktopSessionTool(t, "session_click_element", map[string]any{
@@ -786,64 +615,6 @@ func TestDesktopSessionSemanticFixtureFlows(t *testing.T) {
 	}
 	if !clicked.Clicked {
 		t.Fatalf("expected clicked result, got %#v", clicked)
-	}
-}
-
-func TestDesktopSessionFormTools(t *testing.T) {
-	stateDir := t.TempDir()
-	binDir := t.TempDir()
-	origPath := os.Getenv("PATH")
-
-	writeSemanticFixturePython(t, binDir)
-
-	t.Setenv("XDG_STATE_HOME", stateDir)
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
-
-	record := saveTestDesktopSessionRecord(t, desktopSessionRecord{
-		ID:                    "session-form-fixture",
-		Name:                  "Form Fixture Session",
-		Backend:               "live_wayland",
-		Status:                "connected",
-		WaylandDisplay:        "wayland-0",
-		XDGRuntimeDir:         t.TempDir(),
-		DBUSSessionBusAddress: "unix:path=/tmp/session-bus",
-	})
-
-	formFieldsResult := callDesktopSessionTool(t, "session_form_fields", map[string]any{
-		"session_id":      record.ID,
-		"app":             "Fixture App",
-		"include_actions": true,
-	})
-	if formFieldsResult == nil || formFieldsResult.IsError {
-		t.Fatalf("expected successful session_form_fields result, got %q", extractTextFromResult(t, formFieldsResult))
-	}
-	var fieldsOut SessionSemanticFormFieldsOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, formFieldsResult)), &fieldsOut); err != nil {
-		t.Fatalf("unmarshal session form fields output: %v", err)
-	}
-	if fieldsOut.Session.ID != record.ID || fieldsOut.Count < 5 {
-		t.Fatalf("unexpected session form fields output: %#v", fieldsOut)
-	}
-
-	fillResult := callDesktopSessionTool(t, "session_fill_form", map[string]any{
-		"session_id": record.ID,
-		"app":        "Fixture App",
-		"fields": []map[string]any{
-			{"name": "Full Name", "text": "patched"},
-			{"name": "Volume", "number": 42},
-			{"name": "Accept Terms", "checked": true},
-			{"name": "Submit", "action": "press"},
-		},
-	})
-	if fillResult == nil || fillResult.IsError {
-		t.Fatalf("expected successful session_fill_form result, got %q", extractTextFromResult(t, fillResult))
-	}
-	var fillOut SessionSemanticFormFillOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, fillResult)), &fillOut); err != nil {
-		t.Fatalf("unmarshal session fill form output: %v", err)
-	}
-	if fillOut.Session.ID != record.ID || fillOut.Matched != 4 || fillOut.Applied != 4 {
-		t.Fatalf("unexpected session fill form output: %#v", fillOut)
 	}
 }
 
@@ -955,129 +726,5 @@ func TestDesktopSessionCommandFixtureFlows(t *testing.T) {
 	}
 	if dbusOut.Mode != "dbus-send" || !strings.Contains(dbusOut.Output, "method return") {
 		t.Fatalf("unexpected dbus output: %#v", dbusOut)
-	}
-}
-
-func TestDesktopSessionListStatusAndReadLog(t *testing.T) {
-	stateDir := t.TempDir()
-	binDir := t.TempDir()
-	logDir := t.TempDir()
-	runtimeDir := t.TempDir()
-	socketPath := filepath.Join(runtimeDir, "wayland-0")
-	envPath := filepath.Join(logDir, "session.env")
-	logPath := filepath.Join(logDir, "kwin.log")
-	appLogPath := filepath.Join(logDir, "app.log")
-	origPath := os.Getenv("PATH")
-
-	writeSemanticFixturePython(t, binDir)
-
-	if err := os.WriteFile(socketPath, []byte("socket"), 0o600); err != nil {
-		t.Fatalf("write socket fixture: %v", err)
-	}
-	if err := os.WriteFile(envPath, []byte("DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/test-bus\nAT_SPI_BUS_ADDRESS=unix:path=/tmp/test-atspi\n"), 0o644); err != nil {
-		t.Fatalf("write env fixture: %v", err)
-	}
-	if err := os.WriteFile(logPath, []byte("line 1\nline 2\nline 3\nline 4\n"), 0o644); err != nil {
-		t.Fatalf("write log fixture: %v", err)
-	}
-	if err := os.WriteFile(appLogPath, []byte("app output\n"), 0o644); err != nil {
-		t.Fatalf("write app log fixture: %v", err)
-	}
-
-	t.Setenv("XDG_STATE_HOME", stateDir)
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+origPath)
-
-	newest := saveTestDesktopSessionRecord(t, desktopSessionRecord{
-		ID:                        "session-inspect-newest",
-		Name:                      "Newest Session",
-		Backend:                   "live_hyprland",
-		Status:                    "connected",
-		WaylandDisplay:            "wayland-0",
-		XDGRuntimeDir:             runtimeDir,
-		HyprlandInstanceSignature: "hypr-fixture",
-		DBUSSessionBusAddress:     "unix:path=/tmp/test-bus",
-		ATSPIBusAddress:           "unix:path=/tmp/test-atspi",
-		EnvPath:                   envPath,
-		LogPath:                   logPath,
-		StartedAt:                 "2026-04-10T12:00:00Z",
-		AppLogs: []desktopSessionAppLog{
-			{App: "fixture-app", Path: appLogPath, StartedAt: "2026-04-10T12:05:00Z"},
-		},
-	})
-	saveTestDesktopSessionRecord(t, desktopSessionRecord{
-		ID:        "session-inspect-older",
-		Name:      "Older Session",
-		Backend:   "kwin_virtual",
-		Status:    "stopped",
-		StartedAt: "2026-04-10T10:00:00Z",
-		StoppedAt: "2026-04-10T10:30:00Z",
-	})
-
-	listResult := callDesktopSessionTool(t, "session_list", map[string]any{
-		"limit": 1,
-	})
-	if listResult == nil || listResult.IsError {
-		t.Fatalf("expected successful session_list result, got %q", extractTextFromResult(t, listResult))
-	}
-	listed := unmarshalSessionListResult(t, listResult)
-	if listed.Count != 1 || len(listed.Sessions) != 1 {
-		t.Fatalf("unexpected session list output: %#v", listed)
-	}
-	if listed.Sessions[0].SessionID != newest.ID || listed.Sessions[0].ResolvedStatus != "connected" {
-		t.Fatalf("unexpected first session list entry: %#v", listed.Sessions[0])
-	}
-	if !listed.Sessions[0].SemanticProbeReady || listed.Sessions[0].SemanticAppCount != 1 {
-		t.Fatalf("expected semantic probe readiness in session list entry, got %#v", listed.Sessions[0])
-	}
-
-	statusResult := callDesktopSessionTool(t, "session_status", map[string]any{
-		"session_id": newest.ID,
-	})
-	if statusResult == nil || statusResult.IsError {
-		t.Fatalf("expected successful session_status result, got %q", extractTextFromResult(t, statusResult))
-	}
-	status := unmarshalSessionStatusResult(t, statusResult)
-	if status.Session.ID != newest.ID || status.ResolvedStatus != "connected" {
-		t.Fatalf("unexpected session status output: %#v", status)
-	}
-	if !status.HyprlandBacked || !status.SocketPresent || !status.DBUSReady || !status.ATSPIReady {
-		t.Fatalf("expected ready session status, got %#v", status)
-	}
-	if !status.SemanticProbeReady || status.SemanticAppCount != 1 || strings.TrimSpace(status.SemanticProbeError) != "" {
-		t.Fatalf("expected semantic probe details in session status output, got %#v", status)
-	}
-	if status.AppLogCount != 1 || len(status.AppLogs) != 1 {
-		t.Fatalf("expected one app log in status output, got %#v", status)
-	}
-	if !containsString(status.Recommendations, "Use session_read_app_log to inspect the newest launched application output.") {
-		t.Fatalf("expected app log recommendation, got %#v", status.Recommendations)
-	}
-
-	waitReadyResult := callDesktopSessionTool(t, "session_wait_ready", map[string]any{
-		"session_id":       newest.ID,
-		"timeout":          1,
-		"require_semantic": true,
-	})
-	if waitReadyResult == nil || waitReadyResult.IsError {
-		t.Fatalf("expected successful session_wait_ready result, got %q", extractTextFromResult(t, waitReadyResult))
-	}
-	waitOut := unmarshalSessionWaitReadyResult(t, waitReadyResult)
-	if !waitOut.Ready || !waitOut.RequireSemantic || waitOut.Status.ResolvedStatus != "connected" || waitOut.Timeout != 1 {
-		t.Fatalf("unexpected session wait-ready output: %#v", waitOut)
-	}
-	if !waitOut.Status.SemanticProbeReady || waitOut.Status.SemanticAppCount != 1 {
-		t.Fatalf("expected semantic probe readiness in wait-ready output, got %#v", waitOut)
-	}
-
-	logResult := callDesktopSessionTool(t, "session_read_log", map[string]any{
-		"session_id": newest.ID,
-		"lines":      2,
-	})
-	if logResult == nil || logResult.IsError {
-		t.Fatalf("expected successful session_read_log result, got %q", extractTextFromResult(t, logResult))
-	}
-	logOut := unmarshalSessionLogResult(t, logResult)
-	if logOut.Path != logPath || strings.TrimSpace(logOut.Output) != "line 3\nline 4" {
-		t.Fatalf("unexpected session log output: %#v", logOut)
 	}
 }

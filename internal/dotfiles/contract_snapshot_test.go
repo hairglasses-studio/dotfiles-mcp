@@ -27,8 +27,8 @@ func TestBuildContractSnapshotBundle(t *testing.T) {
 	if bundle.Overview.Profile != "default" {
 		t.Fatalf("profile = %q, want default", bundle.Overview.Profile)
 	}
-	if !bundle.Overview.PublishMirror {
-		t.Fatal("expected mirror snapshot to report publish_mirror=true")
+	if bundle.Overview.PublishMirror {
+		t.Fatal("expected canonical snapshot to report publish_mirror=false")
 	}
 
 	seenJuhradial := false
@@ -190,19 +190,19 @@ func TestBuildContractSnapshotBundleFrontDoorParity(t *testing.T) {
 	}
 }
 
-func TestWellKnownManifestParity(t *testing.T) {
+func TestCanonicalWellKnownManifestParity(t *testing.T) {
 	bundle, err := BuildContractSnapshotBundle("default")
 	if err != nil {
 		t.Fatalf("BuildContractSnapshotBundle: %v", err)
 	}
 
-	if !bundle.Manifest.PublishMirror {
-		t.Fatal("expected publish_mirror=true")
+	if bundle.Manifest.PublishMirror {
+		t.Fatal("expected publish_mirror=false")
 	}
 	if bundle.Manifest.CanonicalSource != canonicalSourceURL {
 		t.Fatalf("canonical_source = %q", bundle.Manifest.CanonicalSource)
 	}
-	if bundle.Manifest.Repository != "https://github.com/hairglasses-studio/dotfiles-mcp" {
+	if bundle.Manifest.Repository != "https://github.com/hairglasses-studio/dotfiles" {
 		t.Fatalf("repository = %q", bundle.Manifest.Repository)
 	}
 	if !bundle.Manifest.Capabilities.Tools || !bundle.Manifest.Capabilities.Resources || !bundle.Manifest.Capabilities.Prompts {

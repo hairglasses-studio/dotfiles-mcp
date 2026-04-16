@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -24,23 +23,6 @@ const (
 	CodexStartMarker = "# BEGIN MANAGED MCP SERVERS: github-stars"
 	CodexEndMarker   = "# END MANAGED MCP SERVERS: github-stars"
 )
-
-var githubRepoURLPattern = regexp.MustCompile("https?://github\\.com/([^\\s)\\]`]+/[^\\s)\\]`]+)")
-
-var reservedGitHubNamespaces = map[string]struct{}{
-	"apps":          {},
-	"codespaces":    {},
-	"collections":   {},
-	"events":        {},
-	"features":      {},
-	"marketplace":   {},
-	"orgs":          {},
-	"organizations": {},
-	"settings":      {},
-	"sponsors":      {},
-	"topics":        {},
-	"users":         {},
-}
 
 type Client struct {
 	Token   string
@@ -166,41 +148,6 @@ type TaxonomyAssignment struct {
 type TaxonomySyncResult struct {
 	ListResults []EnsureListResult       `json:"list_results,omitempty"`
 	RepoResults []RepoListMutationResult `json:"repo_results,omitempty"`
-}
-
-type MarkdownSource struct {
-	Name      string   `json:"name"`
-	Path      string   `json:"path"`
-	RepoCount int      `json:"repo_count"`
-	Repos     []string `json:"repos,omitempty"`
-}
-
-type RepoOverlap struct {
-	Repo  string   `json:"repo"`
-	Lists []string `json:"lists"`
-}
-
-type MarkdownSyncResult struct {
-	Sources     []MarkdownSource   `json:"sources,omitempty"`
-	UniqueRepos int                `json:"unique_repos"`
-	Overlaps    []RepoOverlap      `json:"overlaps,omitempty"`
-	Taxonomy    TaxonomySyncResult `json:"taxonomy"`
-}
-
-type MarkdownListAudit struct {
-	Name          string   `json:"name"`
-	ExpectedCount int      `json:"expected_count"`
-	ActualCount   int      `json:"actual_count"`
-	Missing       []string `json:"missing,omitempty"`
-	Extra         []string `json:"extra,omitempty"`
-}
-
-type MarkdownAudit struct {
-	Sources     []MarkdownSource    `json:"sources,omitempty"`
-	UniqueRepos int                 `json:"unique_repos"`
-	Overlaps    []RepoOverlap       `json:"overlaps,omitempty"`
-	Lists       []MarkdownListAudit `json:"lists,omitempty"`
-	ExactMatch  bool                `json:"exact_match"`
 }
 
 type SuggestedList struct {
@@ -698,23 +645,17 @@ func (c *Client) EnsureLists(ctx context.Context, specs []EnsureListSpec, execut
 	if err != nil {
 		return nil, err
 	}
-	results, _, err := c.ensureListsWithExisting(ctx, specs, existing, execute)
-	return results, err
-}
-
-func (c *Client) ensureListsWithExisting(ctx context.Context, specs []EnsureListSpec, existing []UserList, execute bool) ([]EnsureListResult, []UserList, error) {
 	byName := make(map[string]UserList, len(existing))
 	for _, list := range existing {
-		byName[strings.ToLower(list.Name)] = list
+		byName[list.Name] = list
 	}
 
 	results := make([]EnsureListResult, 0, len(specs))
 	for _, spec := range specs {
-		spec.Name = strings.TrimSpace(spec.Name)
-		if spec.Name == "" {
+		if strings.TrimSpace(spec.Name) == "" {
 			continue
 		}
-		current, ok := byName[strings.ToLower(spec.Name)]
+		current, ok := byName[spec.Name]
 		if !ok {
 			action := "dry-run-create"
 			status := "planned"
@@ -734,8 +675,6 @@ func (c *Client) ensureListsWithExisting(ctx context.Context, specs []EnsureList
 				status = "ok"
 				id = created.ID
 				current = created
-				existing = append(existing, created)
-				byName[strings.ToLower(created.Name)] = created
 			}
 			results = append(results, EnsureListResult{
 				Name:         spec.Name,
@@ -787,13 +726,6 @@ func (c *Client) ensureListsWithExisting(ctx context.Context, specs []EnsureList
 			current = updated
 			action = "update"
 			status = "ok"
-			for i := range existing {
-				if existing[i].ID == current.ID {
-					existing[i] = current
-					break
-				}
-			}
-			byName[strings.ToLower(current.Name)] = current
 		}
 
 		results = append(results, EnsureListResult{
@@ -809,7 +741,7 @@ func (c *Client) ensureListsWithExisting(ctx context.Context, specs []EnsureList
 		})
 	}
 
-	return results, existing, nil
+	return results, nil
 }
 
 func (c *Client) DeleteLists(ctx context.Context, names []string, execute bool) ([]DeleteListResult, error) {
@@ -1031,21 +963,12 @@ func (c *Client) SetRepoMembership(ctx context.Context, requests []RepoListMutat
 	if err != nil {
 		return nil, err
 	}
-	return c.setRepoMembershipWithLists(ctx, requests, execute, lists)
-}
-
-func (c *Client) setRepoMembershipWithLists(ctx context.Context, requests []RepoListMutationRequest, execute bool, lists []UserList) ([]RepoListMutationResult, error) {
 	listByName := make(map[string]UserList, len(lists))
 	membership := make(map[string][]string)
-	canonicalRepoNames := make(map[string]string)
 	for _, list := range lists {
-		listByName[strings.ToLower(list.Name)] = list
+		listByName[list.Name] = list
 		for _, item := range list.Items {
-			key := strings.ToLower(item.NameWithOwner)
-			membership[key] = append(membership[key], list.Name)
-			if _, ok := canonicalRepoNames[key]; !ok {
-				canonicalRepoNames[key] = item.NameWithOwner
-			}
+			membership[item.NameWithOwner] = append(membership[item.NameWithOwner], list.Name)
 		}
 	}
 
@@ -1053,7 +976,7 @@ func (c *Client) setRepoMembershipWithLists(ctx context.Context, requests []Repo
 	for _, request := range requests {
 		if request.CreateMissing {
 			for _, listName := range request.TargetLists {
-				if _, ok := listByName[strings.ToLower(listName)]; !ok {
+				if _, ok := listByName[listName]; !ok {
 					requiredLists[listName] = EnsureListSpec{Name: listName}
 				}
 			}
@@ -1064,21 +987,28 @@ func (c *Client) setRepoMembershipWithLists(ctx context.Context, requests []Repo
 		for _, spec := range requiredLists {
 			specs = append(specs, spec)
 		}
-		var ensureErr error
-		_, lists, ensureErr = c.ensureListsWithExisting(ctx, specs, lists, execute)
-		if ensureErr != nil {
-			return nil, ensureErr
+		_, err := c.EnsureLists(ctx, specs, execute)
+		if err != nil {
+			return nil, err
 		}
-		listByName = make(map[string]UserList, len(lists))
-		membership = make(map[string][]string)
-		canonicalRepoNames = make(map[string]string)
-		for _, list := range lists {
-			listByName[strings.ToLower(list.Name)] = list
-			for _, item := range list.Items {
-				key := strings.ToLower(item.NameWithOwner)
-				membership[key] = append(membership[key], list.Name)
-				if _, ok := canonicalRepoNames[key]; !ok {
-					canonicalRepoNames[key] = item.NameWithOwner
+		if execute {
+			lists, err = c.ListLists(ctx, true, 0)
+			if err != nil {
+				return nil, err
+			}
+			listByName = make(map[string]UserList, len(lists))
+			membership = make(map[string][]string)
+			for _, list := range lists {
+				listByName[list.Name] = list
+				for _, item := range list.Items {
+					membership[item.NameWithOwner] = append(membership[item.NameWithOwner], list.Name)
+				}
+			}
+		} else {
+			for name := range requiredLists {
+				listByName[name] = UserList{
+					ID:   "planned:" + name,
+					Name: name,
 				}
 			}
 		}
@@ -1086,46 +1016,6 @@ func (c *Client) setRepoMembershipWithLists(ctx context.Context, requests []Repo
 
 	results := make([]RepoListMutationResult, 0, len(requests))
 	for _, request := range requests {
-		repoName := strings.TrimSpace(request.Repo)
-		repoKey := strings.ToLower(repoName)
-		if canonical, ok := canonicalRepoNames[repoKey]; ok {
-			repoName = canonical
-		}
-		currentLists := dedupeStrings(membership[repoKey])
-		desiredLists, err := calculateDesiredLists(currentLists, request.TargetLists, request.Operation, request.ManagedListPrefix)
-		if err != nil {
-			results = append(results, RepoListMutationResult{
-				Repo:         repoName,
-				Action:       "membership",
-				Status:       "error",
-				CurrentLists: currentLists,
-				Message:      err.Error(),
-			})
-			continue
-		}
-		if stringSlicesEqual(currentLists, desiredLists) {
-			results = append(results, RepoListMutationResult{
-				Repo:         repoName,
-				Action:       "noop",
-				Status:       "ok",
-				CurrentLists: currentLists,
-				DesiredLists: desiredLists,
-				Message:      "repository already matches desired list membership",
-			})
-			continue
-		}
-		if !execute && len(currentLists) > 0 {
-			results = append(results, RepoListMutationResult{
-				Repo:         repoName,
-				Action:       "dry-run-membership",
-				Status:       "planned",
-				CurrentLists: currentLists,
-				DesiredLists: desiredLists,
-				Message:      "list membership will change",
-			})
-			continue
-		}
-
 		repo, err := c.ResolveRepository(ctx, request.Repo)
 		if err != nil {
 			results = append(results, RepoListMutationResult{
@@ -1160,8 +1050,33 @@ func (c *Client) setRepoMembershipWithLists(ctx context.Context, requests []Repo
 				Repo:         repo.NameWithOwner,
 				Action:       "membership",
 				Status:       "error",
-				CurrentLists: currentLists,
+				CurrentLists: membership[repo.NameWithOwner],
 				Message:      "repository is not starred; set star_missing=true to auto-star before assignment",
+			})
+			continue
+		}
+
+		currentLists := dedupeStrings(membership[repo.NameWithOwner])
+		desiredLists, err := calculateDesiredLists(currentLists, request.TargetLists, request.Operation, request.ManagedListPrefix)
+		if err != nil {
+			results = append(results, RepoListMutationResult{
+				Repo:         repo.NameWithOwner,
+				Action:       "membership",
+				Status:       "error",
+				CurrentLists: currentLists,
+				Message:      err.Error(),
+			})
+			continue
+		}
+
+		if stringSlicesEqual(currentLists, desiredLists) {
+			results = append(results, RepoListMutationResult{
+				Repo:         repo.NameWithOwner,
+				Action:       "noop",
+				Status:       "ok",
+				CurrentLists: currentLists,
+				DesiredLists: desiredLists,
+				Message:      "repository already matches desired list membership",
 			})
 			continue
 		}
@@ -1169,7 +1084,7 @@ func (c *Client) setRepoMembershipWithLists(ctx context.Context, requests []Repo
 		listIDs := make([]string, 0, len(desiredLists))
 		missingLists := make([]string, 0)
 		for _, listName := range desiredLists {
-			list, ok := listByName[strings.ToLower(listName)]
+			list, ok := listByName[listName]
 			if !ok {
 				missingLists = append(missingLists, listName)
 				continue
@@ -1204,9 +1119,7 @@ func (c *Client) setRepoMembershipWithLists(ctx context.Context, requests []Repo
 			}
 			action = "membership"
 			status = "ok"
-			repoKey = strings.ToLower(repo.NameWithOwner)
-			canonicalRepoNames[repoKey] = repo.NameWithOwner
-			membership[repoKey] = desiredLists
+			membership[repo.NameWithOwner] = desiredLists
 		}
 
 		results = append(results, RepoListMutationResult{
@@ -1264,55 +1177,6 @@ func (c *Client) SyncTaxonomy(ctx context.Context, lists []EnsureListSpec, assig
 	}
 
 	repoResults, err := c.SetRepoMembership(ctx, requests, execute)
-	if err != nil {
-		return TaxonomySyncResult{}, err
-	}
-
-	return TaxonomySyncResult{
-		ListResults: listResults,
-		RepoResults: repoResults,
-	}, nil
-}
-
-func (c *Client) SyncExactTaxonomy(ctx context.Context, lists []EnsureListSpec, assignments []TaxonomyAssignment, starMissing bool, execute bool) (TaxonomySyncResult, error) {
-	desiredLists := make(map[string]EnsureListSpec)
-	for _, spec := range lists {
-		if strings.TrimSpace(spec.Name) == "" {
-			continue
-		}
-		desiredLists[strings.ToLower(spec.Name)] = spec
-	}
-	for _, assignment := range assignments {
-		for _, listName := range assignment.Lists {
-			name := strings.TrimSpace(listName)
-			if name == "" {
-				continue
-			}
-			key := strings.ToLower(name)
-			if _, ok := desiredLists[key]; !ok {
-				desiredLists[key] = EnsureListSpec{Name: name}
-			}
-		}
-	}
-
-	ensureSpecs := make([]EnsureListSpec, 0, len(desiredLists))
-	for _, spec := range desiredLists {
-		ensureSpecs = append(ensureSpecs, spec)
-	}
-	sort.Slice(ensureSpecs, func(i, j int) bool {
-		return strings.ToLower(ensureSpecs[i].Name) < strings.ToLower(ensureSpecs[j].Name)
-	})
-
-	currentLists, err := c.ListLists(ctx, true, 0)
-	if err != nil {
-		return TaxonomySyncResult{}, err
-	}
-	listResults, currentLists, err := c.ensureListsWithExisting(ctx, ensureSpecs, currentLists, execute)
-	if err != nil {
-		return TaxonomySyncResult{}, err
-	}
-	requests := BuildExactListRequests(currentLists, assignments, ensureSpecs, starMissing, true)
-	repoResults, err := c.setRepoMembershipWithLists(ctx, requests, execute, currentLists)
 	if err != nil {
 		return TaxonomySyncResult{}, err
 	}
@@ -1670,7 +1534,7 @@ func BuildTaxonomyAudit(repos []StarredRepository, assignments []TaxonomyAssignm
 	currentByRepo := make(map[string]StarredRepository, len(repos))
 	managedLists := make(map[string]bool)
 	for _, repo := range repos {
-		currentByRepo[strings.ToLower(repo.NameWithOwner)] = repo
+		currentByRepo[repo.NameWithOwner] = repo
 		for _, list := range repo.Lists {
 			if strings.TrimSpace(list.Name) == "" {
 				continue
@@ -1682,16 +1546,12 @@ func BuildTaxonomyAudit(repos []StarredRepository, assignments []TaxonomyAssignm
 	}
 
 	desiredByRepo := make(map[string][]string, len(assignments))
-	desiredRepoNames := make(map[string]string, len(assignments))
 	for _, assignment := range assignments {
-		repoName := strings.TrimSpace(assignment.Repo)
-		if repoName == "" {
+		if strings.TrimSpace(assignment.Repo) == "" {
 			continue
 		}
-		key := strings.ToLower(repoName)
-		desiredByRepo[key] = dedupeStrings(append(desiredByRepo[key], assignment.Lists...))
-		desiredRepoNames[key] = repoName
-		sort.Strings(desiredByRepo[key])
+		desiredByRepo[assignment.Repo] = dedupeStrings(assignment.Lists)
+		sort.Strings(desiredByRepo[assignment.Repo])
 	}
 
 	for _, repo := range repos {
@@ -1711,7 +1571,7 @@ func BuildTaxonomyAudit(repos []StarredRepository, assignments []TaxonomyAssignm
 			})
 		}
 
-		desired, wanted := desiredByRepo[strings.ToLower(repo.NameWithOwner)]
+		desired, wanted := desiredByRepo[repo.NameWithOwner]
 		if !wanted {
 			if len(desiredByRepo) > 0 && len(currentManaged) > 0 {
 				audit.ReposOutsideProfile = append(audit.ReposOutsideProfile, RepoAuditGap{
@@ -1733,9 +1593,9 @@ func BuildTaxonomyAudit(repos []StarredRepository, assignments []TaxonomyAssignm
 	}
 
 	if len(desiredByRepo) > 0 {
-		for repoKey := range desiredByRepo {
-			if _, ok := currentByRepo[repoKey]; !ok {
-				audit.DesiredReposMissing = append(audit.DesiredReposMissing, desiredRepoNames[repoKey])
+		for repo := range desiredByRepo {
+			if _, ok := currentByRepo[repo]; !ok {
+				audit.DesiredReposMissing = append(audit.DesiredReposMissing, repo)
 			}
 		}
 	}
@@ -1751,235 +1611,6 @@ func BuildTaxonomyAudit(repos []StarredRepository, assignments []TaxonomyAssignm
 	})
 	sort.Strings(audit.DesiredReposMissing)
 	return audit
-}
-
-func ParseMarkdownSources(sourceDir string, sourcePaths []string) ([]MarkdownSource, error) {
-	paths, err := resolveMarkdownSourcePaths(sourceDir, sourcePaths)
-	if err != nil {
-		return nil, err
-	}
-
-	sources := make([]MarkdownSource, 0, len(paths))
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read markdown source %s: %w", path, err)
-		}
-		repos := extractGitHubRepoSlugs(string(data))
-		sources = append(sources, MarkdownSource{
-			Name:      strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
-			Path:      path,
-			RepoCount: len(repos),
-			Repos:     repos,
-		})
-	}
-	return sources, nil
-}
-
-func BuildMarkdownTaxonomy(sources []MarkdownSource, descriptionTemplate string, isPrivate bool) ([]EnsureListSpec, []TaxonomyAssignment, []RepoOverlap) {
-	if descriptionTemplate == "" {
-		descriptionTemplate = "Managed by docs-mcp github-reference-repos import for %s"
-	}
-
-	lists := make([]EnsureListSpec, 0, len(sources))
-	desiredByRepo := make(map[string][]string)
-	repoNames := make(map[string]string)
-	for _, source := range sources {
-		name := strings.TrimSpace(source.Name)
-		if name == "" {
-			continue
-		}
-		lists = append(lists, EnsureListSpec{
-			Name:        name,
-			Description: renderListDescription(descriptionTemplate, name),
-			IsPrivate:   isPrivate,
-		})
-		for _, repo := range source.Repos {
-			key := strings.ToLower(strings.TrimSpace(repo))
-			if key == "" {
-				continue
-			}
-			if _, ok := repoNames[key]; !ok {
-				repoNames[key] = repo
-			}
-			desiredByRepo[key] = append(desiredByRepo[key], name)
-		}
-	}
-
-	assignments := make([]TaxonomyAssignment, 0, len(desiredByRepo))
-	overlaps := make([]RepoOverlap, 0)
-	keys := make([]string, 0, len(desiredByRepo))
-	for key := range desiredByRepo {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		listsForRepo := dedupeStrings(desiredByRepo[key])
-		assignments = append(assignments, TaxonomyAssignment{
-			Repo:  repoNames[key],
-			Lists: listsForRepo,
-		})
-		if len(listsForRepo) > 1 {
-			overlaps = append(overlaps, RepoOverlap{
-				Repo:  repoNames[key],
-				Lists: listsForRepo,
-			})
-		}
-	}
-	sort.Slice(lists, func(i, j int) bool {
-		return strings.ToLower(lists[i].Name) < strings.ToLower(lists[j].Name)
-	})
-	return lists, assignments, overlaps
-}
-
-func BuildMarkdownAudit(sources []MarkdownSource, currentLists []UserList) MarkdownAudit {
-	_, assignments, overlaps := BuildMarkdownTaxonomy(sources, "", true)
-	actualByList := make(map[string]UserList)
-	for _, list := range currentLists {
-		actualByList[strings.ToLower(list.Name)] = list
-	}
-
-	audit := MarkdownAudit{
-		Sources:     sources,
-		UniqueRepos: len(assignments),
-		Overlaps:    overlaps,
-		ExactMatch:  true,
-	}
-	for _, source := range sources {
-		expectedByRepo := make(map[string]string, len(source.Repos))
-		for _, repo := range source.Repos {
-			expectedByRepo[strings.ToLower(repo)] = repo
-		}
-
-		actual := actualByList[strings.ToLower(source.Name)]
-		actualByRepo := make(map[string]string, len(actual.Items))
-		for _, item := range actual.Items {
-			actualByRepo[strings.ToLower(item.NameWithOwner)] = item.NameWithOwner
-		}
-
-		missing := make([]string, 0)
-		for key, repo := range expectedByRepo {
-			if _, ok := actualByRepo[key]; !ok {
-				missing = append(missing, repo)
-			}
-		}
-		extra := make([]string, 0)
-		for key, repo := range actualByRepo {
-			if _, ok := expectedByRepo[key]; !ok {
-				extra = append(extra, repo)
-			}
-		}
-		sort.Slice(missing, func(i, j int) bool { return strings.ToLower(missing[i]) < strings.ToLower(missing[j]) })
-		sort.Slice(extra, func(i, j int) bool { return strings.ToLower(extra[i]) < strings.ToLower(extra[j]) })
-
-		if len(missing) > 0 || len(extra) > 0 || len(actual.Items) != len(source.Repos) {
-			audit.ExactMatch = false
-		}
-		audit.Lists = append(audit.Lists, MarkdownListAudit{
-			Name:          source.Name,
-			ExpectedCount: len(source.Repos),
-			ActualCount:   len(actual.Items),
-			Missing:       missing,
-			Extra:         extra,
-		})
-	}
-	sort.Slice(audit.Lists, func(i, j int) bool {
-		return strings.ToLower(audit.Lists[i].Name) < strings.ToLower(audit.Lists[j].Name)
-	})
-	return audit
-}
-
-func TrimMarkdownAudit(audit MarkdownAudit, maxItems int) MarkdownAudit {
-	if maxItems <= 0 {
-		maxItems = 100
-	}
-	for i := range audit.Lists {
-		if len(audit.Lists[i].Missing) > maxItems {
-			audit.Lists[i].Missing = audit.Lists[i].Missing[:maxItems]
-		}
-		if len(audit.Lists[i].Extra) > maxItems {
-			audit.Lists[i].Extra = audit.Lists[i].Extra[:maxItems]
-		}
-	}
-	return audit
-}
-
-func BuildExactListRequests(currentLists []UserList, assignments []TaxonomyAssignment, targetLists []EnsureListSpec, starMissing, createMissing bool) []RepoListMutationRequest {
-	targetListNames := make([]string, 0, len(targetLists))
-	for _, spec := range targetLists {
-		if name := strings.TrimSpace(spec.Name); name != "" {
-			targetListNames = append(targetListNames, name)
-		}
-	}
-	for _, assignment := range assignments {
-		targetListNames = append(targetListNames, assignment.Lists...)
-	}
-	targetListNames = dedupeStrings(targetListNames)
-
-	currentByRepo := make(map[string][]string)
-	repoDisplay := make(map[string]string)
-	targetMembers := make(map[string]bool)
-	for _, list := range currentLists {
-		for _, item := range list.Items {
-			key := strings.ToLower(item.NameWithOwner)
-			currentByRepo[key] = append(currentByRepo[key], list.Name)
-			if _, ok := repoDisplay[key]; !ok {
-				repoDisplay[key] = item.NameWithOwner
-			}
-			if hasStringFold(targetListNames, list.Name) {
-				targetMembers[key] = true
-			}
-		}
-	}
-
-	desiredByRepo := make(map[string][]string)
-	for _, assignment := range assignments {
-		repo := strings.TrimSpace(assignment.Repo)
-		if repo == "" {
-			continue
-		}
-		key := strings.ToLower(repo)
-		if _, ok := repoDisplay[key]; !ok {
-			repoDisplay[key] = repo
-		}
-		desiredByRepo[key] = append(desiredByRepo[key], assignment.Lists...)
-	}
-
-	universe := make([]string, 0, len(targetMembers)+len(desiredByRepo))
-	seen := make(map[string]bool)
-	for key := range targetMembers {
-		if !seen[key] {
-			universe = append(universe, key)
-			seen[key] = true
-		}
-	}
-	for key := range desiredByRepo {
-		if !seen[key] {
-			universe = append(universe, key)
-			seen[key] = true
-		}
-	}
-	sort.Strings(universe)
-
-	requests := make([]RepoListMutationRequest, 0, len(universe))
-	for _, key := range universe {
-		currentNames := dedupeStrings(currentByRepo[key])
-		preserved := make([]string, 0, len(currentNames))
-		for _, listName := range currentNames {
-			if !hasStringFold(targetListNames, listName) {
-				preserved = append(preserved, listName)
-			}
-		}
-		desiredNames := dedupeStrings(append(preserved, desiredByRepo[key]...))
-		requests = append(requests, RepoListMutationRequest{
-			Repo:          repoDisplay[key],
-			TargetLists:   desiredNames,
-			Operation:     OperationReplace,
-			CreateMissing: createMissing,
-			StarMissing:   starMissing,
-		})
-	}
-	return requests
 }
 
 func InstallCodexConfig(configPath, dotfilesDir string, execute bool) (CodexInstallResult, error) {
@@ -2642,107 +2273,6 @@ func boolAction(trueValue, falseValue string, value bool) string {
 		return trueValue
 	}
 	return falseValue
-}
-
-func resolveMarkdownSourcePaths(sourceDir string, sourcePaths []string) ([]string, error) {
-	paths := make([]string, 0, len(sourcePaths))
-	if strings.TrimSpace(sourceDir) != "" {
-		matches, err := filepath.Glob(filepath.Join(sourceDir, "*.md"))
-		if err != nil {
-			return nil, fmt.Errorf("glob markdown sources: %w", err)
-		}
-		paths = append(paths, matches...)
-	}
-	paths = append(paths, sourcePaths...)
-	paths = dedupeStrings(paths)
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("no markdown sources found")
-	}
-
-	resolved := make([]string, 0, len(paths))
-	for _, path := range paths {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return nil, fmt.Errorf("resolve markdown source %s: %w", path, err)
-		}
-		if strings.ToLower(filepath.Ext(absPath)) != ".md" {
-			continue
-		}
-		info, err := os.Stat(absPath)
-		if err != nil {
-			return nil, fmt.Errorf("stat markdown source %s: %w", absPath, err)
-		}
-		if info.IsDir() {
-			return nil, fmt.Errorf("markdown source must be a file, got directory: %s", absPath)
-		}
-		resolved = append(resolved, absPath)
-	}
-	if len(resolved) == 0 {
-		return nil, fmt.Errorf("no markdown sources found")
-	}
-	return dedupeStrings(resolved), nil
-}
-
-func extractGitHubRepoSlugs(markdown string) []string {
-	out := make([]string, 0)
-	for _, match := range githubRepoURLPattern.FindAllStringSubmatch(markdown, -1) {
-		if len(match) < 2 {
-			continue
-		}
-		slug, ok := normalizeGitHubRepoSlug(match[1])
-		if !ok || hasStringFold(out, slug) {
-			continue
-		}
-		out = append(out, slug)
-	}
-	return dedupeStrings(out)
-}
-
-func normalizeGitHubRepoSlug(raw string) (string, bool) {
-	value := strings.TrimSpace(raw)
-	value = strings.TrimPrefix(value, "https://github.com/")
-	value = strings.TrimPrefix(value, "http://github.com/")
-	value = strings.TrimSpace(strings.Trim(value, "`'\""))
-	value = strings.Trim(value, "/")
-	value = strings.Split(value, "#")[0]
-	value = strings.Split(value, "?")[0]
-	parts := strings.Split(value, "/")
-	if len(parts) < 2 {
-		return "", false
-	}
-
-	owner := trimRepoToken(parts[0])
-	repo := trimRepoToken(parts[1])
-	if _, blocked := reservedGitHubNamespaces[strings.ToLower(owner)]; blocked {
-		return "", false
-	}
-	switch strings.ToLower(repo) {
-	case "blob", "tree", "commit", "pull", "issues", "wiki":
-		if len(parts) < 3 {
-			return "", false
-		}
-		repo = trimRepoToken(parts[2])
-	}
-	repo = strings.TrimSuffix(repo, ".git")
-	if owner == "" || repo == "" {
-		return "", false
-	}
-	return owner + "/" + repo, true
-}
-
-func trimRepoToken(value string) string {
-	return strings.Trim(strings.TrimSpace(value), "`'\"()[]{}<>.,;:")
-}
-
-func renderListDescription(template, name string) string {
-	template = strings.TrimSpace(template)
-	if template == "" {
-		return ""
-	}
-	if strings.Contains(template, "%s") {
-		return fmt.Sprintf(template, name)
-	}
-	return template
 }
 
 func splitRepo(repo string) (string, string, error) {

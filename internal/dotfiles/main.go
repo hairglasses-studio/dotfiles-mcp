@@ -23,7 +23,6 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/hairglasses-studio/dotfiles-mcp/internal/tracing"
 	"github.com/hairglasses-studio/mcpkit/handler"
-	"github.com/hairglasses-studio/mcpkit/middleware/gate"
 	"github.com/hairglasses-studio/mcpkit/registry"
 	"github.com/hairglasses-studio/mcpkit/resilience"
 )
@@ -2282,27 +2281,6 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 			},
 		),
 
-		// ── dotfiles_pipeline_status ─────────────────
-		handler.TypedHandler[PipelineStatusInput, PipelineStatusOutput](
-			"dotfiles_pipeline_status",
-			"Aggregate remote CI and cached local baseline signals across repos in one view. Optionally refresh baseline data first and filter to specific repos.",
-			dotfilesPipelineStatus,
-		),
-
-		// ── dotfiles_changelog_gen ───────────────────
-		handler.TypedHandler[DotfilesChangelogGenInput, DotfilesChangelogGenOutput](
-			"dotfiles_changelog_gen",
-			"Generate changelog previews across selected workspace repos by reusing the ops changelog engine. Optionally write CHANGELOG.md updates in place.",
-			dotfilesChangelogGen,
-		),
-
-		// ── dotfiles_release ─────────────────────────
-		handler.TypedHandler[DotfilesReleaseInput, DotfilesReleaseOutput](
-			"dotfiles_release",
-			"Run dry-run or execute release orchestration across explicit repo/version targets by reusing the ops release engine.",
-			dotfilesRelease,
-		),
-
 		// ── dotfiles_cascade_reload ──────────────────
 		handler.TypedHandler[CascadeReloadInput, CascadeReloadOutput](
 			"dotfiles_cascade_reload",
@@ -2337,12 +2315,11 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					var healthy bool
 					switch svc {
 					case "hyprland":
-						checkCmd := exec.Command("hyprctl", "configerrors")
+						checkCmd := hyprctlCmd("-j", "configerrors")
 						var checkOut bytes.Buffer
 						checkCmd.Stdout = &checkOut
 						if checkCmd.Run() == nil {
-							output := strings.TrimSpace(checkOut.String())
-							healthy = output == "" || strings.Contains(output, "no errors")
+							healthy = hyprConfigHealthy(checkOut.String())
 						}
 					case "eww":
 						checkCmd := exec.Command("eww", "ping")
@@ -2423,6 +2400,30 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					}
 					result.Services = append(result.Services, ServiceReloadStatus{Service: svc, Action: action})
 				}
+
+				// Hyprland shell stack status.
+				for _, component := range []struct {
+					name    string
+					running bool
+				}{
+					{name: "hyprshell", running: processRunningExact("hyprshell")},
+					{name: "hypr-dock", running: processRunningExact("hypr-dock")},
+					{name: "hyprdynamicmonitors", running: processRunningExact("hyprdynamicmonitors")},
+					{name: "autoname", running: processRunningExact("hyprland-autoname-workspaces")},
+					{name: "swaync", running: processRunningExact("swaync")},
+					{name: "notification-history", running: notificationHistoryListenerRunning()},
+				} {
+					action := "stopped"
+					if component.running {
+						action = "running"
+					}
+					result.ShellServices = append(result.ShellServices, ServiceReloadStatus{
+						Service: component.name,
+						Action:  action,
+					})
+				}
+				result.MonitorIncludePath = desktopMonitorIncludePath()
+				result.MonitorIncludePresent = pathExists(result.MonitorIncludePath)
 
 				// Palette scan (full mode only).
 				if level == "full" {
@@ -2718,19 +2719,25 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 }
 
 // ---------------------------------------------------------------------------
-// Setup
+// main
 // ---------------------------------------------------------------------------
 
-func Setup(ctx context.Context) (*registry.ToolRegistry, *registry.MCPServer, func(context.Context) error) {
+func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})).With("service", "dotfiles-mcp"))
 
+	if maybeRunAuxiliaryCommand(os.Args[1:]) {
+		return
+	}
+
+	// Initialize OpenTelemetry tracing (no-op unless OTEL_ENABLED=true).
+	ctx := context.Background()
 	shutdownTracing := tracing.Init(ctx, dotfilesMCPVersion)
+	defer shutdownTracing(ctx)
 
 	cbRegistry := resilience.NewCircuitBreakerRegistry(nil)
 	mw := []registry.Middleware{
-		gate.Middleware(gate.Config{Gate: gate.PauseWrites}),
 		registry.AuditMiddleware(""),
 		registry.SafetyTierMiddleware(),
 		resilience.CircuitBreakerMiddleware(cbRegistry),
@@ -2749,5 +2756,8 @@ func Setup(ctx context.Context) (*registry.ToolRegistry, *registry.MCPServer, fu
 	resReg.RegisterWithServer(s)
 	promptReg.RegisterWithServer(s)
 
-	return reg, s, shutdownTracing
+	if err := registry.ServeAuto(s); err != nil {
+		slog.Error("server stopped", "error", err)
+		os.Exit(1)
+	}
 }

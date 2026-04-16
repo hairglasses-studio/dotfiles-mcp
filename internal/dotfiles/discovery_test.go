@@ -78,23 +78,14 @@ func TestShouldDeferDotfilesTool(t *testing.T) {
 		{"desktop", "desktop_read_value", false},
 		{"desktop", "desktop_set_text", false},
 		{"desktop", "desktop_set_value", false},
-		{"desktop", "desktop_form_fields", false},
-		{"desktop", "desktop_fill_form", false},
 		{"desktop", "desktop_project_open", false},
-		{"desktop", "session_list", false},
 		{"desktop", "session_connect", false},
-		{"desktop", "session_wait_ready", false},
-		{"desktop", "session_status", false},
-		{"desktop", "session_list_apps", false},
 		{"desktop", "session_accessibility_tree", false},
 		{"desktop", "session_find_ui_elements", false},
 		{"desktop", "session_focus_element", false},
 		{"desktop", "session_read_value", false},
 		{"desktop", "session_set_text", false},
 		{"desktop", "session_set_value", false},
-		{"desktop", "session_form_fields", false},
-		{"desktop", "session_fill_form", false},
-		{"desktop", "session_read_log", false},
 		{"desktop", "shader_status", false},
 		{"desktop", "input_type_text", false},
 		{"desktop", "dotfiles_rice_check", false},
@@ -211,23 +202,14 @@ func TestRegisterDotfilesModules_DesktopProfile(t *testing.T) {
 		"desktop_read_value",
 		"desktop_set_text",
 		"desktop_set_value",
-		"desktop_form_fields",
-		"desktop_fill_form",
 		"desktop_project_open",
-		"session_list",
 		"session_connect",
-		"session_wait_ready",
-		"session_status",
-		"session_list_apps",
 		"session_accessibility_tree",
 		"session_find_ui_elements",
 		"session_focus_element",
 		"session_read_value",
 		"session_set_text",
 		"session_set_value",
-		"session_form_fields",
-		"session_fill_form",
-		"session_read_log",
 		"shader_status",
 		"input_type_text",
 		"dotfiles_rice_check",
@@ -263,8 +245,8 @@ func TestDiscoveryModuleRegistration(t *testing.T) {
 	}
 
 	tools := m.Tools()
-	if len(tools) != 8 {
-		t.Fatalf("expected 8 discovery tools, got %d", len(tools))
+	if len(tools) != 10 {
+		t.Fatalf("expected 10 discovery tools, got %d", len(tools))
 	}
 
 	names := make(map[string]bool)
@@ -278,6 +260,8 @@ func TestDiscoveryModuleRegistration(t *testing.T) {
 		"dotfiles_tool_stats",
 		"dotfiles_server_health",
 		"dotfiles_desktop_status",
+		"dotfiles_launcher_audit",
+		"dotfiles_bar_audit",
 		"dotfiles_workstation_diagnostics",
 		"dotfiles_workspace_scene",
 	} {
@@ -438,8 +422,8 @@ func TestServerHealth_WithSurfaceRegistries(t *testing.T) {
 	if got, ok := prioritySummary["missing_front_door_count"].(float64); !ok || int(got) != 0 {
 		t.Fatalf("expected zero missing front doors in priority summary, got %#v", prioritySummary["missing_front_door_count"])
 	}
-	if len(out.DiscoveryTools) != 8 {
-		t.Fatalf("expected 8 discovery tools, got %d", len(out.DiscoveryTools))
+	if len(out.DiscoveryTools) != 10 {
+		t.Fatalf("expected 10 discovery tools, got %d", len(out.DiscoveryTools))
 	}
 }
 
