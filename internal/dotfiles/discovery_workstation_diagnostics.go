@@ -12,11 +12,8 @@ import (
 )
 
 type dotfilesWorkstationDiagnosticsInput struct {
-	Symptom       string  `json:"symptom,omitempty" jsonschema:"description=Short description of the workstation symptom or context to anchor the report"`
-	RiceLevel     string  `json:"rice_level,omitempty" jsonschema:"description=Rice scan level to include,enum=quick,enum=full"`
-	WarnCPUTemp   float64 `json:"warn_cpu_temp,omitempty" jsonschema:"description=Optional CPU temperature warning threshold in Celsius to pass through to system health"`
-	WarnDiskPct   int     `json:"warn_disk_pct,omitempty" jsonschema:"description=Optional disk usage warning threshold percentage to pass through to system health"`
-	WarnMemoryPct float64 `json:"warn_memory_pct,omitempty" jsonschema:"description=Optional memory usage warning threshold percentage to pass through to system health"`
+	Symptom   string `json:"symptom,omitempty" jsonschema:"description=Short description of the workstation symptom or context to anchor the report"`
+	RiceLevel string `json:"rice_level,omitempty" jsonschema:"description=Rice scan level to include,enum=quick,enum=full"`
 }
 
 type dotfilesDesktopCapabilitySummary struct {
@@ -88,11 +85,7 @@ func (m *DotfilesDiscoveryModule) buildWorkstationDiagnostics(ctx context.Contex
 		PromptName:  "dotfiles_diagnose_workstation",
 	}
 
-	systemOut, err := systemHealthCheck(ctx, SystemHealthCheckInput{
-		WarnCPUTemp:   input.WarnCPUTemp,
-		WarnDiskPct:   input.WarnDiskPct,
-		WarnMemoryPct: input.WarnMemoryPct,
-	})
+	systemOut, err := systemHealthCheck(ctx, SystemHealthCheckInput{})
 	if err != nil {
 		out.Errors = append(out.Errors, fmt.Sprintf("system_health_check: %v", err))
 	} else {
@@ -204,7 +197,7 @@ func collectWorkstationIssues(systemOut SystemHealthCheckOutput, desktopOut dotf
 			RecommendedTools: issueToolsForComponent("rice.compositor"),
 		})
 	}
-	if strings.TrimSpace(riceOut.MonitorIncludePath) != "" && !riceOut.MonitorIncludePresent {
+	if !riceOut.MonitorIncludePresent {
 		issues = append(issues, dotfilesWorkstationDiagnosticIssue{
 			Severity:         "warn",
 			Component:        "rice.monitors",

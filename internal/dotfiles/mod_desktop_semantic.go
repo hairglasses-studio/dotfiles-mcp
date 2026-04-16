@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
@@ -157,12 +156,6 @@ type desktopSemanticElementOutput struct {
 	Element    map[string]any            `json:"element,omitempty"`
 	Error      string                    `json:"error,omitempty"`
 }
-
-const (
-	semanticLookupDepth  = 12
-	semanticDefaultLimit = 20
-	semanticPollInterval = 350 * time.Millisecond
-)
 
 type desktopSemanticFormFieldsInput struct {
 	App            string `json:"app" jsonschema:"required,description=Application name or unique substring"`
@@ -696,8 +689,7 @@ func semanticRelationLabelValues(relations map[string][]string) []string {
 	sort.Strings(keys)
 	labels := make([]string, 0)
 	for _, key := range keys {
-		normKey := semanticNormalize(key)
-		if !strings.Contains(normKey, "label") && !strings.Contains(normKey, "describ") {
+		if !strings.Contains(semanticNormalize(key), "label") {
 			continue
 		}
 		labels = append(labels, relations[key]...)
@@ -720,26 +712,15 @@ func semanticElementLabels(element map[string]any) []string {
 		"label",
 		"accessible-name",
 		"accessible_name",
-		"accessible-description",
-		"accessible_description",
 		"aria-label",
-		"aria-labelledby",
-		"aria-description",
-		"aria-describedby",
 		"title",
 		"placeholder",
 		"placeholder-text",
 		"placeholder_text",
-		"placeholder-value",
 		"description",
 		"tooltip",
-		"tooltip-text",
 		"tool-tip",
 		"help-text",
-		"help",
-		"hint",
-		"labelled-by",
-		"described-by",
 	} {
 		if value := strings.TrimSpace(attributes[key]); value != "" {
 			labels = append(labels, value)
@@ -1024,14 +1005,6 @@ func semanticQueryForElement(app string, element map[string]any, role string) de
 	return query
 }
 
-func semanticResolvedQueryForElement(query desktopSemanticQueryInput, element map[string]any) desktopSemanticQueryInput {
-	resolved := semanticQueryForElement(query.App, element, query.Role)
-	resolved.States = append([]string(nil), query.States...)
-	resolved.Limit = query.Limit
-	resolved.Exact = query.Exact
-	return resolved
-}
-
 func semanticFetchTree(ctx context.Context, runner semanticRunner, app string, depth int) (map[string]any, string, int, error) {
 	if strings.TrimSpace(app) == "" {
 		return nil, "", 0, fmt.Errorf("[%s] app is required", handler.ErrInvalidParam)
@@ -1048,146 +1021,6 @@ func semanticFetchTree(ctx context.Context, runner semanticRunner, app string, d
 		return nil, helperPath, depth, fmt.Errorf("%s", errText)
 	}
 	return semanticMapValue(result["tree"]), helperPath, depth, nil
-}
-
-func semanticElementStateMatches(element map[string]any, requiredStates []string) bool {
-	if len(requiredStates) == 0 {
-		return true
-	}
-	current := make(map[string]struct{}, len(requiredStates))
-	for _, state := range semanticStringSlice(element["states"]) {
-		norm := semanticNormalize(state)
-		if norm == "" {
-			continue
-		}
-		current[norm] = struct{}{}
-	}
-	for _, state := range requiredStates {
-		norm := semanticNormalize(state)
-		if norm == "" {
-			continue
-		}
-		if _, ok := current[norm]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
-func semanticQueryNeedsTreeLookup(query desktopSemanticQueryInput) bool {
-	return strings.TrimSpace(query.Name) != "" &&
-		strings.TrimSpace(query.Ref) == "" &&
-		strings.TrimSpace(query.Path) == ""
-}
-
-type semanticScoredElement struct {
-	Element map[string]any
-	Score   int
-	Index   int
-}
-
-func semanticTreeLimit(limit int) int {
-	if limit <= 0 {
-		return semanticDefaultLimit
-	}
-	return limit
-}
-
-func semanticQueryMatchScore(element map[string]any, query desktopSemanticQueryInput) int {
-	if element == nil {
-		return 0
-	}
-	if !semanticRoleMatches(stringValue(element["role"]), query.Role) {
-		return 0
-	}
-	if !semanticElementStateMatches(element, query.States) {
-		return 0
-	}
-	if strings.TrimSpace(query.Name) == "" {
-		return 1
-	}
-	return semanticMatchScore(semanticElementLabels(element), query.Name, query.Exact)
-}
-
-func semanticFindTreeMatches(root map[string]any, query desktopSemanticQueryInput, limit int) []map[string]any {
-	if root == nil {
-		return nil
-	}
-	elements := semanticCollectElements(root)
-	scored := make([]semanticScoredElement, 0, len(elements))
-	for idx, element := range elements {
-		score := semanticQueryMatchScore(element, query)
-		if score <= 0 {
-			continue
-		}
-		scored = append(scored, semanticScoredElement{
-			Element: element,
-			Score:   score,
-			Index:   idx,
-		})
-	}
-	sort.SliceStable(scored, func(i, j int) bool {
-		if scored[i].Score == scored[j].Score {
-			return scored[i].Index < scored[j].Index
-		}
-		return scored[i].Score > scored[j].Score
-	})
-	if limit > 0 && len(scored) > limit {
-		scored = scored[:limit]
-	}
-	out := make([]map[string]any, 0, len(scored))
-	for _, match := range scored {
-		out = append(out, match.Element)
-	}
-	return out
-}
-
-func semanticFindMatchesWithRunner(ctx context.Context, runner semanticRunner, query desktopSemanticQueryInput) ([]map[string]any, string, error) {
-	tree, helperPath, _, err := semanticFetchTree(ctx, runner, query.App, semanticLookupDepth)
-	if err != nil {
-		return nil, helperPath, err
-	}
-	return semanticFindTreeMatches(tree, query, semanticTreeLimit(query.Limit)), helperPath, nil
-}
-
-func semanticResolveQueryWithRunner(ctx context.Context, runner semanticRunner, query desktopSemanticQueryInput) (desktopSemanticQueryInput, map[string]any, string, error) {
-	matches, helperPath, err := semanticFindMatchesWithRunner(ctx, runner, query)
-	if err != nil {
-		return query, nil, helperPath, err
-	}
-	if len(matches) == 0 {
-		return query, nil, helperPath, nil
-	}
-	return semanticResolvedQueryForElement(query, matches[0]), matches[0], helperPath, nil
-}
-
-func semanticWaitForQueryWithRunner(ctx context.Context, runner semanticRunner, query desktopSemanticQueryInput, timeout int) (desktopSemanticQueryInput, map[string]any, string, string, error) {
-	if timeout <= 0 {
-		timeout = 5
-	}
-	deadline := time.Now().Add(time.Duration(timeout) * time.Second)
-	helperPath := ""
-	for {
-		matches, currentHelperPath, err := semanticFindMatchesWithRunner(ctx, runner, query)
-		if currentHelperPath != "" {
-			helperPath = currentHelperPath
-		}
-		if err != nil {
-			return query, nil, helperPath, "", err
-		}
-		if len(matches) > 0 {
-			return semanticResolvedQueryForElement(query, matches[0]), matches[0], helperPath, "", nil
-		}
-		if time.Now().After(deadline) {
-			break
-		}
-		select {
-		case <-ctx.Done():
-			return query, nil, helperPath, "", ctx.Err()
-		case <-time.After(semanticPollInterval):
-		}
-	}
-	return query, nil, helperPath, fmt.Sprintf("Timeout waiting for element in %s", query.App), nil
 }
 
 func semanticBuildFormFields(ctx context.Context, runner semanticRunner, input desktopSemanticFormFieldsInput) (desktopSemanticFormFieldsOutput, error) {
@@ -1456,25 +1289,6 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		"desktop_find",
 		"Find a semantic element by app plus name, role, states, ref, or a previously returned path.",
 		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticElementOutput, error) {
-			if semanticQueryNeedsTreeLookup(input) {
-				matches, helperPath, err := semanticFindMatchesWithRunner(ctx, runDesktopSemanticHelper, input)
-				if err != nil {
-					return desktopSemanticElementOutput{}, err
-				}
-				out := desktopSemanticElementOutput{
-					HelperPath: helperPath,
-					App:        input.App,
-					Query:      input,
-					Matched:    len(matches) > 0,
-				}
-				if len(matches) == 0 {
-					out.Error = fmt.Sprintf("Element not found in %s", input.App)
-					return out, nil
-				}
-				out.Query = semanticResolvedQueryForElement(input, matches[0])
-				out.Element = matches[0]
-				return out, nil
-			}
 			args, err := semanticQueryArgs(input)
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
@@ -1494,20 +1308,6 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		"desktop_find_all",
 		"Find all semantic elements matching an app plus name, role, states, ref, or path.",
 		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticMatchesOutput, error) {
-			if semanticQueryNeedsTreeLookup(input) {
-				matches, helperPath, err := semanticFindMatchesWithRunner(ctx, runDesktopSemanticHelper, input)
-				if err != nil {
-					return desktopSemanticMatchesOutput{}, err
-				}
-				return desktopSemanticMatchesOutput{
-					HelperPath: helperPath,
-					App:        input.App,
-					Query:      input,
-					Matched:    len(matches) > 0,
-					Count:      len(matches),
-					Matches:    matches,
-				}, nil
-			}
 			args, err := semanticQueryArgs(input)
 			if err != nil {
 				return desktopSemanticMatchesOutput{}, err
@@ -1557,25 +1357,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		"desktop_focus",
 		"Focus a semantic element by ref, path, or by app plus name and optional role, using AT-SPI component focus or a focus action fallback.",
 		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticElementOutput, error) {
-			query := input
-			var matchedElement map[string]any
-			var resolvedHelperPath string
-			var err error
-			if semanticQueryNeedsTreeLookup(query) {
-				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, runDesktopSemanticHelper, query)
-				if err != nil {
-					return desktopSemanticElementOutput{}, err
-				}
-				if matchedElement == nil {
-					return desktopSemanticElementOutput{
-						HelperPath: resolvedHelperPath,
-						App:        input.App,
-						Query:      input,
-						Error:      fmt.Sprintf("Element not found in %s", input.App),
-					}, nil
-				}
-			}
-			args, err := semanticQueryArgs(query)
+			args, err := semanticQueryArgs(input)
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
@@ -1583,11 +1365,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			out := desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed))
-			if out.Element == nil && matchedElement != nil {
-				out.Element = matchedElement
-			}
-			return out, nil
+			return desktopSemanticElementFromResult(helperPath, input, semanticMapValue(parsed)), nil
 		},
 	)
 	focus.Category = "desktop"
@@ -1597,25 +1375,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		"desktop_read_value",
 		"Read the current text or numeric value from a semantic element, such as an entry, label, slider, or spinbox.",
 		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticElementOutput, error) {
-			query := input
-			var matchedElement map[string]any
-			var resolvedHelperPath string
-			var err error
-			if semanticQueryNeedsTreeLookup(query) {
-				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, runDesktopSemanticHelper, query)
-				if err != nil {
-					return desktopSemanticElementOutput{}, err
-				}
-				if matchedElement == nil {
-					return desktopSemanticElementOutput{
-						HelperPath: resolvedHelperPath,
-						App:        input.App,
-						Query:      input,
-						Error:      fmt.Sprintf("Element not found in %s", input.App),
-					}, nil
-				}
-			}
-			args, err := semanticQueryArgs(query)
+			args, err := semanticQueryArgs(input)
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
@@ -1623,11 +1383,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			out := desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed))
-			if out.Element == nil && matchedElement != nil {
-				out.Element = matchedElement
-			}
-			return out, nil
+			return desktopSemanticElementFromResult(helperPath, input, semanticMapValue(parsed)), nil
 		},
 	)
 	readValue.Category = "desktop"
@@ -1641,23 +1397,6 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 				return desktopSemanticElementOutput{}, fmt.Errorf("[%s] text is required", handler.ErrInvalidParam)
 			}
 			query := desktopSemanticQueryFromTextInput(input)
-			var matchedElement map[string]any
-			var resolvedHelperPath string
-			var err error
-			if semanticQueryNeedsTreeLookup(query) {
-				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, runDesktopSemanticHelper, query)
-				if err != nil {
-					return desktopSemanticElementOutput{}, err
-				}
-				if matchedElement == nil {
-					return desktopSemanticElementOutput{
-						HelperPath: resolvedHelperPath,
-						App:        input.App,
-						Query:      desktopSemanticQueryFromTextInput(input),
-						Error:      fmt.Sprintf("Element not found in %s", input.App),
-					}, nil
-				}
-			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
@@ -1667,11 +1406,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			out := desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed))
-			if out.Element == nil && matchedElement != nil {
-				out.Element = matchedElement
-			}
-			return out, nil
+			return desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	setText.Category = "desktop"
@@ -1685,23 +1420,6 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 				return desktopSemanticElementOutput{}, fmt.Errorf("[%s] value is required", handler.ErrInvalidParam)
 			}
 			query := desktopSemanticQueryFromValueInput(input)
-			var matchedElement map[string]any
-			var resolvedHelperPath string
-			var err error
-			if semanticQueryNeedsTreeLookup(query) {
-				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, runDesktopSemanticHelper, query)
-				if err != nil {
-					return desktopSemanticElementOutput{}, err
-				}
-				if matchedElement == nil {
-					return desktopSemanticElementOutput{
-						HelperPath: resolvedHelperPath,
-						App:        input.App,
-						Query:      desktopSemanticQueryFromValueInput(input),
-						Error:      fmt.Sprintf("Element not found in %s", input.App),
-					}, nil
-				}
-			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
@@ -1711,11 +1429,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			out := desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed))
-			if out.Element == nil && matchedElement != nil {
-				out.Element = matchedElement
-			}
-			return out, nil
+			return desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	setValue.Category = "desktop"
@@ -1745,25 +1459,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 		"desktop_click",
 		"Invoke the default clickable semantic action by ref, path, or by app plus name and optional role.",
 		func(ctx context.Context, input desktopSemanticQueryInput) (desktopSemanticElementOutput, error) {
-			query := input
-			var matchedElement map[string]any
-			var resolvedHelperPath string
-			var err error
-			if semanticQueryNeedsTreeLookup(query) {
-				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, runDesktopSemanticHelper, query)
-				if err != nil {
-					return desktopSemanticElementOutput{}, err
-				}
-				if matchedElement == nil {
-					return desktopSemanticElementOutput{
-						HelperPath: resolvedHelperPath,
-						App:        input.App,
-						Query:      input,
-						Error:      fmt.Sprintf("Element not found in %s", input.App),
-					}, nil
-				}
-			}
-			args, err := semanticQueryArgs(query)
+			args, err := semanticQueryArgs(input)
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
@@ -1771,11 +1467,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			out := desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed))
-			if out.Element == nil && matchedElement != nil {
-				out.Element = matchedElement
-			}
-			return out, nil
+			return desktopSemanticElementFromResult(helperPath, input, semanticMapValue(parsed)), nil
 		},
 	)
 	click.Category = "desktop"
@@ -1794,31 +1486,6 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 				States: input.States,
 				Exact:  input.Exact,
 			}
-			var matchedElement map[string]any
-			var resolvedHelperPath string
-			var err error
-			if semanticQueryNeedsTreeLookup(query) {
-				query, matchedElement, resolvedHelperPath, err = semanticResolveQueryWithRunner(ctx, runDesktopSemanticHelper, query)
-				if err != nil {
-					return desktopSemanticElementOutput{}, err
-				}
-				if matchedElement == nil {
-					return desktopSemanticElementOutput{
-						HelperPath: resolvedHelperPath,
-						App:        input.App,
-						Query: desktopSemanticQueryInput{
-							App:    input.App,
-							Name:   input.Name,
-							Role:   input.Role,
-							Ref:    input.Ref,
-							Path:   input.Path,
-							States: input.States,
-							Exact:  input.Exact,
-						},
-						Error: fmt.Sprintf("Element not found in %s", input.App),
-					}, nil
-				}
-			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
@@ -1830,11 +1497,7 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
 			}
-			out := desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed))
-			if out.Element == nil && matchedElement != nil {
-				out.Element = matchedElement
-			}
-			return out, nil
+			return desktopSemanticElementFromResult(helperPath, query, semanticMapValue(parsed)), nil
 		},
 	)
 	act.Category = "desktop"
@@ -1853,28 +1516,13 @@ func (m *DesktopSemanticModule) Tools() []registry.ToolDefinition {
 				States: input.States,
 				Exact:  input.Exact,
 			}
-			timeout := input.Timeout
-			if timeout <= 0 {
-				timeout = 5
-			}
-			if semanticQueryNeedsTreeLookup(query) {
-				resolvedQuery, matchedElement, helperPath, errorText, err := semanticWaitForQueryWithRunner(ctx, runDesktopSemanticHelper, query, timeout)
-				if err != nil {
-					return desktopSemanticElementOutput{}, err
-				}
-				out := desktopSemanticElementOutput{
-					HelperPath: helperPath,
-					App:        query.App,
-					Query:      resolvedQuery,
-					Matched:    matchedElement != nil,
-					Element:    matchedElement,
-					Error:      errorText,
-				}
-				return out, nil
-			}
 			args, err := semanticQueryArgs(query)
 			if err != nil {
 				return desktopSemanticElementOutput{}, err
+			}
+			timeout := input.Timeout
+			if timeout <= 0 {
+				timeout = 5
 			}
 			args = append(args, "--timeout", strconv.Itoa(timeout))
 			parsed, helperPath, err := runDesktopSemanticHelper(ctx, append([]string{"wait"}, args...)...)

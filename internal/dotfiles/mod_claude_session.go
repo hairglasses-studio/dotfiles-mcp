@@ -2978,8 +2978,8 @@ func buildSessionIndex() ([]SessionIndexEntry, error) {
 	return index, nil
 }
 
-// OutputSessionIndex writes the session index as JSONL to stdout.
-func OutputSessionIndex() error {
+// outputSessionIndex writes the session index as JSONL to stdout.
+func outputSessionIndex() error {
 	index, err := buildSessionIndex()
 	if err != nil {
 		return err

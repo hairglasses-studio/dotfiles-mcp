@@ -74,14 +74,13 @@ func TestDotfilesWorkstationDiagnosticsReadyWithFixtures(t *testing.T) {
 	writeSystemHealthFixtures(t, binDir)
 
 	result := callDiscoveryTool(t, "dotfiles_workstation_diagnostics", map[string]any{
-		"symptom":         "bar missing after login",
-		"rice_level":      "quick",
-		"warn_memory_pct": 100,
+		"symptom":    "bar missing after login",
+		"rice_level": "quick",
 	})
 	out := unmarshalWorkstationDiagnosticsResult(t, extractTextFromResult(t, result))
 
 	if out.Status != "ok" {
-		t.Fatalf("status = %q, want ok; issues=%+v errors=%v capabilities=%+v", out.Status, out.Issues, out.Errors, out.Capabilities)
+		t.Fatalf("status = %q, want ok", out.Status)
 	}
 	if out.Profile != "desktop" {
 		t.Fatalf("profile = %q, want desktop", out.Profile)
