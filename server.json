@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.hairglasses-studio/dotfiles-mcp",
+  "title": "dotfiles-mcp",
+  "description": "Hyprland, Wayland desktop, GitHub org, and fleet automation for Linux workstations.",
+  "version": "2.2.0",
+  "websiteUrl": "https://github.com/hairglasses-studio/dotfiles-mcp",
+  "repository": {
+    "url": "https://github.com/hairglasses-studio/dotfiles-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/hairglasses-studio/dotfiles-mcp:2.2.0",
+      "version": "2.2.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DOTFILES_MCP_PROFILE",
+          "description": "Startup profile: default, desktop, ops, or full.",
+          "default": "default",
+          "format": "string",
+          "isRequired": false
+        },
+        {
+          "name": "WAYLAND_DISPLAY",
+          "description": "Wayland socket name when mounting a host desktop session.",
+          "format": "string",
+          "isRequired": false
+        },
+        {
+          "name": "HYPRLAND_INSTANCE_SIGNATURE",
+          "description": "Hyprland instance signature for host IPC discovery.",
+          "format": "string",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}
