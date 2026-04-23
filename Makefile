@@ -1,4 +1,4 @@
-.PHONY: build test vet lint check coverage contract-snapshot contract-check contract-diff canonical-drift canonical-sync-report canonical-sync-diff host-smoke host-smoke-strict release-parity registry-metadata-check publish-check
+.PHONY: build test vet lint check coverage contract-snapshot contract-check contract-diff canonical-drift canonical-sync-report canonical-sync-diff host-smoke host-smoke-strict release-parity registry-metadata-check mcpb publish-check
 
 build:
 	go build ./...
@@ -48,6 +48,9 @@ release-parity:
 
 registry-metadata-check:
 	bash ./scripts/validate-server-json.sh
+
+mcpb:
+	bash ./scripts/build-mcpb.sh
 
 publish-check: vet test contract-check release-parity registry-metadata-check
 
