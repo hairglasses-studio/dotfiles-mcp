@@ -358,16 +358,17 @@ func (m *MappingEngineModule) Tools() []registry.ToolDefinition {
 			"Validate a mapping profile for schema compliance. Provide either content (TOML string) or name (profile on disk).",
 			func(_ context.Context, input MappingValidateInput) (MappingValidateOutput, error) {
 				var content string
-				if input.Content != "" {
+				switch {
+				case input.Content != "":
 					content = input.Content
-				} else if input.Name != "" {
+				case input.Name != "":
 					path := resolveMappingPath(input.Name)
 					data, err := os.ReadFile(path)
 					if err != nil {
 						return MappingValidateOutput{}, fmt.Errorf("[%s] profile %q not found: %w", handler.ErrNotFound, input.Name, err)
 					}
 					content = string(data)
-				} else {
+				default:
 					return MappingValidateOutput{}, fmt.Errorf("[%s] provide either content or name", handler.ErrInvalidParam)
 				}
 

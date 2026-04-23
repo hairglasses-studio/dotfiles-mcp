@@ -8,6 +8,13 @@ import (
 	"testing"
 )
 
+func writeExecutableScript(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+		t.Fatalf("write executable script %s: %v", path, err)
+	}
+}
+
 func TestSafeStateName(t *testing.T) {
 	tests := []struct {
 		input string

@@ -1,10 +1,9 @@
-// mod_input.go — Input device, BT, controller, MIDI, juhradial tools (migrated from input-mcp)
+// mod_input.go — Input device, BT, controller, MIDI tools (migrated from input-mcp)
 package dotfiles
 
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,11 +24,8 @@ import (
 
 func inputDotfilesDir() string { return dotfilesDir() }
 
-func juhradialDir() string          { return filepath.Join(inputDotfilesDir(), "juhradial") }
-func juhradialConfigPath() string   { return filepath.Join(juhradialDir(), "config.json") }
-func juhradialProfilesPath() string { return filepath.Join(juhradialDir(), "profiles.json") }
-func makimaDir() string             { return filepath.Join(inputDotfilesDir(), "makima") }
-func midiDir() string               { return filepath.Join(inputDotfilesDir(), "midi") }
+func makimaDir() string { return filepath.Join(inputDotfilesDir(), "makima") }
+func midiDir() string   { return filepath.Join(inputDotfilesDir(), "midi") }
 
 func inputRunCmd(name string, args ...string) (string, string, error) {
 	return inputRunCmdEnv(nil, name, args...)
@@ -45,154 +41,6 @@ func inputRunCmdEnv(extraEnv []string, name string, args ...string) (string, str
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
-}
-
-func inputRuntimeDir() string {
-	if runtimeDir := os.Getenv("XDG_RUNTIME_DIR"); runtimeDir != "" {
-		return runtimeDir
-	}
-	return filepath.Join("/run/user", strconv.Itoa(os.Getuid()))
-}
-
-func juhradialSessionEnv() []string {
-	runtimeDir := inputRuntimeDir()
-	return []string{
-		"XDG_RUNTIME_DIR=" + runtimeDir,
-		"DBUS_SESSION_BUS_ADDRESS=unix:path=" + filepath.Join(runtimeDir, "bus"),
-	}
-}
-
-func juhradialRunCmd(name string, args ...string) (string, string, error) {
-	return inputRunCmdEnv(juhradialSessionEnv(), name, args...)
-}
-
-func juhradialSystemctl(args ...string) (string, string, error) {
-	return juhradialRunCmd("systemctl", append([]string{"--user"}, args...)...)
-}
-
-func writeFileAtomic(path string, content []byte, mode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return fmt.Errorf("create parent dir: %w", err)
-	}
-
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp.*")
-	if err != nil {
-		return fmt.Errorf("create temp file: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-
-	if _, err := tmp.Write(content); err != nil {
-		tmp.Close()
-		return fmt.Errorf("write temp file: %w", err)
-	}
-	if err := tmp.Chmod(mode); err != nil {
-		tmp.Close()
-		return fmt.Errorf("chmod temp file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close temp file: %w", err)
-	}
-
-	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("rename temp file: %w", err)
-	}
-	return nil
-}
-
-func validateJSONDocument(content string) error {
-	var parsed any
-	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
-		return err
-	}
-	return nil
-}
-
-func parseJuhradialBatteryOutput(raw string) (InputGetJuhradialBatteryOutput, error) {
-	out := strings.TrimSpace(raw)
-	out = strings.TrimPrefix(out, "(")
-	out = strings.TrimSuffix(out, ")")
-	parts := strings.Split(out, ",")
-	if len(parts) < 2 {
-		return InputGetJuhradialBatteryOutput{}, fmt.Errorf("unexpected battery output: %q", raw)
-	}
-
-	left := strings.Fields(strings.TrimSpace(parts[0]))
-	if len(left) == 0 {
-		return InputGetJuhradialBatteryOutput{}, fmt.Errorf("unexpected battery value: %q", raw)
-	}
-	percent, err := strconv.Atoi(strings.Trim(left[len(left)-1], "'\""))
-	if err != nil {
-		return InputGetJuhradialBatteryOutput{}, fmt.Errorf("parse battery percent: %w", err)
-	}
-
-	chargingToken := strings.ToLower(strings.Trim(strings.TrimSpace(parts[1]), "'\""))
-	return InputGetJuhradialBatteryOutput{
-		Percent:  percent,
-		Charging: strings.HasPrefix(chargingToken, "true"),
-		Source:   "dbus",
-	}, nil
-}
-
-func fallbackJuhradialBattery() (InputGetJuhradialBatteryOutput, error) {
-	devices, err := btListPaired()
-	if err != nil {
-		return InputGetJuhradialBatteryOutput{}, err
-	}
-
-	bestIndex := -1
-	bestScore := -1
-	for i := range devices {
-		btEnrichDevice(&devices[i])
-		if devices[i].Battery < 0 {
-			continue
-		}
-
-		score := 0
-		lowerName := strings.ToLower(devices[i].Name)
-		if strings.Contains(lowerName, "mx master") {
-			score += 4
-		}
-		if strings.Contains(lowerName, "logitech") {
-			score += 2
-		}
-		if devices[i].Connected {
-			score += 2
-		}
-		if score > bestScore {
-			bestScore = score
-			bestIndex = i
-		}
-	}
-
-	if bestIndex == -1 {
-		return InputGetJuhradialBatteryOutput{}, fmt.Errorf("no Logitech battery information available")
-	}
-
-	return InputGetJuhradialBatteryOutput{
-		Device:   devices[bestIndex].Name,
-		Percent:  devices[bestIndex].Battery,
-		Charging: false,
-		Source:   "bluetoothctl",
-	}, nil
-}
-
-func juhradialBatteryStatus() (InputGetJuhradialBatteryOutput, error) {
-	out, _, err := juhradialRunCmd(
-		"gdbus", "call",
-		"--session",
-		"--dest", "org.kde.juhradialmx",
-		"--object-path", "/org/kde/juhradialmx/Daemon",
-		"--method", "org.kde.juhradialmx.Daemon.GetBatteryStatus",
-	)
-	if err == nil && strings.TrimSpace(out) != "" {
-		status, parseErr := parseJuhradialBatteryOutput(out)
-		if parseErr == nil && status.Percent > 0 && status.Percent <= 100 {
-			return status, nil
-		}
-	}
-
-	return fallbackJuhradialBattery()
 }
 
 // btInteractivePair runs bluetoothctl interactively with an agent registered,
@@ -386,8 +234,7 @@ func parseInputDevices() []controllerInfo {
 				name = strings.Trim(strings.TrimPrefix(line, "N: Name="), "\"")
 				lower := strings.ToLower(name)
 				if strings.Contains(lower, "virtual") || strings.Contains(lower, "ydotool") ||
-					strings.Contains(lower, "antimicrox") || strings.Contains(lower, "makima") ||
-					strings.Contains(lower, "juhradial") {
+					strings.Contains(lower, "antimicrox") || strings.Contains(lower, "makima") {
 					isVirtual = true
 				}
 			} else if strings.HasPrefix(line, "I: ") {
@@ -692,7 +539,7 @@ func detectMidiDevices() []midiDevice {
 	for _, m := range matches {
 		base := filepath.Base(m)
 		var card, dev int
-		fmt.Sscanf(base, "midiC%dD%d", &card, &dev)
+		_, _ = fmt.Sscanf(base, "midiC%dD%d", &card, &dev)
 
 		nameBytes, _ := os.ReadFile(fmt.Sprintf("/proc/asound/card%d/id", card))
 		name := strings.TrimSpace(string(nameBytes))
@@ -890,80 +737,7 @@ type serviceStatus struct {
 }
 
 type InputStatusOutput struct {
-	Services []serviceStatus                 `json:"services"`
-	Battery  *InputGetJuhradialBatteryOutput `json:"battery,omitempty"`
-}
-
-type InputGetJuhradialConfigInput struct{}
-type InputGetJuhradialConfigOutput struct {
-	Content string `json:"content"`
-	Path    string `json:"path"`
-}
-
-type InputSetJuhradialConfigInput struct {
-	Content string `json:"content" jsonschema:"required,description=Full juhradial config.json content in JSON format"`
-}
-type InputSetJuhradialConfigOutput struct {
-	Written string `json:"written"`
-	Valid   bool   `json:"valid"`
-}
-
-type InputGetJuhradialProfilesInput struct{}
-type InputGetJuhradialProfilesOutput struct {
-	Content string `json:"content"`
-	Path    string `json:"path"`
-}
-
-type InputSetJuhradialProfilesInput struct {
-	Content string `json:"content" jsonschema:"required,description=Full juhradial profiles.json content in JSON format"`
-}
-type InputSetJuhradialProfilesOutput struct {
-	Written string `json:"written"`
-	Valid   bool   `json:"valid"`
-}
-
-type InputGetJuhradialBatteryInput struct{}
-type InputGetJuhradialBatteryOutput struct {
-	Device   string `json:"device,omitempty"`
-	Percent  int    `json:"percent"`
-	Charging bool   `json:"charging"`
-	Source   string `json:"source"`
-}
-
-type InputListMakimaInput struct{}
-
-type makimaProfile struct {
-	Name     string         `json:"name"`
-	File     string         `json:"file"`
-	Remap    map[string]any `json:"remap,omitempty"`
-	Commands map[string]any `json:"commands,omitempty"`
-}
-
-type InputListMakimaOutput struct {
-	Profiles []makimaProfile `json:"profiles"`
-}
-
-type InputGetMakimaInput struct {
-	Name string `json:"name" jsonschema:"required,description=Profile name (e.g. 'MX Master 4 Mouse::firefox'). .toml extension optional."`
-}
-type InputGetMakimaOutput struct {
-	Content string `json:"content"`
-}
-
-type InputSetMakimaInput struct {
-	Name    string `json:"name" jsonschema:"required,description=Profile name (e.g. 'MX Master 4 Mouse::firefox'). .toml extension optional."`
-	Content string `json:"content" jsonschema:"required,description=Full TOML content for the makima profile"`
-}
-type InputSetMakimaOutput struct {
-	Written string `json:"written"`
-	Valid   bool   `json:"valid"`
-}
-
-type InputDeleteMakimaInput struct {
-	Name string `json:"name" jsonschema:"required,description=Profile name to delete. .toml extension optional."`
-}
-type InputDeleteMakimaOutput struct {
-	Deleted string `json:"deleted"`
+	Services []serviceStatus `json:"services"`
 }
 
 type InputRestartInput struct {
@@ -1070,7 +844,7 @@ type DetectControllersOutput struct {
 type GenerateProfileInput struct {
 	DeviceName string `json:"device_name" jsonschema:"required,description=Exact device name from input_detect_controllers"`
 	Template   string `json:"template" jsonschema:"required,description=Preset mapping template,enum=desktop,enum=claude-code,enum=gaming,enum=media,enum=macropad"`
-	AppID      string `json:"app_id,omitempty" jsonschema:"description=Per-app override ID (e.g. 'com.mitchellh.ghostty'). Creates DeviceName::app_id.toml"`
+	AppID      string `json:"app_id,omitempty" jsonschema:"description=Per-app override ID (e.g. 'kitty'). Creates DeviceName::app_id.toml"`
 	Force      bool   `json:"force,omitempty" jsonschema:"description=Overwrite existing profile if it exists. Default false."`
 }
 type GenerateProfileOutput struct {
@@ -1172,8 +946,6 @@ type MidiSetOutput struct {
 	Valid   bool   `json:"valid"`
 }
 
-// ── JuhradialModule ────────────────────────────────────────────────────────
-
 // ===========================================================================
 // Modules
 // ===========================================================================
@@ -1184,14 +956,14 @@ type InputModule struct{}
 
 func (m *InputModule) Name() string { return "input" }
 func (m *InputModule) Description() string {
-	return "Input device management (juhradial-mx, makima, services)"
+	return "Input device management (controllers, services)"
 }
 
 func (m *InputModule) Tools() []registry.ToolDefinition {
 	return []registry.ToolDefinition{
 		handler.TypedHandler[InputStatusInput, InputStatusOutput](
 			"input_status",
-			"Show running state of juhradial mouse services, the makima controller service, and MX battery status when available.",
+			"Show running state of the ydotool and makima controller services.",
 			func(_ context.Context, _ InputStatusInput) (InputStatusOutput, error) {
 				var result InputStatusOutput
 
@@ -1200,13 +972,12 @@ func (m *InputModule) Tools() []registry.ToolDefinition {
 					user bool
 				}
 				for _, svc := range []serviceCheck{
-					{name: "juhradialmx-daemon", user: true},
 					{name: "ydotool", user: true},
 					{name: "makima", user: false},
 				} {
 					var err error
 					if svc.user {
-						_, _, err = juhradialSystemctl("is-active", svc.name+".service")
+						_, _, err = inputRunCmd("systemctl", "--user", "is-active", svc.name+".service")
 					} else {
 						_, _, err = inputRunCmd("systemctl", "is-active", svc.name+".service")
 					}
@@ -1216,133 +987,23 @@ func (m *InputModule) Tools() []registry.ToolDefinition {
 					})
 				}
 
-				battery, err := juhradialBatteryStatus()
-				if err == nil {
-					result.Battery = &battery
-				}
-
 				return result, nil
-			},
-		),
-
-		handler.TypedHandler[InputListMakimaInput, InputListMakimaOutput](
-			"input_list_makima_profiles",
-			"List all makima per-app button remapping profiles with their remap and command bindings.",
-			func(_ context.Context, _ InputListMakimaInput) (InputListMakimaOutput, error) {
-				dir := makimaDir()
-				entries, err := os.ReadDir(dir)
-				if err != nil {
-					return InputListMakimaOutput{}, fmt.Errorf("read makima dir: %w", err)
-				}
-
-				var profiles []makimaProfile
-				for _, e := range entries {
-					if e.IsDir() || !strings.HasSuffix(e.Name(), ".toml") {
-						continue
-					}
-					p := makimaProfile{
-						Name: strings.TrimSuffix(e.Name(), ".toml"),
-						File: e.Name(),
-					}
-
-					data, _ := os.ReadFile(filepath.Join(dir, e.Name()))
-					var parsed map[string]any
-					if _, terr := toml.Decode(string(data), &parsed); terr == nil {
-						if r, ok := parsed["remap"]; ok {
-							p.Remap, _ = r.(map[string]any)
-						}
-						if c, ok := parsed["commands"]; ok {
-							p.Commands, _ = c.(map[string]any)
-						}
-					}
-
-					profiles = append(profiles, p)
-				}
-
-				return InputListMakimaOutput{Profiles: profiles}, nil
-			},
-		),
-
-		handler.TypedHandler[InputGetMakimaInput, InputGetMakimaOutput](
-			"input_get_makima_profile",
-			"Read a specific makima per-app profile by name.",
-			func(_ context.Context, input InputGetMakimaInput) (InputGetMakimaOutput, error) {
-				if input.Name == "" {
-					return InputGetMakimaOutput{}, fmt.Errorf("[%s] name is required", handler.ErrInvalidParam)
-				}
-				name := input.Name
-				if !strings.HasSuffix(name, ".toml") {
-					name += ".toml"
-				}
-				data, err := os.ReadFile(filepath.Join(makimaDir(), name))
-				if err != nil {
-					return InputGetMakimaOutput{}, fmt.Errorf("[%s] read profile: %w", handler.ErrNotFound, err)
-				}
-				return InputGetMakimaOutput{Content: string(data)}, nil
-			},
-		),
-
-		handler.TypedHandler[InputSetMakimaInput, InputSetMakimaOutput](
-			"input_set_makima_profile",
-			"Create or update a makima per-app profile. Validates TOML before writing.",
-			func(_ context.Context, input InputSetMakimaInput) (InputSetMakimaOutput, error) {
-				if input.Name == "" {
-					return InputSetMakimaOutput{}, fmt.Errorf("[%s] name is required", handler.ErrInvalidParam)
-				}
-				if input.Content == "" {
-					return InputSetMakimaOutput{}, fmt.Errorf("[%s] content is required", handler.ErrInvalidParam)
-				}
-				name := input.Name
-				if !strings.HasSuffix(name, ".toml") {
-					name += ".toml"
-				}
-
-				var parsed map[string]any
-				if _, err := toml.Decode(input.Content, &parsed); err != nil {
-					return InputSetMakimaOutput{}, fmt.Errorf("[%s] invalid TOML: %w", handler.ErrInvalidParam, err)
-				}
-
-				path := filepath.Join(makimaDir(), name)
-				if err := os.WriteFile(path, []byte(input.Content), 0644); err != nil {
-					return InputSetMakimaOutput{}, fmt.Errorf("write profile: %w", err)
-				}
-
-				return InputSetMakimaOutput{Written: path, Valid: true}, nil
-			},
-		),
-
-		handler.TypedHandler[InputDeleteMakimaInput, InputDeleteMakimaOutput](
-			"input_delete_makima_profile",
-			"Delete a makima per-app profile.",
-			func(_ context.Context, input InputDeleteMakimaInput) (InputDeleteMakimaOutput, error) {
-				if input.Name == "" {
-					return InputDeleteMakimaOutput{}, fmt.Errorf("[%s] name is required", handler.ErrInvalidParam)
-				}
-				name := input.Name
-				if !strings.HasSuffix(name, ".toml") {
-					name += ".toml"
-				}
-				path := filepath.Join(makimaDir(), name)
-				if err := os.Remove(path); err != nil {
-					return InputDeleteMakimaOutput{}, fmt.Errorf("[%s] delete profile: %w", handler.ErrNotFound, err)
-				}
-				return InputDeleteMakimaOutput{Deleted: path}, nil
 			},
 		),
 
 		handler.TypedHandler[InputRestartInput, InputRestartOutput](
 			"input_restart_services",
-			"Restart juhradial mouse services or the makima controller service. Restarting the controller service may require elevated systemd permissions.",
+			"Restart the ydotool or makima service groups. Restarting the controller service may require elevated systemd permissions.",
 			func(_ context.Context, input InputRestartInput) (InputRestartOutput, error) {
 				var userTargets []string
 				var systemTargets []string
 				switch input.Service {
 				case "mouse":
-					userTargets = []string{"ydotool", "juhradialmx-daemon"}
+					userTargets = []string{"ydotool"}
 				case "controller":
 					systemTargets = []string{"makima"}
 				case "all":
-					userTargets = []string{"ydotool", "juhradialmx-daemon"}
+					userTargets = []string{"ydotool"}
 					systemTargets = []string{"makima"}
 				default:
 					return InputRestartOutput{}, fmt.Errorf("[%s] service must be mouse, controller, or all", handler.ErrInvalidParam)
@@ -1350,7 +1011,7 @@ func (m *InputModule) Tools() []registry.ToolDefinition {
 
 				var result InputRestartOutput
 				for _, t := range userTargets {
-					_, stderr, err := juhradialSystemctl("restart", t+".service")
+					_, stderr, err := inputRunCmd("systemctl", "--user", "restart", t+".service")
 					status := serviceStatus{Name: t, Active: err == nil}
 					if err != nil {
 						status.Name += " (error: " + stderr + ")"
@@ -1637,7 +1298,66 @@ func (m *BluetoothModule) Tools() []registry.ToolDefinition {
 				return BTPowerOutput{Status: "power_" + state, Output: out}, nil
 			},
 		),
+
+		// ── bt_audio_profile ─────────────────────────────
+		handler.TypedHandler[BTAudioProfileInput, BTAudioProfileOutput](
+			"bt_audio_profile",
+			"Switch a Bluetooth audio card's PipeWire/PulseAudio profile between A2DP (music, high-quality playback) and HSP/HFP (headset, bidirectional with microphone). Auto-resolves card= from the BT MAC if possible; falls back to the exact pactl card name.",
+			func(_ context.Context, input BTAudioProfileInput) (BTAudioProfileOutput, error) {
+				if input.Card == "" {
+					return BTAudioProfileOutput{}, fmt.Errorf("[%s] card is required (MAC or pactl card name like bluez_card.AA_BB_CC_DD_EE_FF)", handler.ErrInvalidParam)
+				}
+				target := strings.ToLower(strings.TrimSpace(input.Profile))
+				var pactlProfile string
+				switch target {
+				case "a2dp", "music", "high-quality":
+					pactlProfile = "a2dp-sink"
+				case "hsp", "hfp", "headset", "mic":
+					pactlProfile = "headset-head-unit"
+				case "off":
+					pactlProfile = "off"
+				case "":
+					return BTAudioProfileOutput{}, fmt.Errorf("[%s] profile is required: a2dp | hsp | off", handler.ErrInvalidParam)
+				default:
+					// Pass-through for exact PipeWire profile names.
+					pactlProfile = target
+				}
+
+				// Normalize a MAC (AA:BB:...) into bluez_card.AA_BB_... if needed.
+				card := input.Card
+				if strings.Count(card, ":") == 5 {
+					card = "bluez_card." + strings.ReplaceAll(card, ":", "_")
+				}
+
+				out, stderr, err := inputRunCmd("pactl", "set-card-profile", card, pactlProfile)
+				if err != nil {
+					return BTAudioProfileOutput{
+						Card:    card,
+						Profile: pactlProfile,
+					}, fmt.Errorf("pactl set-card-profile %s %s failed: %s %s", card, pactlProfile, out, stderr)
+				}
+				return BTAudioProfileOutput{
+					Card:    card,
+					Profile: pactlProfile,
+					Applied: true,
+					Output:  strings.TrimSpace(out),
+				}, nil
+			},
+		),
 	}
+}
+
+// BTAudioProfileInput switches the active PipeWire profile on a BT card.
+type BTAudioProfileInput struct {
+	Card    string `json:"card" jsonschema:"required,description=Card ID — either a pactl card name (bluez_card.AA_BB_...) or a MAC address (AA:BB:CC:DD:EE:FF)"`
+	Profile string `json:"profile" jsonschema:"required,description=Profile alias (a2dp | hsp | off) or exact PipeWire profile name"`
+}
+
+type BTAudioProfileOutput struct {
+	Card    string `json:"card"`
+	Profile string `json:"profile"`
+	Applied bool   `json:"applied"`
+	Output  string `json:"output,omitempty"`
 }
 
 // ── ControllerModule ───────────────────────────────────────────────────────
@@ -1919,89 +1639,6 @@ func (m *MidiModule) Tools() []registry.ToolDefinition {
 				}
 
 				return MidiSetOutput{Written: path, Valid: true}, nil
-			},
-		),
-	}
-}
-
-// ── JuhradialModule ────────────────────────────────────────────────────────
-
-type JuhradialModule struct{}
-
-func (m *JuhradialModule) Name() string { return "juhradial" }
-func (m *JuhradialModule) Description() string {
-	return "MX Master 4 juhradial-mx config and battery management"
-}
-
-func (m *JuhradialModule) Tools() []registry.ToolDefinition {
-	return []registry.ToolDefinition{
-		handler.TypedHandler[InputGetJuhradialConfigInput, InputGetJuhradialConfigOutput](
-			"input_get_juhradial_config",
-			"Read the tracked juhradial config.json from dotfiles.",
-			func(_ context.Context, _ InputGetJuhradialConfigInput) (InputGetJuhradialConfigOutput, error) {
-				data, err := os.ReadFile(juhradialConfigPath())
-				if err != nil {
-					return InputGetJuhradialConfigOutput{}, fmt.Errorf("[%s] read juhradial config: %w", handler.ErrNotFound, err)
-				}
-				return InputGetJuhradialConfigOutput{Content: string(data), Path: juhradialConfigPath()}, nil
-			},
-		),
-
-		handler.TypedHandler[InputSetJuhradialConfigInput, InputSetJuhradialConfigOutput](
-			"input_set_juhradial_config",
-			"Write dotfiles juhradial config.json after validating that the content is valid JSON.",
-			func(_ context.Context, input InputSetJuhradialConfigInput) (InputSetJuhradialConfigOutput, error) {
-				if strings.TrimSpace(input.Content) == "" {
-					return InputSetJuhradialConfigOutput{}, fmt.Errorf("[%s] content is required", handler.ErrInvalidParam)
-				}
-				if err := validateJSONDocument(input.Content); err != nil {
-					return InputSetJuhradialConfigOutput{}, fmt.Errorf("[%s] invalid JSON: %w", handler.ErrInvalidParam, err)
-				}
-				if err := writeFileAtomic(juhradialConfigPath(), []byte(input.Content), 0644); err != nil {
-					return InputSetJuhradialConfigOutput{}, fmt.Errorf("write juhradial config: %w", err)
-				}
-				return InputSetJuhradialConfigOutput{Written: juhradialConfigPath(), Valid: true}, nil
-			},
-		),
-
-		handler.TypedHandler[InputGetJuhradialProfilesInput, InputGetJuhradialProfilesOutput](
-			"input_get_juhradial_profiles",
-			"Read the tracked juhradial profiles.json from dotfiles.",
-			func(_ context.Context, _ InputGetJuhradialProfilesInput) (InputGetJuhradialProfilesOutput, error) {
-				data, err := os.ReadFile(juhradialProfilesPath())
-				if err != nil {
-					return InputGetJuhradialProfilesOutput{}, fmt.Errorf("[%s] read juhradial profiles: %w", handler.ErrNotFound, err)
-				}
-				return InputGetJuhradialProfilesOutput{Content: string(data), Path: juhradialProfilesPath()}, nil
-			},
-		),
-
-		handler.TypedHandler[InputSetJuhradialProfilesInput, InputSetJuhradialProfilesOutput](
-			"input_set_juhradial_profiles",
-			"Write dotfiles juhradial profiles.json after validating that the content is valid JSON.",
-			func(_ context.Context, input InputSetJuhradialProfilesInput) (InputSetJuhradialProfilesOutput, error) {
-				if strings.TrimSpace(input.Content) == "" {
-					return InputSetJuhradialProfilesOutput{}, fmt.Errorf("[%s] content is required", handler.ErrInvalidParam)
-				}
-				if err := validateJSONDocument(input.Content); err != nil {
-					return InputSetJuhradialProfilesOutput{}, fmt.Errorf("[%s] invalid JSON: %w", handler.ErrInvalidParam, err)
-				}
-				if err := writeFileAtomic(juhradialProfilesPath(), []byte(input.Content), 0644); err != nil {
-					return InputSetJuhradialProfilesOutput{}, fmt.Errorf("write juhradial profiles: %w", err)
-				}
-				return InputSetJuhradialProfilesOutput{Written: juhradialProfilesPath(), Valid: true}, nil
-			},
-		),
-
-		handler.TypedHandler[InputGetJuhradialBatteryInput, InputGetJuhradialBatteryOutput](
-			"input_get_juhradial_battery",
-			"Read MX battery status from the juhradial D-Bus daemon, falling back to bluetoothctl when D-Bus is unavailable.",
-			func(_ context.Context, _ InputGetJuhradialBatteryInput) (InputGetJuhradialBatteryOutput, error) {
-				status, err := juhradialBatteryStatus()
-				if err != nil {
-					return InputGetJuhradialBatteryOutput{}, fmt.Errorf("juhradial battery: %w", err)
-				}
-				return status, nil
 			},
 		),
 	}

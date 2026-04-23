@@ -6,24 +6,16 @@ import (
 	"strings"
 )
 
-// Example detection patterns for bare examples in text
+// Example detection patterns for bare examples in text. Only the
+// header + arrow patterns are currently wired into the detector; the
+// input/output and "for example" patterns were planned but the logic
+// never landed — drop them until there's a concrete consumer.
 var (
 	// "Example:" or "Example 1:" headers
 	exampleHeaderPattern = regexp.MustCompile(`(?mi)^#{0,3}\s*example\s*\d*\s*:`)
-	// Input/Output pairs
-	inputOutputPattern = regexp.MustCompile(`(?mi)^(input|output|query|answer|question|response|prompt|result)\s*:\s*`)
 	// Arrow-separated transformations: "foo -> bar"
 	arrowPattern = regexp.MustCompile(`(?m)^.{5,}\s*(->|=>|→)\s*.{5,}$`)
-	// "For example:" followed by content
-	forExamplePattern = regexp.MustCompile(`(?mi)for example[,:]`)
 )
-
-// exampleBlock represents a detected example in the text
-type exampleBlock struct {
-	Start int
-	End   int
-	Text  string
-}
 
 // DetectAndWrapExamples finds bare examples in text and wraps them in <example> tags.
 // Returns the modified text and a list of improvements, or the original text unchanged.

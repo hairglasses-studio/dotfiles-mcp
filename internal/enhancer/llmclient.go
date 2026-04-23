@@ -28,7 +28,7 @@ func resolveLLMBaseURL(cfg LLMConfig) string {
 	return strings.TrimRight(baseURL, "/")
 }
 
-func resolveLLMAPIKey(cfg LLMConfig, baseURL string) string {
+func resolveLLMAPIKey(cfg LLMConfig) string {
 	if cfg.APIKeyEnv != "" {
 		if apiKey := strings.TrimSpace(os.Getenv(cfg.APIKeyEnv)); apiKey != "" {
 			return apiKey
@@ -40,21 +40,21 @@ func resolveLLMAPIKey(cfg LLMConfig, baseURL string) string {
 	return ""
 }
 
-func defaultLLMModel(baseURL string) string {
+func defaultLLMModel() string {
 	return "claude-sonnet-4-6"
 }
 
 // NewLLMClient creates a client from config. Returns nil if no API key is available.
 func NewLLMClient(cfg LLMConfig) *LLMClient {
 	baseURL := resolveLLMBaseURL(cfg)
-	apiKey := resolveLLMAPIKey(cfg, baseURL)
+	apiKey := resolveLLMAPIKey(cfg)
 	if apiKey == "" {
 		return nil
 	}
 
 	model := cfg.Model
 	if model == "" {
-		model = defaultLLMModel(baseURL)
+		model = defaultLLMModel()
 	}
 
 	timeout := cfg.Timeout

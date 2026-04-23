@@ -160,14 +160,14 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 						Text: strings.Join([]string{
 							"1. Start with `dotfiles_rice_check` for compositor, shader, wallpaper, and service state.",
 							"2. Use `system_health_check` if the symptom may be machine-wide rather than desktop-specific.",
-							"3. Use `dotfiles_eww_status`, `dotfiles_eww_inspect`, `notify_history_entries`, `hypr_list_windows`, or `hypr_get_monitors` to narrow the failing surface.",
+							"3. Use `dotfiles_desktop_status`, `notify_history_entries`, `hypr_list_windows`, or `hypr_get_monitors` to narrow the failing surface, then reload only the failing layer.",
 							"4. Only run `dotfiles_cascade_reload` or `dotfiles_reload_service` after the read path explains which layer is stale.",
 						}, "\n"),
 					},
 				}, nil
 			},
 			Category: "workflow",
-			Tags:     []string{"desktop", "hyprland", "eww", "workflow"},
+			Tags:     []string{"desktop", "hyprland", "ironbar", "workflow"},
 		},
 		{
 			Resource: mcp.NewResource(
@@ -182,13 +182,13 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 						URI:      "dotfiles://workflows/desktop-control",
 						MIMEType: "text/markdown",
 						Text: strings.Join([]string{
-							"1. Start with `dotfiles_desktop_status` and `dotfiles_rice_check` to confirm Wayland, Hyprland, shell-stack, Eww, notification-history, semantic AT-SPI, OCR, input, and shader readiness before trying UI writes.",
-							"2. Use `desktop_capabilities`, `desktop_snapshot`, `desktop_list_windows`, `desktop_target_windows`, `desktop_find`, `desktop_find_all`, `desktop_focus_window`, `desktop_focus`, `desktop_read_value`, `desktop_set_text`, `desktop_set_value`, or `desktop_act` first when the target is a labeled UI element or semantic window; use `kitty_status`, `kitty_list_windows`, `kitty_launch`, `kitty_focus_window`, `kitty_get_text`, `kitty_send_key`, or `kitty_send_text` when the target is a kitty pane or tab; use `hypr_list_windows` or `hypr_get_monitors` when the task is scene- or window-oriented.",
+							"1. Start with `dotfiles_desktop_status` and `dotfiles_rice_check` to confirm Wayland, Hyprland, shell-stack, Ironbar, notification-history, semantic AT-SPI, OCR, input, and shader readiness before trying UI writes.",
+							"2. Use `desktop_capabilities`, `desktop_snapshot`, `desktop_list_windows`, `desktop_target_windows`, `desktop_find`, `desktop_find_all`, `desktop_focus_window`, `desktop_focus`, `desktop_read_value`, `desktop_set_text`, `desktop_set_value`, `desktop_form_fields`, `desktop_fill_form`, or `desktop_act` first when the target is a labeled UI element, semantic form, or semantic window; use `kitty_status`, `kitty_list_windows`, `kitty_launch`, `kitty_focus_window`, `kitty_get_text`, `kitty_send_key`, or `kitty_send_text` when the target is a kitty pane or tab; use `dotfiles_workspace_scene`, `hypr_list_windows`, or `hypr_get_monitors` when the task is scene- or window-oriented.",
 							"3. Use `screen_screenshot`, `desktop_screenshot_ocr`, or `desktop_find_text` to prove the visible state and coordinates only when semantic targeting is unavailable or insufficient.",
-							"4. Use `session_connect` or `session_start` when the task needs an explicit session handle, then prefer `session_accessibility_tree`, `session_find_ui_element`, `session_find_ui_elements`, `session_focus_element`, `session_read_value`, `session_set_text`, `session_set_value`, `session_click_element`, `session_invoke_action`, `session_type_text`, `session_dbus_call`, `session_screenshot`, `session_launch_app`, or clipboard/session helpers over ad-hoc shell reconstruction.",
-							"5. Use `hypr_monitor_preset_list`, `hypr_layout_list`, `hypr_monitor_preset_restore`, `hypr_layout_restore`, or `desktop_project_open` when the task is a scene change rather than a single click.",
+							"4. Use `session_list`, `session_connect`, or `session_start` when the task needs an explicit session handle, then use `session_wait_ready`, `session_status`, `session_read_log`, and `session_list_apps` to prove readiness and discover targets before driving session-local UI. Prefer `session_accessibility_tree`, `session_find_ui_element`, `session_find_ui_elements`, `session_focus_element`, `session_read_value`, `session_set_text`, `session_set_value`, `session_form_fields`, `session_fill_form`, `session_click_element`, `session_invoke_action`, `session_type_text`, `session_dbus_call`, `session_screenshot`, `session_launch_app`, or clipboard/session helpers over ad-hoc shell reconstruction.",
+							"5. Use `dotfiles_workspace_scene`, `hypr_monitor_preset_list`, `hypr_layout_list`, `hypr_monitor_preset_restore`, `hypr_layout_restore`, or `desktop_project_open` when the task is a scene change rather than a single click.",
 							"6. Use `desktop_click`, `desktop_type`, `desktop_key`, `input_type_text`, `desktop_click_text`, `hypr_click`, or other narrow write tools only after the read path proves the target.",
-							"7. Prefer `dotfiles_eww_reload`, `dotfiles_reload_service`, or `hypr_reload_config` for one stale layer; reserve `dotfiles_cascade_reload` for broader desktop refreshes.",
+							"7. Prefer `dotfiles_reload_service` or `hypr_reload_config` for one stale layer; reserve `dotfiles_cascade_reload` for broader desktop refreshes.",
 						}, "\n"),
 					},
 				}, nil
@@ -319,26 +319,6 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 		},
 		{
 			Resource: mcp.NewResource(
-				"dotfiles://config/ghostty",
-				"Ghostty Config",
-				mcp.WithResourceDescription("Current Ghostty terminal configuration"),
-				mcp.WithMIMEType("text/plain"),
-			),
-			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-				path := filepath.Join(dotfilesDir(), "ghostty", "config")
-				data, err := os.ReadFile(path)
-				if err != nil {
-					return nil, fmt.Errorf("read ghostty config: %w", err)
-				}
-				return []mcp.ResourceContents{
-					mcp.TextResourceContents{URI: "dotfiles://config/ghostty", MIMEType: "text/plain", Text: string(data)},
-				}, nil
-			},
-			Category: "config",
-			Tags:     []string{"ghostty", "terminal", "config"},
-		},
-		{
-			Resource: mcp.NewResource(
 				"dotfiles://config/hyprland",
 				"Hyprland Config",
 				mcp.WithResourceDescription("Current Hyprland window manager configuration"),
@@ -356,66 +336,6 @@ func (m *dotfilesResourceModule) Resources() []resources.ResourceDefinition {
 			},
 			Category: "config",
 			Tags:     []string{"hyprland", "wm", "config"},
-		},
-		{
-			Resource: mcp.NewResource(
-				"dotfiles://palette/snazzy",
-				"Snazzy Color Palette",
-				mcp.WithResourceDescription("Snazzy terminal color palette as JSON"),
-				mcp.WithMIMEType("application/json"),
-			),
-			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-				palette := map[string]string{
-					"bg":      "#000000",
-					"fg":      "#f1f1f0",
-					"cyan":    "#57c7ff",
-					"magenta": "#ff6ac1",
-					"green":   "#5af78e",
-					"yellow":  "#f3f99d",
-					"red":     "#ff5c57",
-					"blue":    "#57c7ff",
-				}
-				data, _ := json.MarshalIndent(palette, "", "  ")
-				return []mcp.ResourceContents{
-					mcp.TextResourceContents{URI: "dotfiles://palette/snazzy", MIMEType: "application/json", Text: string(data)},
-				}, nil
-			},
-			Category: "config",
-			Tags:     []string{"palette", "colors", "snazzy"},
-		},
-		{
-			Resource: mcp.NewResource(
-				"dotfiles://shader/current",
-				"Active Shader",
-				mcp.WithResourceDescription("Currently active Ghostty shader name and path"),
-				mcp.WithMIMEType("application/json"),
-			),
-			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-				configPath := filepath.Join(dotfilesDir(), "ghostty", "config")
-				data, err := os.ReadFile(configPath)
-				if err != nil {
-					return nil, fmt.Errorf("read ghostty config: %w", err)
-				}
-				shaderPath := ""
-				for _, line := range strings.Split(string(data), "\n") {
-					if strings.HasPrefix(strings.TrimSpace(line), "custom-shader") {
-						parts := strings.SplitN(line, "=", 2)
-						if len(parts) == 2 {
-							shaderPath = strings.TrimSpace(parts[1])
-						}
-					}
-				}
-				result := map[string]string{
-					"path": shaderPath,
-					"name": filepath.Base(shaderPath),
-				}
-				out, _ := json.MarshalIndent(result, "", "  ")
-				return []mcp.ResourceContents{
-					mcp.TextResourceContents{URI: "dotfiles://shader/current", MIMEType: "application/json", Text: string(out)},
-				}, nil
-			},
-			Category: "config",
-			Tags:     []string{"shader", "ghostty", "glsl"},
 		},
 	}
 }
@@ -450,9 +370,9 @@ func (m *dotfilesResourceModule) overviewMarkdown() string {
 		"",
 		"Highest-value paths:",
 		"",
-		"- Desktop control: `dotfiles_desktop_status` -> `dotfiles_rice_check` -> `desktop_capabilities` / `desktop_snapshot` / `desktop_list_windows` / `desktop_target_windows` / `desktop_find` / `desktop_find_all` / `desktop_focus_window` / `desktop_focus` / `desktop_read_value` / `desktop_set_text` / `desktop_set_value` / `desktop_act` -> `kitty_status` / `kitty_list_tabs` / `kitty_list_windows` / `kitty_focus_tab` / `kitty_focus_window` / `kitty_launch` / `kitty_get_text` / `kitty_send_key` / `kitty_send_text` for kitty-targeted terminal work -> `session_connect` / `session_accessibility_tree` / `session_find_ui_element` / `session_find_ui_elements` / `session_focus_element` / `session_read_value` / `session_set_text` / `session_set_value` / `session_click_element` when a session handle exists -> `hypr_list_windows` / `hypr_get_monitors` / `hypr_monitor_preset_list` / `hypr_layout_list` -> OCR only if needed -> narrow input, semantic action, or scene restore action.",
+		"- Desktop control: `dotfiles_desktop_status` -> `dotfiles_rice_check` -> `desktop_capabilities` / `desktop_snapshot` / `desktop_list_windows` / `desktop_target_windows` / `desktop_find` / `desktop_find_all` / `desktop_focus_window` / `desktop_focus` / `desktop_read_value` / `desktop_set_text` / `desktop_set_value` / `desktop_form_fields` / `desktop_fill_form` / `desktop_act` -> `kitty_status` / `kitty_list_tabs` / `kitty_list_windows` / `kitty_focus_tab` / `kitty_focus_window` / `kitty_launch` / `kitty_get_text` / `kitty_send_key` / `kitty_send_text` for kitty-targeted terminal work -> `session_list` / `session_connect` / `session_wait_ready` / `session_status` / `session_read_log` / `session_list_apps` / `session_accessibility_tree` / `session_find_ui_element` / `session_find_ui_elements` / `session_focus_element` / `session_read_value` / `session_set_text` / `session_set_value` / `session_form_fields` / `session_fill_form` / `session_click_element` when a session handle exists -> `hypr_list_windows` / `hypr_get_monitors` / `hypr_monitor_preset_list` / `hypr_layout_list` -> OCR only if needed -> narrow input, semantic action, or scene restore action.",
 		"- Fleet maintenance: `dotfiles_fleet_audit` -> `dotfiles_dep_audit` / `dotfiles_gh_local_sync_audit` -> `dotfiles_workflow_sync` or `dotfiles_gh_full_sync`.",
-		"- Desktop triage: `dotfiles_desktop_status` / `dotfiles_rice_check` -> `system_health_check` / targeted Hyprland or eww reads / `notify_history_entries` -> reload only the failing layer.",
+		"- Desktop triage: `dotfiles_desktop_status` / `dotfiles_rice_check` -> `system_health_check` / targeted Hyprland or Ironbar reads / `notify_history_entries` -> reload only the failing layer.",
 		"- Config repair: `dotfiles_list_configs` / config resources -> `dotfiles_validate_config` -> smallest-safe reload.",
 		"- Workstation diagnosis: `system_health_check` -> subsystem reads -> `systemd_failed` before desktop-specific escalation.",
 		"- Repo validation: `dotfiles_oss_check` / `dotfiles_oss_score` -> `dotfiles_pipeline_run` -> `dotfiles_workflow_sync` in dry-run mode.",
@@ -526,13 +446,13 @@ func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
 				symptom := req.Params.Arguments["symptom"]
 				return mcp.NewGetPromptResult("Triage desktop issue", []mcp.PromptMessage{
 					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
-						"Triage this desktop issue: %q. Start with `dotfiles_rice_check`. Use `system_health_check` if the symptom might be machine-wide. Use `dotfiles_eww_status`, `dotfiles_eww_inspect`, `notify_history_entries`, `hypr_list_windows`, or `hypr_get_monitors` to narrow the failing layer. Only use `dotfiles_cascade_reload` or `dotfiles_reload_service` after the read path shows which layer is stale.",
+						"Triage this desktop issue: %q. Start with `dotfiles_rice_check`. Use `system_health_check` if the symptom might be machine-wide. Use `dotfiles_desktop_status`, `notify_history_entries`, `hypr_list_windows`, or `hypr_get_monitors` to narrow the failing layer. Only use `dotfiles_cascade_reload` or `dotfiles_reload_service` after the read path shows which layer is stale.",
 						symptom,
 					))),
 				}), nil
 			},
 			Category: "workflow",
-			Tags:     []string{"desktop", "triage", "hyprland", "eww"},
+			Tags:     []string{"desktop", "triage", "hyprland", "ironbar"},
 		},
 		{
 			Prompt: mcp.NewPrompt(
@@ -544,7 +464,7 @@ func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
 				objective := req.Params.Arguments["objective"]
 				return mcp.NewGetPromptResult("Control desktop surface", []mcp.PromptMessage{
 					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(fmt.Sprintf(
-						"Complete this desktop control task: %q. Start with `dotfiles_desktop_status` and `dotfiles_rice_check` to confirm runtime readiness. Prefer `desktop_capabilities`, `desktop_snapshot`, `desktop_list_windows`, `desktop_target_windows`, `desktop_find`, `desktop_find_all`, `desktop_focus_window`, `desktop_focus`, `desktop_read_value`, `desktop_set_text`, `desktop_set_value`, or `desktop_act` when the target is a semantic UI element or window; use `kitty_status`, `kitty_list_tabs`, `kitty_list_windows`, `kitty_focus_tab`, `kitty_focus_window`, `kitty_launch`, `kitty_get_text`, `kitty_send_key`, or `kitty_send_text` when the task is really about a kitty terminal surface; then use `hypr_list_windows`, `hypr_get_monitors`, `hypr_monitor_preset_list`, or `hypr_layout_list` to confirm the scene. Use `session_connect` or `session_start` when the task benefits from an explicit session handle, then prefer `session_accessibility_tree`, `session_find_ui_element`, `session_find_ui_elements`, `session_focus_element`, `session_read_value`, `session_set_text`, `session_set_value`, `session_click_element`, `session_invoke_action`, `session_type_text`, `session_dbus_call`, `session_screenshot`, or `session_launch_app` over ad-hoc shell reconstruction. Use `screen_screenshot`, `desktop_screenshot_ocr`, or `desktop_find_text` only when semantic targeting is unavailable or insufficient. After the target is confirmed, prefer narrow actions such as `desktop_click`, `desktop_type`, `desktop_key`, `input_type_text`, `desktop_click_text`, `hypr_click`, `hypr_focus_window`, `session_connect`, `session_screenshot`, `hypr_monitor_preset_restore`, `hypr_layout_restore`, or `desktop_project_open`, and only use `dotfiles_eww_reload`, `dotfiles_reload_service`, `hypr_reload_config`, or `dotfiles_cascade_reload` when the failing layer is clear.",
+						"Complete this desktop control task: %q. Start with `dotfiles_desktop_status` and `dotfiles_rice_check` to confirm runtime readiness. Prefer `desktop_capabilities`, `desktop_snapshot`, `desktop_list_windows`, `desktop_target_windows`, `desktop_find`, `desktop_find_all`, `desktop_focus_window`, `desktop_focus`, `desktop_read_value`, `desktop_set_text`, `desktop_set_value`, `desktop_form_fields`, `desktop_fill_form`, or `desktop_act` when the target is a semantic UI element, form, or window; use `kitty_status`, `kitty_list_tabs`, `kitty_list_windows`, `kitty_focus_tab`, `kitty_focus_window`, `kitty_launch`, `kitty_get_text`, `kitty_send_key`, or `kitty_send_text` when the task is really about a kitty terminal surface; then use `dotfiles_workspace_scene`, `hypr_list_windows`, `hypr_get_monitors`, `hypr_monitor_preset_list`, or `hypr_layout_list` to confirm the scene. Use `session_list`, `session_connect`, or `session_start` when the task benefits from an explicit session handle, check `session_wait_ready`, `session_status`, `session_read_log`, and `session_list_apps` if readiness or target discovery is unclear, then prefer `session_accessibility_tree`, `session_find_ui_element`, `session_find_ui_elements`, `session_focus_element`, `session_read_value`, `session_set_text`, `session_set_value`, `session_form_fields`, `session_fill_form`, `session_click_element`, `session_invoke_action`, `session_type_text`, `session_dbus_call`, `session_screenshot`, or `session_launch_app` over ad-hoc shell reconstruction. Use `screen_screenshot`, `desktop_screenshot_ocr`, or `desktop_find_text` only when semantic targeting is unavailable or insufficient. After the target is confirmed, prefer narrow actions such as `desktop_click`, `desktop_type`, `desktop_key`, `input_type_text`, `desktop_click_text`, `hypr_click`, `hypr_focus_window`, `session_connect`, `session_screenshot`, `hypr_monitor_preset_restore`, `hypr_layout_restore`, or `desktop_project_open`, and only use `dotfiles_reload_service`, `hypr_reload_config`, or `dotfiles_cascade_reload` when the failing layer is clear.",
 						objective,
 					))),
 				}), nil
@@ -655,6 +575,33 @@ func (m *dotfilesPromptModule) Prompts() []prompts.PromptDefinition {
 			Category: "workflow",
 			Tags:     []string{"claude", "sessions", "recovery"},
 		},
+		{
+			Prompt: mcp.NewPrompt(
+				"validate-rice",
+				mcp.WithPromptDescription("Comprehensive rice health check across compositor, shader, symlinks, and failed services"),
+			),
+			Handler: func(_ context.Context, _ mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+				return mcp.NewGetPromptResult("Validate rice health", []mcp.PromptMessage{
+					mcp.NewPromptMessage(mcp.RoleUser, mcp.NewTextContent(strings.Join([]string{
+						"Run a comprehensive rice health check in the following sequence and summarize the results:",
+						"",
+						"1. Call `dotfiles_rice_check` to get the compositor, shader, wallpaper, and service status overview.",
+						"2. Call `dotfiles_check_symlinks` to verify all expected dotfiles symlinks are healthy.",
+						"3. Call `shader_status` to confirm the active kitty shader, theme, playlist position, and auto-rotate timer state.",
+						"4. Call `systemd_failed` to surface any failed systemd user units that may be degrading the desktop.",
+						"",
+						"After all four calls complete, provide a structured summary covering:",
+						"- Overall rice health (healthy / degraded / broken)",
+						"- Any symlink failures and their source/target paths",
+						"- Current shader and kitty theme state",
+						"- Any failed services and their names",
+						"- Recommended remediation steps for any issues found",
+					}, "\n"))),
+				}), nil
+			},
+			Category: "workflow",
+			Tags:     []string{"rice", "desktop", "health", "shader", "symlinks", "systemd"},
+		},
 	}
 }
 
@@ -662,6 +609,9 @@ func buildDotfilesResourceRegistry(reg *registry.ToolRegistry, promptReg *prompt
 	resReg := resources.NewResourceRegistry()
 	resReg.RegisterModule(&dotfilesResourceModule{reg: reg, promptReg: promptReg})
 	resReg.RegisterModule(&archResourceModule{})
+	resReg.RegisterModule(&ShaderModule{})
+	resReg.RegisterModule(&ThemeModule{})
+	resReg.RegisterModule(&EventsModule{})
 	return resReg
 }
 

@@ -889,7 +889,7 @@ func sandboxDiff(_ context.Context, input SandboxDiffInput) (SandboxDiffOutput, 
 
 	// Check symlinks inside container
 	out, _ := dockerExecUser(s.ContainerID, "hg", "bash", "-c",
-		`for link in ~/.config/hypr ~/.config/eww ~/.config/ghostty ~/.config/swaync ~/.config/foot ~/.config/starship.toml; do
+		`for link in ~/.config/hypr ~/.config/ironbar ~/.config/swaync ~/.config/kitty ~/.config/starship.toml; do
 			if [ -L "$link" ]; then
 				target=$(readlink "$link")
 				if [ -e "$link" ]; then
@@ -942,7 +942,7 @@ func sandboxScreenshotHandler(_ context.Context, req registry.CallToolRequest) (
 	var input SandboxScreenshotInput
 	if req.Params.Arguments != nil {
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 	}
 
 	if input.ID == "" {
@@ -1024,7 +1024,7 @@ func sandboxVisualDiffHandler(_ context.Context, req registry.CallToolRequest) (
 	var input SandboxVisualDiffInput
 	if req.Params.Arguments != nil {
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 	}
 
 	if input.ID == "" {

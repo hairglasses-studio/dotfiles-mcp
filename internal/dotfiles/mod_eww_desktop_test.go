@@ -195,7 +195,7 @@ func setupFakeEwwEnv(t *testing.T) fakeEwwEnv {
 
 	logPath := filepath.Join(root, "eww.log")
 
-	writeExecutableScript(t, filepath.Join(binDir, "eww"), `#!/usr/bin/env bash
+	writeEwwExecutableScript(t, filepath.Join(binDir, "eww"), `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "-c" ]]; then
 	shift 2
@@ -236,7 +236,7 @@ fi
 esac
 `)
 
-	writeExecutableScript(t, filepath.Join(binDir, "pgrep"), `#!/usr/bin/env bash
+	writeEwwExecutableScript(t, filepath.Join(binDir, "pgrep"), `#!/usr/bin/env bash
 set -euo pipefail
 case "${1:-} ${2:-}" in
 	"-x eww")
@@ -259,7 +259,7 @@ case "${1:-} ${2:-}" in
 esac
 `)
 
-	writeExecutableScript(t, filepath.Join(binDir, "hyprctl"), `#!/usr/bin/env bash
+	writeEwwExecutableScript(t, filepath.Join(binDir, "hyprctl"), `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "layers" ]]; then
 	cat <<'EOF'
@@ -283,7 +283,7 @@ exit 1
 	return fakeEwwEnv{logPath: logPath}
 }
 
-func writeExecutableScript(t *testing.T, path string, content string) {
+func writeEwwExecutableScript(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 		t.Fatalf("write script %s: %v", path, err)

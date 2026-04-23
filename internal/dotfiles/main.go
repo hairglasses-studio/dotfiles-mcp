@@ -17,8 +17,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/hairglasses-studio/dotfiles-mcp/internal/tracing"
@@ -63,67 +63,11 @@ func detectFormat(path string) string {
 // reloadCommands maps service name -> reload command.
 var reloadCommands = map[string][]string{
 	"hyprland": {"hyprctl", "reload"},
+	"ironbar":  {"ironbar", "reload"},
 	"mako":     {"makoctl", "reload"},
-	"eww":      {"eww", "reload"},
 	"waybar":   {"pkill", "-SIGUSR2", "waybar"},
 	"sway":     {"swaymsg", "reload"},
 	"tmux":     {"tmux", "source-file", "~/.tmux.conf"},
-}
-
-// expectedSymlinks returns the symlink mapping from install.sh logic.
-func expectedSymlinks() []struct{ src, dst string } {
-	dir := dotfilesDir()
-	home := homeDir()
-	cfg := filepath.Join(home, ".config")
-
-	// Common (all platforms).
-	links := []struct{ src, dst string }{
-		{filepath.Join(dir, "zsh/zshrc"), filepath.Join(home, ".zshrc")},
-		{filepath.Join(dir, "zsh/p10k.zsh"), filepath.Join(home, ".p10k.zsh")},
-		{filepath.Join(dir, "zsh/zshenv"), filepath.Join(home, ".zshenv")},
-		{filepath.Join(dir, "git/gitconfig"), filepath.Join(home, ".gitconfig")},
-		{filepath.Join(dir, "ssh/config"), filepath.Join(home, ".ssh/config")},
-		{filepath.Join(dir, "starship/starship.toml"), filepath.Join(cfg, "starship.toml")},
-		{filepath.Join(dir, "ghostty"), filepath.Join(cfg, "ghostty")},
-		{filepath.Join(dir, "nvim"), filepath.Join(cfg, "nvim")},
-		{filepath.Join(dir, "bat"), filepath.Join(cfg, "bat")},
-		{filepath.Join(dir, "fastfetch"), filepath.Join(cfg, "fastfetch")},
-		{filepath.Join(dir, "git/delta"), filepath.Join(cfg, "delta")},
-		{filepath.Join(dir, "git/ignore"), filepath.Join(cfg, "git/ignore")},
-		{filepath.Join(dir, "gh"), filepath.Join(cfg, "gh")},
-		{filepath.Join(dir, "k9s"), filepath.Join(cfg, "k9s")},
-		{filepath.Join(dir, "lazygit"), filepath.Join(cfg, "lazygit")},
-		{filepath.Join(dir, "btop"), filepath.Join(cfg, "btop")},
-		{filepath.Join(dir, "yazi"), filepath.Join(cfg, "yazi")},
-		{filepath.Join(dir, "cava"), filepath.Join(cfg, "cava")},
-		{filepath.Join(dir, "glow"), filepath.Join(cfg, "glow")},
-		{filepath.Join(dir, "tmux/tmux.conf"), filepath.Join(home, ".tmux.conf")},
-	}
-
-	// Platform-specific links.
-	if runtime.GOOS == "darwin" {
-		links = append(links,
-			struct{ src, dst string }{filepath.Join(dir, "aerospace/aerospace.toml"), filepath.Join(home, ".aerospace.toml")},
-			struct{ src, dst string }{filepath.Join(dir, "sketchybar"), filepath.Join(cfg, "sketchybar")},
-			struct{ src, dst string }{filepath.Join(dir, "borders"), filepath.Join(cfg, "borders")},
-			struct{ src, dst string }{filepath.Join(dir, "tattoo/tattoy.toml"), filepath.Join(home, "Library/Application Support/tattoy/tattoy.toml")},
-		)
-	} else if runtime.GOOS == "linux" {
-		links = append(links,
-			struct{ src, dst string }{filepath.Join(dir, "sway/config"), filepath.Join(cfg, "sway/config")},
-			struct{ src, dst string }{filepath.Join(dir, "waybar/config.jsonc"), filepath.Join(cfg, "waybar/config")},
-			struct{ src, dst string }{filepath.Join(dir, "waybar/style.css"), filepath.Join(cfg, "waybar/style.css")},
-			struct{ src, dst string }{filepath.Join(dir, "mako/config"), filepath.Join(cfg, "mako/config")},
-			struct{ src, dst string }{filepath.Join(dir, "wofi/config"), filepath.Join(cfg, "wofi/config")},
-			struct{ src, dst string }{filepath.Join(dir, "wofi/style.css"), filepath.Join(cfg, "wofi/style.css")},
-			struct{ src, dst string }{filepath.Join(dir, "foot/foot.ini"), filepath.Join(cfg, "foot/foot.ini")},
-			struct{ src, dst string }{filepath.Join(dir, "hyprland"), filepath.Join(cfg, "hypr")},
-			struct{ src, dst string }{filepath.Join(dir, "eww"), filepath.Join(cfg, "eww")},
-			struct{ src, dst string }{filepath.Join(dir, "tattoy/tattoy.toml"), filepath.Join(cfg, "tattoy/tattoy.toml")},
-		)
-	}
-
-	return links
 }
 
 // parseStringArray extracts a []string from an interface{} that may be []any.
@@ -182,7 +126,7 @@ type ValidateConfigOutput struct {
 // Tool 3: dotfiles_reload_service
 
 type ReloadServiceInput struct {
-	Service string `json:"service" jsonschema:"required,description=Service to reload,enum=hyprland,enum=mako,enum=eww,enum=waybar,enum=sway,enum=tmux"`
+	Service string `json:"service" jsonschema:"required,description=Service to reload,enum=hyprland,enum=ironbar,enum=mako,enum=waybar,enum=sway,enum=tmux"`
 }
 
 type ReloadServiceOutput struct {
@@ -190,6 +134,27 @@ type ReloadServiceOutput struct {
 	Success bool   `json:"success"`
 	Output  string `json:"output,omitempty"`
 	Error   string `json:"error,omitempty"`
+}
+
+// Tool: dotfiles_write_config
+
+type WriteConfigInput struct {
+	Path    string `json:"path" jsonschema:"required,description=Absolute path to the config file to write"`
+	Content string `json:"content" jsonschema:"required,description=New config file content"`
+	Format  string `json:"format" jsonschema:"description=Config format for validation (toml or json). Skips validation if empty."`
+	Service string `json:"service" jsonschema:"description=Service to reload after writing (hyprland or ironbar or tmux etc). Skips reload if empty."`
+	Execute bool   `json:"execute" jsonschema:"description=Actually write the file. Dry-run by default (shows what would happen without writing)."`
+}
+
+type WriteConfigOutput struct {
+	Path       string `json:"path"`
+	Written    bool   `json:"written"`
+	Validated  bool   `json:"validated"`
+	Valid      bool   `json:"valid"`
+	BackupPath string `json:"backup_path,omitempty"`
+	Reloaded   string `json:"reloaded,omitempty"`
+	Error      string `json:"error,omitempty"`
+	DryRun     bool   `json:"dry_run"`
 }
 
 // Tool 4: dotfiles_check_symlinks
@@ -552,7 +517,7 @@ type FleetAuditOutput struct {
 // Tool 19: dotfiles_cascade_reload
 
 type CascadeReloadInput struct {
-	Services []string `json:"services,omitempty" jsonschema:"description=Services to reload in order (default: hyprland then mako then eww)"`
+	Services []string `json:"services,omitempty" jsonschema:"description=Services to reload in order (default: hyprland then mako then ironbar)"`
 }
 
 type ServiceReloadStatus struct {
@@ -611,47 +576,12 @@ type BulkPipelineOutput struct {
 	Results []PipelineResult `json:"results"`
 }
 
-// Tool 22: dotfiles_eww_restart
-
-type EwwRestartInput struct{}
-
-type EwwRestartOutput struct {
-	Killed    int      `json:"killed"`
-	WaybarOff bool     `json:"waybar_killed"`
-	DaemonPID string   `json:"daemon_pid,omitempty"`
-	BarsOpen  []string `json:"bars_opened"`
-	Error     string   `json:"error,omitempty"`
-}
-
-// Tool 9: dotfiles_eww_status
-
-type EwwStatusInput struct{}
+// EwwLayerInfo is kept for the desktop status capability struct.
 
 type EwwLayerInfo struct {
 	Monitor   string `json:"monitor"`
 	Namespace string `json:"namespace"`
 	Position  string `json:"position"`
-}
-
-type EwwStatusOutput struct {
-	DaemonRunning  bool              `json:"daemon_running"`
-	DaemonCount    int               `json:"daemon_count"`
-	WaybarRunning  bool              `json:"waybar_running"`
-	Windows        []string          `json:"windows"`
-	DefinedWindows []string          `json:"defined_windows,omitempty"`
-	Layers         []EwwLayerInfo    `json:"layers"`
-	Variables      map[string]string `json:"variables,omitempty"`
-}
-
-// Tool 10: dotfiles_eww_get
-
-type EwwGetInput struct {
-	Variable string `json:"variable" jsonschema:"required,description=eww variable name to query"`
-}
-
-type EwwGetOutput struct {
-	Variable string `json:"variable"`
-	Value    any    `json:"value"`
 }
 
 // Tool 11: dotfiles_onboard_repo
@@ -880,12 +810,114 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 			},
 		),
 
+		// ── dotfiles_write_config ────────────────────
+		handler.TypedHandler[WriteConfigInput, WriteConfigOutput](
+			"dotfiles_write_config",
+			"Atomic config write with optional validation, backup, and service reload. Dry-run by default.",
+			func(_ context.Context, input WriteConfigInput) (WriteConfigOutput, error) {
+				if input.Path == "" {
+					return WriteConfigOutput{}, fmt.Errorf("[%s] path is required", handler.ErrInvalidParam)
+				}
+				if input.Content == "" {
+					return WriteConfigOutput{}, fmt.Errorf("[%s] content is required", handler.ErrInvalidParam)
+				}
+
+				result := WriteConfigOutput{Path: input.Path, DryRun: !input.Execute}
+
+				// Validate if format is specified
+				if input.Format != "" {
+					result.Validated = true
+					switch strings.ToLower(input.Format) {
+					case "toml":
+						_, err := toml.NewDecoder(strings.NewReader(input.Content)).Decode(new(map[string]any))
+						if err != nil {
+							result.Valid = false
+							result.Error = fmt.Sprintf("validation failed: %v", err)
+							return result, nil
+						}
+						result.Valid = true
+					case "json":
+						var dst any
+						if err := json.NewDecoder(strings.NewReader(input.Content)).Decode(&dst); err != nil {
+							result.Valid = false
+							result.Error = fmt.Sprintf("validation failed: %v", err)
+							return result, nil
+						}
+						result.Valid = true
+					default:
+						return WriteConfigOutput{}, fmt.Errorf("[%s] unsupported format %q", handler.ErrInvalidParam, input.Format)
+					}
+				}
+
+				if !input.Execute {
+					result.Error = "dry-run: pass execute=true to write"
+					return result, nil
+				}
+
+				// Backup existing file
+				if _, err := os.Stat(input.Path); err == nil {
+					backupDir := filepath.Join(os.TempDir(), "dotfiles-config-backup")
+					os.MkdirAll(backupDir, 0o755)
+					ts := time.Now().Format("20060102-150405")
+					base := filepath.Base(input.Path)
+					backupPath := filepath.Join(backupDir, fmt.Sprintf("%s.%s.bak", base, ts))
+					if data, err := os.ReadFile(input.Path); err == nil {
+						// Only report BackupPath on a successful write; a
+						// failed backup would make the reply claim a path
+						// that doesn't exist.
+						if err := os.WriteFile(backupPath, data, 0o644); err == nil {
+							result.BackupPath = backupPath
+						}
+					}
+				}
+
+				// Atomic write: temp file + rename
+				dir := filepath.Dir(input.Path)
+				os.MkdirAll(dir, 0o755)
+				tmp, err := os.CreateTemp(dir, ".dotfiles-write-*.tmp")
+				if err != nil {
+					result.Error = fmt.Sprintf("create temp file: %v", err)
+					return result, nil
+				}
+				tmpPath := tmp.Name()
+				if _, err := tmp.WriteString(input.Content); err != nil {
+					tmp.Close()
+					os.Remove(tmpPath)
+					result.Error = fmt.Sprintf("write temp file: %v", err)
+					return result, nil
+				}
+				tmp.Close()
+				if err := os.Rename(tmpPath, input.Path); err != nil {
+					os.Remove(tmpPath)
+					result.Error = fmt.Sprintf("rename temp to target: %v", err)
+					return result, nil
+				}
+				result.Written = true
+
+				// Reload service if specified
+				if input.Service != "" {
+					cmdParts, ok := reloadCommands[strings.ToLower(input.Service)]
+					if ok {
+						cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
+						if err := cmd.Run(); err == nil {
+							result.Reloaded = input.Service
+						}
+					}
+				}
+
+				return result, nil
+			},
+		),
+
 		// ── dotfiles_check_symlinks ───────────────────
 		handler.TypedHandler[CheckSymlinksInput, CheckSymlinksOutput](
 			"dotfiles_check_symlinks",
 			"Check health of all expected dotfiles symlinks (healthy, broken, or missing).",
 			func(_ context.Context, _ CheckSymlinksInput) (CheckSymlinksOutput, error) {
-				links := expectedSymlinks()
+				links, err := loadManagedLinkSpecs()
+				if err != nil {
+					return CheckSymlinksOutput{}, fmt.Errorf("load managed link inventory: %w", err)
+				}
 				var results []SymlinkStatus
 
 				for _, l := range links {
@@ -895,11 +927,12 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					}
 
 					target, err := os.Readlink(l.dst)
-					if err != nil {
+					switch {
+					case err != nil:
 						ss.Status = "missing"
-					} else if target == l.src {
+					case target == l.src:
 						ss.Status = "healthy"
-					} else {
+					default:
 						ss.Status = "broken"
 						ss.Actual = target
 					}
@@ -1134,47 +1167,6 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				}
 
 				return GHRecreateForkOutput{Results: results}, nil
-			},
-		),
-
-		// ── dotfiles_eww_restart ──────────────────────
-		handler.TypedHandler[EwwRestartInput, EwwRestartOutput](
-			"dotfiles_eww_restart",
-			"Kill all eww and waybar processes, restart eww daemon, and open the primary eww surface (sidebar). Use after editing eww config files.",
-			func(_ context.Context, _ EwwRestartInput) (EwwRestartOutput, error) {
-				return restartEwwBars(), nil
-			},
-		),
-
-		// ── dotfiles_eww_status ───────────────────────
-		handler.TypedHandler[EwwStatusInput, EwwStatusOutput](
-			"dotfiles_eww_status",
-			"Show eww bar status: daemon health, open windows, layer surfaces, key variable values, and whether waybar is incorrectly running.",
-			func(_ context.Context, _ EwwStatusInput) (EwwStatusOutput, error) {
-				return currentEwwStatus(), nil
-			},
-		),
-
-		// ── dotfiles_eww_get ──────────────────────────
-		handler.TypedHandler[EwwGetInput, EwwGetOutput](
-			"dotfiles_eww_get",
-			"Get the current value of an eww variable. Useful for debugging bar widgets (e.g. bar_workspaces_dp1, bar_cpu, bar_shader, rg_fleet).",
-			func(_ context.Context, input EwwGetInput) (EwwGetOutput, error) {
-				if input.Variable == "" {
-					return EwwGetOutput{}, fmt.Errorf("[%s] variable name is required", handler.ErrInvalidParam)
-				}
-
-				value, err := runEww("get", input.Variable)
-				if err != nil {
-					return EwwGetOutput{}, err
-				}
-
-				var parsed any
-				if json.Unmarshal([]byte(value), &parsed) == nil {
-					return EwwGetOutput{Variable: input.Variable, Value: parsed}, nil
-				}
-
-				return EwwGetOutput{Variable: input.Variable, Value: value}, nil
 			},
 		),
 
@@ -1805,7 +1797,10 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					currentCmd.Stdout = &currentOut
 					var previous map[string]bool
 					if err := currentCmd.Run(); err == nil {
-						json.Unmarshal(currentOut.Bytes(), &previous)
+						// Ignore parse errors — previous stays nil and the
+						// allMatch check below treats that as "no prior state,
+						// apply settings fresh".
+						_ = json.Unmarshal(currentOut.Bytes(), &previous)
 					}
 
 					// Check if all settings already match.
@@ -2154,12 +2149,13 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					pullCmd.Dir = repoPath
 					out, err := pullCmd.CombinedOutput()
 					outStr := strings.TrimSpace(string(out))
-					if err != nil {
+					switch {
+					case err != nil:
 						failed++
 						details = append(details, FullSyncDetail{Repo: e.Name(), Action: "pull-failed", Detail: outStr})
-					} else if strings.Contains(outStr, "Already up to date") || strings.Contains(outStr, "Already up-to-date") {
+					case strings.Contains(outStr, "Already up to date") || strings.Contains(outStr, "Already up-to-date"):
 						current++
-					} else {
+					default:
 						pulled++
 						details = append(details, FullSyncDetail{Repo: e.Name(), Action: "pulled", Detail: outStr})
 					}
@@ -2281,14 +2277,35 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 			},
 		),
 
+		// ── dotfiles_pipeline_status ─────────────────
+		handler.TypedHandler[PipelineStatusInput, PipelineStatusOutput](
+			"dotfiles_pipeline_status",
+			"Aggregate remote CI and cached local baseline signals across repos in one view. Optionally refresh baseline data first and filter to specific repos.",
+			dotfilesPipelineStatus,
+		),
+
+		// ── dotfiles_changelog_gen ───────────────────
+		handler.TypedHandler[DotfilesChangelogGenInput, DotfilesChangelogGenOutput](
+			"dotfiles_changelog_gen",
+			"Generate changelog previews across selected workspace repos by reusing the ops changelog engine. Optionally write CHANGELOG.md updates in place.",
+			dotfilesChangelogGen,
+		),
+
+		// ── dotfiles_release ─────────────────────────
+		handler.TypedHandler[DotfilesReleaseInput, DotfilesReleaseOutput](
+			"dotfiles_release",
+			"Run dry-run or execute release orchestration across explicit repo/version targets by reusing the ops release engine.",
+			dotfilesRelease,
+		),
+
 		// ── dotfiles_cascade_reload ──────────────────
 		handler.TypedHandler[CascadeReloadInput, CascadeReloadOutput](
 			"dotfiles_cascade_reload",
-			"Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → eww), verifying each is healthy before proceeding to the next.",
+			"Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → ironbar), verifying each is healthy before proceeding to the next.",
 			func(_ context.Context, input CascadeReloadInput) (CascadeReloadOutput, error) {
 				services := input.Services
 				if len(services) == 0 {
-					services = []string{"hyprland", "mako", "eww"}
+					services = []string{"hyprland", "mako", "ironbar"}
 				}
 
 				var results []ServiceReloadStatus
@@ -2321,9 +2338,8 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 						if checkCmd.Run() == nil {
 							healthy = hyprConfigHealthy(checkOut.String())
 						}
-					case "eww":
-						checkCmd := exec.Command("eww", "ping")
-						healthy = checkCmd.Run() == nil
+					case "ironbar":
+						healthy = processRunningExact("ironbar") || systemdUserUnitActive("ironbar.service")
 					default:
 						healthy = true // No health check available.
 					}
@@ -2353,29 +2369,28 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				dir := dotfilesDir()
 
 				// Compositor detection.
-				if os.Getenv("HYPRLAND_INSTANCE_SIGNATURE") != "" {
+				switch {
+				case os.Getenv("HYPRLAND_INSTANCE_SIGNATURE") != "":
 					result.Compositor = "hyprland"
-				} else if os.Getenv("SWAYSOCK") != "" {
+				case os.Getenv("SWAYSOCK") != "":
 					result.Compositor = "sway"
-				} else {
+				default:
 					result.Compositor = "unknown"
 				}
 
-				// Active shader.
-				ghosttyConfig := filepath.Join(homeDir(), ".config", "ghostty", "config")
-				shaderCmd := exec.Command("grep", "-m1", "^custom-shader = ", ghosttyConfig)
-				var shaderOut bytes.Buffer
-				shaderCmd.Stdout = &shaderOut
-				if shaderCmd.Run() == nil {
-					line := strings.TrimSpace(shaderOut.String())
-					line = strings.TrimPrefix(line, "custom-shader = ")
-					if line != "" && line != "none" {
-						result.Shader = filepath.Base(strings.TrimSuffix(line, ".glsl"))
+				// Active shader — read from kitty shader state file.
+				{
+					stateFile := filepath.Join(homeDir(), ".local", "state", "kitty-shader", "current")
+					if data, err := os.ReadFile(stateFile); err == nil {
+						shaderName := filepath.Base(strings.TrimSuffix(strings.TrimSpace(string(data)), ".glsl"))
+						if shaderName != "" && shaderName != "none" {
+							result.Shader = shaderName
+						} else {
+							result.Shader = "none"
+						}
 					} else {
 						result.Shader = "none"
 					}
-				} else {
-					result.Shader = "none"
 				}
 
 				// Wallpaper.
@@ -2391,7 +2406,7 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				}
 
 				// Service status.
-				checkServices := []string{"hyprland", "eww", "mako", "waybar", "swww-daemon", "hypridle"}
+				checkServices := []string{"hyprland", "ironbar", "mako", "swww-daemon"}
 				for _, svc := range checkServices {
 					pgrepCmd := exec.Command("pgrep", "-x", svc)
 					action := "stopped"
@@ -2434,11 +2449,9 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					}
 					scanDirs := []string{
 						filepath.Join(dir, "hyprland"),
-						filepath.Join(dir, "eww"),
+						filepath.Join(dir, "ironbar"),
 						filepath.Join(dir, "mako"),
 						filepath.Join(dir, "wofi"),
-						filepath.Join(dir, "waybar"),
-						filepath.Join(dir, "foot"),
 					}
 
 					for _, scanDir := range scanDirs {
@@ -2469,7 +2482,7 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 										lineNum := 0
 										if len(parts) >= 2 {
 											file = parts[0]
-											fmt.Sscanf(parts[1], "%d", &lineNum)
+											_, _ = fmt.Sscanf(parts[1], "%d", &lineNum)
 										}
 										result.PaletteViolations = append(result.PaletteViolations, PaletteViolation{
 											File:  filepath.Base(file),
@@ -2608,7 +2621,7 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					localDir = filepath.Join(homeDir(), "hairglasses-studio")
 				}
 
-				mcpRepos := []string{"dotfiles-mcp", "process-mcp", "systemd-mcp", "tmux-mcp"}
+				mcpRepos := []string{"dotfiles-mcp"}
 				dryRun := !input.Execute
 
 				// Get latest mcpkit version from the first repo that has it.
@@ -2732,9 +2745,12 @@ func main() {
 	}
 
 	// Initialize OpenTelemetry tracing (no-op unless OTEL_ENABLED=true).
+	// Intentionally NOT using defer here — the error path below calls
+	// os.Exit(1) which skips deferred functions and would drop
+	// in-flight spans. Both success and failure paths invoke
+	// shutdownTracing explicitly.
 	ctx := context.Background()
 	shutdownTracing := tracing.Init(ctx, dotfilesMCPVersion)
-	defer shutdownTracing(ctx)
 
 	cbRegistry := resilience.NewCircuitBreakerRegistry(nil)
 	mw := []registry.Middleware{
@@ -2758,6 +2774,8 @@ func main() {
 
 	if err := registry.ServeAuto(s); err != nil {
 		slog.Error("server stopped", "error", err)
+		shutdownTracing(ctx)
 		os.Exit(1)
 	}
+	shutdownTracing(ctx)
 }

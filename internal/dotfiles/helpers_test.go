@@ -2,6 +2,7 @@ package dotfiles
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -196,7 +197,7 @@ func TestValidateConfig_EmptyJSON(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestReloadCommands_AllPresent(t *testing.T) {
-	expected := []string{"hyprland", "mako", "eww", "waybar", "sway", "tmux"}
+	expected := []string{"hyprland", "ironbar", "mako", "waybar", "sway", "tmux"}
 	for _, svc := range expected {
 		if _, ok := reloadCommands[svc]; !ok {
 			t.Errorf("missing reload command for %s", svc)
@@ -204,19 +205,75 @@ func TestReloadCommands_AllPresent(t *testing.T) {
 	}
 }
 
+func writeTestInstallScript(t *testing.T, dir, body string) string {
+	t.Helper()
+	path := filepath.Join(dir, "install.sh")
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatalf("write install.sh: %v", err)
+	}
+	return path
+}
+
 // ---------------------------------------------------------------------------
-// expectedSymlinks
+// Installer-backed link inventory
 // ---------------------------------------------------------------------------
 
-func TestExpectedSymlinks_NonEmpty(t *testing.T) {
-	links := expectedSymlinks()
-	if len(links) == 0 {
-		t.Fatal("expected non-empty symlinks list")
+func TestParseLinkSpecsOutput(t *testing.T) {
+	links, err := parseLinkSpecsOutput("/src/a|/dst/a\n/src/b|/dst/b\n")
+	if err != nil {
+		t.Fatalf("parseLinkSpecsOutput returned error: %v", err)
 	}
-	for i, link := range links {
-		if link.src == "" || link.dst == "" {
-			t.Errorf("symlink %d has empty src=%q or dst=%q", i, link.src, link.dst)
-		}
+	if len(links) != 2 {
+		t.Fatalf("got %d links, want 2", len(links))
+	}
+	if links[0].src != "/src/a" || links[0].dst != "/dst/a" {
+		t.Fatalf("unexpected first link: %+v", links[0])
+	}
+}
+
+func TestParseLinkSpecsOutput_InvalidLine(t *testing.T) {
+	if _, err := parseLinkSpecsOutput("/src-only-without-separator\n"); err == nil {
+		t.Fatal("expected error for malformed line")
+	}
+}
+
+func TestLoadManagedLinkSpecs_UsesInstallScript(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, "home")
+	src1 := filepath.Join(dir, "ghostty")
+	src2 := filepath.Join(dir, "kitty")
+	dst1 := filepath.Join(home, ".config/ghostty")
+	dst2 := filepath.Join(home, ".config/kitty")
+
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatalf("mkdir home: %v", err)
+	}
+
+	writeTestInstallScript(t, dir, fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" != "--print-link-specs" ]]; then
+  printf 'unexpected args\n' >&2
+  exit 2
+fi
+printf '%s|%s\n' %q %q
+printf '%s|%s\n' %q %q
+`, "%s", "%s", src1, dst1, "%s", "%s", src2, dst2))
+
+	t.Setenv("DOTFILES_DIR", dir)
+	t.Setenv("HOME", home)
+
+	links, err := loadManagedLinkSpecs()
+	if err != nil {
+		t.Fatalf("loadManagedLinkSpecs returned error: %v", err)
+	}
+	if len(links) != 2 {
+		t.Fatalf("got %d links, want 2", len(links))
+	}
+	if links[0].src != src1 || links[0].dst != dst1 {
+		t.Fatalf("unexpected first link: %+v", links[0])
+	}
+	if links[1].src != src2 || links[1].dst != dst2 {
+		t.Fatalf("unexpected second link: %+v", links[1])
 	}
 }
 
@@ -259,7 +316,7 @@ func TestDotfilesModules_Count(t *testing.T) {
 
 	expected := []string{
 		"dotfiles", "hyprland", "shader", "input", "bluetooth",
-		"controller", "midi", "juhradial", "workflow", "oss",
+		"controller", "midi", "workflow", "oss",
 		"mapping", "learn", "mapping_status", "mapping_daemon",
 		"screen", "input_simulate", "claude_session", "prompt_registry",
 	}
@@ -313,12 +370,6 @@ func TestAllModuleToolsValid(t *testing.T) {
 
 func TestInputPathHelpers(t *testing.T) {
 	t.Setenv("DOTFILES_DIR", "/tmp/test-dotfiles")
-	if got := juhradialConfigPath(); got != "/tmp/test-dotfiles/juhradial/config.json" {
-		t.Errorf("juhradialConfigPath() = %q", got)
-	}
-	if got := juhradialProfilesPath(); got != "/tmp/test-dotfiles/juhradial/profiles.json" {
-		t.Errorf("juhradialProfilesPath() = %q", got)
-	}
 	if got := makimaDir(); got != "/tmp/test-dotfiles/makima" {
 		t.Errorf("makimaDir() = %q", got)
 	}
@@ -361,10 +412,8 @@ func TestDeviceRe(t *testing.T) {
 			if m[2] != tc.name {
 				t.Errorf("name = %q, want %q", m[2], tc.name)
 			}
-		} else {
-			if m != nil {
-				t.Errorf("unexpected match for %q", tc.input)
-			}
+		} else if m != nil {
+			t.Errorf("unexpected match for %q", tc.input)
 		}
 	}
 }
@@ -424,7 +473,7 @@ func TestRiceCheckOutput_JSONRoundTrip(t *testing.T) {
 		Shader:     "none",
 		Wallpaper:  "none",
 		Services: []ServiceReloadStatus{
-			{Service: "eww", Action: "running"},
+			{Service: "ironbar", Action: "running"},
 		},
 	}
 	data, err := json.Marshal(out)

@@ -134,7 +134,11 @@ func (m *ClipboardModule) Tools() []registry.ToolDefinition {
 				}
 				if req.Params.Arguments != nil {
 					b, _ := json.Marshal(req.Params.Arguments)
-					json.Unmarshal(b, &input)
+					// Ignore error — unmarshal failure leaves input at zero-value
+					// and downstream handler validation surfaces the missing required
+					// fields via ErrInvalidParam. Keeping the explicit _ = marker so
+					// errcheck stays clean and the intent is obvious.
+					_ = json.Unmarshal(b, &input)
 				}
 
 				if input.Text == "" {
@@ -221,6 +225,254 @@ func (m *ClipboardModule) Tools() []registry.ToolDefinition {
 							Type:     "image",
 							Data:     b64,
 							MIMEType: "image/png",
+						},
+					},
+				}, nil
+			},
+		},
+
+		// ── cliphist_list ─────────────────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "cliphist_list",
+				Description: "List recent clipboard history entries via cliphist. Returns a structured JSON array of the most recent 50 entries, each with id, preview text, and detected type.",
+				InputSchema: mcp.ToolInputSchema{
+					Type:       "object",
+					Properties: map[string]any{},
+				},
+			},
+			Handler: func(_ context.Context, _ registry.CallToolRequest) (*registry.CallToolResult, error) {
+				if err := clipCheckTool("cliphist"); err != nil {
+					return handler.ErrorResult(err), nil
+				}
+
+				out, err := clipRunCmd("cliphist", "list")
+				if err != nil {
+					return handler.ErrorResult(err), nil
+				}
+
+				type entry struct {
+					ID      string `json:"id"`
+					Preview string `json:"preview"`
+					Type    string `json:"type"`
+				}
+
+				var entries []entry
+				lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+				for _, line := range lines {
+					if line == "" {
+						continue
+					}
+					parts := strings.SplitN(line, "\t", 2)
+					id := parts[0]
+					preview := ""
+					if len(parts) == 2 {
+						preview = parts[1]
+					}
+
+					// Detect type from preview heuristics
+					entryType := "text"
+					if strings.HasPrefix(preview, "[[") || strings.Contains(preview, "binary data") {
+						entryType = "binary"
+					} else if strings.HasPrefix(preview, "http://") || strings.HasPrefix(preview, "https://") {
+						entryType = "url"
+					}
+
+					entries = append(entries, entry{ID: id, Preview: preview, Type: entryType})
+					if len(entries) >= 50 {
+						break
+					}
+				}
+
+				result, _ := json.Marshal(entries)
+				return &registry.CallToolResult{
+					Content: []mcp.Content{
+						mcp.TextContent{
+							Type: "text",
+							Text: string(result),
+						},
+					},
+				}, nil
+			},
+		},
+
+		// ── cliphist_get ──────────────────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "cliphist_get",
+				Description: "Retrieve a specific clipboard history entry by ID via cliphist decode. Returns the full content of the entry.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"id": map[string]any{
+							"type":        "string",
+							"description": "The cliphist entry ID (from cliphist_list)",
+						},
+					},
+					Required: []string{"id"},
+				},
+			},
+			Handler: func(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+				if err := clipCheckTool("cliphist"); err != nil {
+					return handler.ErrorResult(err), nil
+				}
+
+				var input struct {
+					ID string `json:"id"`
+				}
+				b, _ := json.Marshal(req.Params.Arguments)
+				// Ignore error — unmarshal failure leaves input at zero-value
+				// and downstream handler validation surfaces the missing required
+				// fields via ErrInvalidParam. Keeping the explicit _ = marker so
+				// errcheck stays clean and the intent is obvious.
+				_ = json.Unmarshal(b, &input)
+
+				if input.ID == "" {
+					return handler.CodedErrorResult(handler.ErrInvalidParam, fmt.Errorf("id must not be empty")), nil
+				}
+
+				out, err := clipRunCmd("cliphist", "decode", input.ID)
+				if err != nil {
+					return handler.ErrorResult(err), nil
+				}
+
+				return &registry.CallToolResult{
+					Content: []mcp.Content{
+						mcp.TextContent{
+							Type: "text",
+							Text: out,
+						},
+					},
+				}, nil
+			},
+		},
+
+		// ── cliphist_delete ───────────────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "cliphist_delete",
+				Description: "Delete clipboard history entries matching a query via cliphist delete-query. Dry-run by default — set execute to true to actually delete.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"query": map[string]any{
+							"type":        "string",
+							"description": "Search query to match entries for deletion",
+						},
+						"execute": map[string]any{
+							"type":        "boolean",
+							"description": "Set to true to actually delete matching entries. Defaults to false (dry-run).",
+						},
+					},
+					Required: []string{"query"},
+				},
+			},
+			Handler: func(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+				if err := clipCheckTool("cliphist"); err != nil {
+					return handler.ErrorResult(err), nil
+				}
+
+				var input struct {
+					Query   string `json:"query"`
+					Execute bool   `json:"execute"`
+				}
+				b, _ := json.Marshal(req.Params.Arguments)
+				// Ignore error — unmarshal failure leaves input at zero-value
+				// and downstream handler validation surfaces the missing required
+				// fields via ErrInvalidParam. Keeping the explicit _ = marker so
+				// errcheck stays clean and the intent is obvious.
+				_ = json.Unmarshal(b, &input)
+
+				if input.Query == "" {
+					return handler.CodedErrorResult(handler.ErrInvalidParam, fmt.Errorf("query must not be empty")), nil
+				}
+
+				if !input.Execute {
+					return &registry.CallToolResult{
+						Content: []mcp.Content{
+							mcp.TextContent{
+								Type: "text",
+								Text: fmt.Sprintf("Dry-run: would run `cliphist delete-query %q`. Set execute=true to delete matching entries.", input.Query),
+							},
+						},
+					}, nil
+				}
+
+				out, err := clipRunCmd("cliphist", "delete-query", input.Query)
+				if err != nil {
+					return handler.ErrorResult(err), nil
+				}
+
+				msg := fmt.Sprintf("Deleted clipboard history entries matching %q.", input.Query)
+				if strings.TrimSpace(out) != "" {
+					msg += "\n" + out
+				}
+				return &registry.CallToolResult{
+					Content: []mcp.Content{
+						mcp.TextContent{
+							Type: "text",
+							Text: msg,
+						},
+					},
+				}, nil
+			},
+		},
+
+		// ── cliphist_clear ────────────────────────────────
+		{
+			Tool: mcp.Tool{
+				Name:        "cliphist_clear",
+				Description: "Clear all clipboard history via cliphist wipe. Dry-run by default — set execute to true to actually wipe. This is a destructive operation and cannot be undone.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"execute": map[string]any{
+							"type":        "boolean",
+							"description": "Set to true to actually wipe all clipboard history. Defaults to false (dry-run). This action is irreversible.",
+						},
+					},
+				},
+			},
+			Handler: func(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+				if err := clipCheckTool("cliphist"); err != nil {
+					return handler.ErrorResult(err), nil
+				}
+
+				var input struct {
+					Execute bool `json:"execute"`
+				}
+				b, _ := json.Marshal(req.Params.Arguments)
+				// Ignore error — unmarshal failure leaves input at zero-value
+				// and downstream handler validation surfaces the missing required
+				// fields via ErrInvalidParam. Keeping the explicit _ = marker so
+				// errcheck stays clean and the intent is obvious.
+				_ = json.Unmarshal(b, &input)
+
+				if !input.Execute {
+					return &registry.CallToolResult{
+						Content: []mcp.Content{
+							mcp.TextContent{
+								Type: "text",
+								Text: "Dry-run: would run `cliphist wipe` to clear all clipboard history. Set execute=true to proceed. This action is irreversible.",
+							},
+						},
+					}, nil
+				}
+
+				out, err := clipRunCmd("cliphist", "wipe")
+				if err != nil {
+					return handler.ErrorResult(err), nil
+				}
+
+				msg := "Clipboard history wiped."
+				if strings.TrimSpace(out) != "" {
+					msg += "\n" + out
+				}
+				return &registry.CallToolResult{
+					Content: []mcp.Content{
+						mcp.TextContent{
+							Type: "text",
+							Text: msg,
 						},
 					},
 				}, nil

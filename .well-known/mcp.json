@@ -1,13 +1,13 @@
 {
   "name": "io.github.hairglasses-studio.dotfiles-mcp",
-  "description": "Publish mirror of the canonical dotfiles-mcp workstation MCP server with discovery-first tools, resources, and prompts.",
+  "description": "Canonical dotfiles-mcp workstation MCP server with discovery-first tools, resources, and prompts.",
   "version": "2.2.0",
-  "homepage": "https://github.com/hairglasses-studio/dotfiles-mcp",
+  "homepage": "https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp",
   "license": "MIT",
   "organization": "hairglasses-studio",
-  "repository": "https://github.com/hairglasses-studio/dotfiles-mcp",
+  "repository": "https://github.com/hairglasses-studio/dotfiles",
   "canonical_source": "https://github.com/hairglasses-studio/dotfiles/tree/main/mcp/dotfiles-mcp",
-  "publish_mirror": true,
+  "publish_mirror": false,
   "transport": [
     "stdio"
   ],
@@ -95,6 +95,10 @@
     {
       "name": "audio_volume",
       "description": "Set audio volume. Accepts absolute percentage (e.g. '50'), float 0-1 (e.g. '0.5'), or relative adjustment (e.g. '+5', '-10'). Uses wpctl to control PipeWire."
+    },
+    {
+      "name": "bt_audio_profile",
+      "description": "Switch a Bluetooth audio card's PipeWire/PulseAudio profile between A2DP (music, high-quality playback) and HSP/HFP (headset, bidirectional with microphone). Auto-resolves card= from the BT MAC if possible; falls back to the exact pactl card name."
     },
     {
       "name": "bt_connect",
@@ -213,6 +217,26 @@
       "description": "Write text to the Wayland clipboard. Uses wl-copy. Optionally specify a MIME type."
     },
     {
+      "name": "cliphist_clear",
+      "description": "Clear all clipboard history via cliphist wipe. Dry-run by default — set execute to true to actually wipe. This is a destructive operation and cannot be undone."
+    },
+    {
+      "name": "cliphist_delete",
+      "description": "Delete clipboard history entries matching a query via cliphist delete-query. Dry-run by default — set execute to true to actually delete."
+    },
+    {
+      "name": "cliphist_get",
+      "description": "Retrieve a specific clipboard history entry by ID via cliphist decode. Returns the full content of the entry."
+    },
+    {
+      "name": "cliphist_list",
+      "description": "List recent clipboard history entries via cliphist. Returns a structured JSON array of the most recent 50 entries, each with id, preview text, and detected type."
+    },
+    {
+      "name": "color_pipeline_apply",
+      "description": "Render all palette templates via scripts/palette-propagate.sh — fans out Hairglasses Neon to 12 consumers (5 GTK CSS + kitty + hyprland + hyprlock + btop + yazi + zsh-fzf + cava). Pass use_wallpaper=true for matugen-derived accents from current swww wallpaper."
+    },
+    {
       "name": "desktop_act",
       "description": "Invoke a specific AT-SPI action on a semantic element, such as activate, press, select, or grab focus."
     },
@@ -305,12 +329,16 @@
       "description": "Poll screenshot+OCR until text appears on screen or timeout. Returns coordinates and final screenshot when found. Use to wait for UI state changes (dialogs, loading, notifications)."
     },
     {
+      "name": "dotfiles_bar_audit",
+      "description": "Audit Ironbar layout readiness by checking live monitors, monitor-specific config coverage, service state, and recent bar log noise."
+    },
+    {
       "name": "dotfiles_bulk_pipeline",
       "description": "Run build+test pipeline across multiple repos. Detects language and runs appropriate build/test steps. Returns per-repo pass/fail with output."
     },
     {
       "name": "dotfiles_cascade_reload",
-      "description": "Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → eww), verifying each is healthy before proceeding to the next."
+      "description": "Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → ironbar), verifying each is healthy before proceeding to the next."
     },
     {
       "name": "dotfiles_changelog_gen",
@@ -330,27 +358,7 @@
     },
     {
       "name": "dotfiles_desktop_status",
-      "description": "Report desktop control readiness, including Hyprland, AT-SPI semantic targeting, session helpers, screenshot/OCR, input injection, and the kitty-to-ghostty terminal shader pipeline."
-    },
-    {
-      "name": "dotfiles_eww_get",
-      "description": "Get the current value of an eww variable. Useful for debugging bar widgets (e.g. bar_workspaces_dp1, bar_cpu, bar_shader, rg_fleet)."
-    },
-    {
-      "name": "dotfiles_eww_inspect",
-      "description": "Inspect the current eww daemon state, active and defined windows, visible layer bindings, and parsed variable map."
-    },
-    {
-      "name": "dotfiles_eww_reload",
-      "description": "Reload eww narrowly when possible by reopening one target window, falling back to full eww reload and then daemon restart only when needed."
-    },
-    {
-      "name": "dotfiles_eww_restart",
-      "description": "Kill all eww and waybar processes, restart eww daemon, and open the primary eww surface (sidebar). Use after editing eww config files."
-    },
-    {
-      "name": "dotfiles_eww_status",
-      "description": "Show eww bar status: daemon health, open windows, layer surfaces, key variable values, and whether waybar is incorrectly running."
+      "description": "Report desktop control readiness, including Hyprland, AT-SPI semantic targeting, session helpers, screenshot/OCR, input injection, and the kitty terminal shader pipeline."
     },
     {
       "name": "dotfiles_fleet_audit",
@@ -415,6 +423,10 @@
     {
       "name": "dotfiles_health_check",
       "description": "Run org-wide health dashboard across all hairglasses-studio repos. Shows build status, Go version, pipeline.mk inclusion, and CI workflow presence for every repo."
+    },
+    {
+      "name": "dotfiles_launcher_audit",
+      "description": "Audit the launcher stack by checking wrapper scripts, hyprshell socket readiness, fallback launchers, and recent hyprshell journal signals."
     },
     {
       "name": "dotfiles_list_configs",
@@ -491,6 +503,14 @@
     {
       "name": "dotfiles_workstation_diagnostics",
       "description": "Build a publishable workstation diagnostics snapshot by composing machine health, desktop readiness, rice state, and actionable follow-up recommendations."
+    },
+    {
+      "name": "dotfiles_write_config",
+      "description": "Atomic config write with optional validation, backup, and service reload. Dry-run by default."
+    },
+    {
+      "name": "events_tail",
+      "description": "Tail structured events from ~/.local/state/dotfiles/events.jsonl. Filters by time window, type, and severity. Use this to drive /heal (pending fixes) and /canary (post-deploy liveness)."
     },
     {
       "name": "gh_star_lists_delete",
@@ -573,6 +593,18 @@
       "description": "Close a window. Resolves window by address or class."
     },
     {
+      "name": "hypr_config_list",
+      "description": "List all Hyprland config snapshots with their metadata (git SHA, kernel, driver) in newest-first order."
+    },
+    {
+      "name": "hypr_config_rollback",
+      "description": "Restore a previous Hyprland config snapshot atomically, reload the compositor, and check configerrors. If errors reappear, the prior live state is restored and applied=false is returned so the caller knows the snapshot itself was bad."
+    },
+    {
+      "name": "hypr_config_snapshot",
+      "description": "Capture the current Hyprland config (hyprland.conf, monitors.conf, and sibling *.conf pieces) to a timestamped directory with meta.json. Use before a risky edit so hypr_config_rollback has something to restore."
+    },
+    {
       "name": "hypr_dismiss_notify",
       "description": "Dismiss the most recent Hyprland notification via hyprctl dismissnotify."
     },
@@ -583,6 +615,10 @@
     {
       "name": "hypr_focus_window",
       "description": "Focus a window by its address or class name."
+    },
+    {
+      "name": "hypr_frame_overlay",
+      "description": "Toggle the Hyprland compositor FPS/frametime overlay (debug:overlay). Pass enable=true/false to set; omit to read current state."
     },
     {
       "name": "hypr_fullscreen_window",
@@ -598,7 +634,7 @@
     },
     {
       "name": "hypr_get_config_errors",
-      "description": "Return Hyprland config parse errors and whether the active config is healthy."
+      "description": "Return Hyprland config parse errors and whether the active config is healthy. When errors are present, attaches a structured Remediation record callers can dispatch directly."
     },
     {
       "name": "hypr_get_cursor_position",
@@ -705,6 +741,10 @@
       "description": "Run a Hyprland output subcommand such as create remove list or dpms through hyprctl output."
     },
     {
+      "name": "hypr_perf_mode",
+      "description": "Get or toggle the Hyprland perf-mode profile (quality or performance). `performance` reduces blur, disables shadows, enables VFR, and turns on the frame overlay — useful for 240Hz tuning on NVIDIA. `auto` toggles between the two. Omit `mode` to read current state."
+    },
+    {
       "name": "hypr_plugin",
       "description": "Run a Hyprland plugin subcommand through hyprctl plugin."
     },
@@ -727,6 +767,10 @@
     {
       "name": "hypr_screenshot_monitors",
       "description": "Capture separate screenshots of each monitor. Returns multiple images, one per active monitor, each resized individually for better detail than a single combined capture. Also captures a cropped menubar view (top 48px) of each monitor for bar inspection."
+    },
+    {
+      "name": "hypr_screenshot_region",
+      "description": "Capture a screenshot of a selected screen region using slurp + wayshot. Launches slurp for interactive region selection, then captures with wayshot."
     },
     {
       "name": "hypr_screenshot_window",
@@ -765,8 +809,36 @@
       "description": "Type text at the current cursor position using wtype (Wayland)."
     },
     {
+      "name": "hypr_vrr_set",
+      "description": "Set per-monitor VRR mode via `hyprctl keyword monitor`. Read the current monitor spec first so mode/position/scale stay intact, then issue the full line with the new `vrr,\u003cmode\u003e` tail. On NVIDIA 590.48.01 this is safe at runtime (A/B tested) but not at compositor startup — see .claude/rules/nvidia-wayland.md. Watch `journalctl -k --since '10 sec ago'` for planePitch errors after each flip."
+    },
+    {
+      "name": "hypr_vrr_status",
+      "description": "Report per-monitor VRR state via `hyprctl monitors -j`. Returns name, description, resolution, refresh rate, scale, and VRR enablement for each connected monitor."
+    },
+    {
       "name": "hypr_wait_for_event",
       "description": "Wait for a specific Hyprland IPC event on .socket2.sock."
+    },
+    {
+      "name": "hyprshade_list",
+      "description": "List available Hyprshade screen shaders. Runs `hyprshade ls` and returns a structured list of shader names."
+    },
+    {
+      "name": "hyprshade_off",
+      "description": "Disable the currently active Hyprshade screen shader. Runs `hyprshade off`."
+    },
+    {
+      "name": "hyprshade_set",
+      "description": "Activate a Hyprshade screen shader by name. Runs `hyprshade on \u003cshader\u003e`."
+    },
+    {
+      "name": "hyprshade_status",
+      "description": "Get the currently active Hyprshade screen shader. Runs `hyprshade current` and returns structured status."
+    },
+    {
+      "name": "hyprshade_toggle",
+      "description": "Toggle a Hyprshade screen shader on or off by name. Runs `hyprshade toggle \u003cshader\u003e`."
     },
     {
       "name": "input_auto_setup_controller",
@@ -777,10 +849,6 @@
       "description": "Read events from a controller for 3 seconds to verify it works. Returns last 10 button/axis events."
     },
     {
-      "name": "input_delete_makima_profile",
-      "description": "Delete a makima per-app profile."
-    },
-    {
       "name": "input_detect_controllers",
       "description": "Scan for connected gamepad/controller devices. Returns brand (xbox/playstation/nintendo), capabilities, event path, and whether a makima profile exists."
     },
@@ -789,28 +857,8 @@
       "description": "Generate a starter makima TOML profile for a controller with preset mappings (desktop, claude-code, gaming, media). Includes brand-aware button label comments."
     },
     {
-      "name": "input_get_juhradial_battery",
-      "description": "Read MX battery status from the juhradial D-Bus daemon, falling back to bluetoothctl when D-Bus is unavailable."
-    },
-    {
-      "name": "input_get_juhradial_config",
-      "description": "Read the tracked juhradial config.json from dotfiles."
-    },
-    {
-      "name": "input_get_juhradial_profiles",
-      "description": "Read the tracked juhradial profiles.json from dotfiles."
-    },
-    {
-      "name": "input_get_makima_profile",
-      "description": "Read a specific makima per-app profile by name."
-    },
-    {
       "name": "input_key_press",
       "description": "DESTRUCTIVE: Press a key combination (e.g. ctrl+shift+t, Return, super) using wtype -k or ydotool key. Simulates real key events — requires explicit approval."
-    },
-    {
-      "name": "input_list_makima_profiles",
-      "description": "List all makima per-app button remapping profiles with their remap and command bindings."
     },
     {
       "name": "input_mouse_click",
@@ -826,27 +874,15 @@
     },
     {
       "name": "input_restart_services",
-      "description": "Restart juhradial mouse services or the makima controller service. Restarting the controller service may require elevated systemd permissions."
+      "description": "Restart the ydotool or makima service groups. Restarting the controller service may require elevated systemd permissions."
     },
     {
       "name": "input_screenshot_click",
       "description": "DESTRUCTIVE: Take a screenshot, then click at the specified coordinates. Combines screenshot capture for agent visual context with coordinate-based clicking. Requires explicit approval."
     },
     {
-      "name": "input_set_juhradial_config",
-      "description": "Write dotfiles juhradial config.json after validating that the content is valid JSON."
-    },
-    {
-      "name": "input_set_juhradial_profiles",
-      "description": "Write dotfiles juhradial profiles.json after validating that the content is valid JSON."
-    },
-    {
-      "name": "input_set_makima_profile",
-      "description": "Create or update a makima per-app profile. Validates TOML before writing."
-    },
-    {
       "name": "input_status",
-      "description": "Show running state of juhradial mouse services, the makima controller service, and MX battery status when available."
+      "description": "Show running state of the ydotool and makima controller services."
     },
     {
       "name": "input_type_text",
@@ -859,6 +895,34 @@
     {
       "name": "investigate_service",
       "description": "Investigate a systemd service: get status, find its processes, check its ports, and fetch recent logs. Single tool replaces systemd_status + ps_list + port_list + systemd_logs."
+    },
+    {
+      "name": "keybind_add",
+      "description": "Register a runtime Hyprland keybind via `hyprctl keyword bind`. Takes effect immediately without editing the config file — useful for ad-hoc demos or for a layer that is only valid while a specific app is running. The bind does NOT persist across a compositor reload; add it to hyprland/binds/*.conf for permanence."
+    },
+    {
+      "name": "keybind_remove",
+      "description": "Unbind a runtime Hyprland keybind via `hyprctl keyword unbind`. Does not affect binds declared in the config file — a subsequent `hyprctl reload` (or PostToolUse reload hook) will bring those back."
+    },
+    {
+      "name": "keybinds_conflicts",
+      "description": "Check for conflicting or duplicate keybinds. Reports any key+modifier combinations bound more than once."
+    },
+    {
+      "name": "keybinds_free_slots",
+      "description": "Show unbound key combinations available for new keybinds. Reports free Super+letter, Super+number, and modifier combos."
+    },
+    {
+      "name": "keybinds_list",
+      "description": "List all Hyprland keybinds with descriptions, matching the ticker display. Returns structured JSON with modifiers, key, description, dispatcher, and args."
+    },
+    {
+      "name": "keybinds_refresh_ticker",
+      "description": "Restart the keybind ticker bar to pick up new keybinds immediately instead of waiting for the 5-minute poll."
+    },
+    {
+      "name": "keybinds_search",
+      "description": "Search keybinds by description or key name. Case-insensitive match against description and key fields."
     },
     {
       "name": "kill_process",
@@ -1051,6 +1115,10 @@
     {
       "name": "network_dns",
       "description": "Show DNS servers per network interface. Tries resolvectl first, falls back to /etc/resolv.conf."
+    },
+    {
+      "name": "network_dns_set",
+      "description": "Set DNS servers on a NetworkManager profile via `nmcli connection modify \u003cprofile\u003e ipv4.dns`. Requires the connection to be brought back up to take effect — pass reapply=true (default) to do both steps. Passing an empty servers list clears the override so the profile falls back to the DHCP-provided DNS."
     },
     {
       "name": "network_status",
@@ -1255,6 +1323,26 @@
     {
       "name": "ps_tree",
       "description": "Show process tree for a given PID using pstree. Falls back to ps --forest if pstree is unavailable."
+    },
+    {
+      "name": "remediation_list",
+      "description": "List every registered error code and its structured remediation. Useful for auditing coverage and for UIs that surface known auto-fix paths."
+    },
+    {
+      "name": "remediation_lookup",
+      "description": "Look up the structured remediation for an error code. Returns Found=false when the code is not registered. Consumers should dispatch the referenced Tool with Args to apply the fix."
+    },
+    {
+      "name": "retroarch_audit",
+      "description": "Composite RetroArch workstation audit: cores, BIOS, playlists, rclone mounts. Shells out to scripts/retroarch-{workstation-audit,playlist-audit,mounts-audit}.py and merges their JSON reports into a single document. Safe to call on any workstation; reads the most recently cached reports when invocation flags don't force regeneration."
+    },
+    {
+      "name": "retroarch_command",
+      "description": "Send a UDP network command to a running RetroArch instance. Wraps scripts/retroarch-command.py --json. Requires network_cmd_enable=true in retroarch.cfg and an active RetroArch process. See retroarch-command --list for the command taxonomy."
+    },
+    {
+      "name": "retroarch_now_playing",
+      "description": "Summarize the most recent RetroArch session: reads the ticker cache at /tmp/bar-retroarch.txt (written every 30s by bar-retroarch.timer) and the first entry of content_history.lpl. Returns JSON with title, core, path, mount_health, and the raw ticker label. Safe when nothing has been played yet — the fields are just empty."
     },
     {
       "name": "sandbox_create",
@@ -1465,6 +1553,10 @@
       "description": "View the raw, append-only shader change history log. Returns all recorded shader changes with timestamps and sources."
     },
     {
+      "name": "shader_benchmark",
+      "description": "Benchmark shader compilation time and file size via glslangValidator. Reports per-shader and aggregate stats."
+    },
+    {
       "name": "shader_build",
       "description": "Run glslangValidator to preprocess and validate shaders. Test a single shader or all shaders. Returns structured results."
     },
@@ -1501,6 +1593,14 @@
       "description": "List curated shader playlists or pick a random shader from one. Omit name to list all playlists."
     },
     {
+      "name": "shader_preset_apply",
+      "description": "Apply a named preset to a DarkWindow shader. Reads the preset from presets.toml, rewrites matching parameter tokens in a temporary copy of the GLSL source, then applies it via shader_set. The original shader source is never modified."
+    },
+    {
+      "name": "shader_preset_list",
+      "description": "List named parameter presets for DarkWindow shaders. Presets document the configurable #define values and top-level constants in each shader's GLSL source. Optionally filter to a specific shader name."
+    },
+    {
       "name": "shader_preview",
       "description": "Preview a shader for N seconds, then automatically revert to the previous shader. Cancels any in-progress preview."
     },
@@ -1519,6 +1619,10 @@
     {
       "name": "shader_test",
       "description": "Compile-test shaders via glslangValidator. If name is provided, test that shader; otherwise test all."
+    },
+    {
+      "name": "shader_tier",
+      "description": "List DarkWindow shaders grouped by perf tier (cheap/mid/heavy). Filter by tier, or pass regenerate=true to rebuild playlists from the current catalog first."
     },
     {
       "name": "system_disk",
@@ -1575,6 +1679,10 @@
     {
       "name": "systemd_logs",
       "description": "Fetch recent journal logs for a systemd unit."
+    },
+    {
+      "name": "systemd_reset_failed",
+      "description": "Clear the 'failed' state of a unit via `systemctl reset-failed`. Required before a unit that hit its StartLimitBurst can be restarted — otherwise systemctl restart will report 'start request repeated too quickly' and refuse."
     },
     {
       "name": "systemd_restart",
@@ -1662,11 +1770,11 @@
     "input",
     "github-org",
     "fleet-management",
-    "publish-mirror"
+    "canonical-source"
   ],
-  "tool_count": 407,
-  "resource_count": 24,
-  "prompt_count": 12,
+  "tool_count": 434,
+  "resource_count": 25,
+  "prompt_count": 13,
   "categories": [
     "",
     "desktop",

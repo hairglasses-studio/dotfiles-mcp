@@ -192,7 +192,7 @@ func (m *MappingStatusModule) Tools() []registry.ToolDefinition {
 
 				// Validate input naming convention.
 				if !validInputPattern.MatchString(input.Input) {
-					return QuickMapOutput{}, fmt.Errorf("[%s] invalid input %q; must start with BTN_, ABS_, KEY_, REL_, or midi:", handler.ErrInvalidParam, input.Input)
+					return QuickMapOutput{}, fmt.Errorf("[%s] invalid input %q; must start with BTN_, ABS_, KEY_, REL_, or midi prefix", handler.ErrInvalidParam, input.Input)
 				}
 
 				// Build the mapping line based on output type.

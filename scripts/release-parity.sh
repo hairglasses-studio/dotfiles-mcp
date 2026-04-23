@@ -9,7 +9,7 @@ fail() {
   exit 1
 }
 
-env GOWORK=off go run . --contract-check
+env GOWORK=off go run ./cmd/dotfiles-mcp-contract --check
 
 jq -e '
   .publish_mirror == false and

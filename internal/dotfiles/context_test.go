@@ -14,8 +14,8 @@ import (
 
 func TestBuildDotfilesPromptRegistry(t *testing.T) {
 	promptReg := buildDotfilesPromptRegistry()
-	if promptReg.PromptCount() != 12 {
-		t.Fatalf("expected 12 prompts, got %d", promptReg.PromptCount())
+	if promptReg.PromptCount() != 13 {
+		t.Fatalf("expected 13 prompts, got %d", promptReg.PromptCount())
 	}
 	if _, ok := promptReg.GetPrompt("dotfiles_audit_fleet"); !ok {
 		t.Fatal("expected dotfiles_audit_fleet prompt to be registered")
@@ -44,8 +44,11 @@ func TestBuildDotfilesResourceRegistry(t *testing.T) {
 	reg := registry.NewToolRegistry()
 	promptReg := buildDotfilesPromptRegistry()
 	resReg := buildDotfilesResourceRegistry(reg, promptReg)
-	if resReg.ResourceCount() != 19 {
-		t.Fatalf("expected 19 resources, got %d", resReg.ResourceCount())
+	if resReg.ResourceCount() != 20 {
+		t.Fatalf("expected 20 resources, got %d", resReg.ResourceCount())
+	}
+	if _, ok := resReg.GetResource("dotfiles://events/pending-high"); !ok {
+		t.Fatal("expected dotfiles://events/pending-high resource to be registered")
 	}
 	if _, ok := resReg.GetResource("dotfiles://server/overview"); !ok {
 		t.Fatal("expected dotfiles overview resource to be registered")

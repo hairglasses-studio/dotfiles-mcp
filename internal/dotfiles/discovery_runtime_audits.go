@@ -327,8 +327,10 @@ func (m *DotfilesDiscoveryModule) buildBarAudit(ctx context.Context, input dotfi
 		layoutByName[layout.Name] = layout
 	}
 	liveNames := make([]string, 0, len(out.LiveMonitors))
+	liveNameSet := make(map[string]struct{}, len(out.LiveMonitors))
 	for _, monitor := range out.LiveMonitors {
 		liveNames = append(liveNames, monitor.Name)
+		liveNameSet[monitor.Name] = struct{}{}
 		applied, ok := layoutByName[monitor.Name]
 		switch {
 		case ok:
@@ -347,7 +349,7 @@ func (m *DotfilesDiscoveryModule) buildBarAudit(ctx context.Context, input dotfi
 	sort.Strings(liveNames)
 	sort.Slice(out.AppliedMonitors, func(i, j int) bool { return out.AppliedMonitors[i].Name < out.AppliedMonitors[j].Name })
 	for _, configured := range configuredNames {
-		if !containsString(liveNames, configured) {
+		if _, ok := liveNameSet[configured]; !ok {
 			out.StaleMonitorConfigs = append(out.StaleMonitorConfigs, configured)
 		}
 	}

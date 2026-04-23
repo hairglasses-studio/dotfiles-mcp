@@ -27,7 +27,6 @@ var (
 	archWikiAPIURL            = "https://wiki.archlinux.org/api.php"
 	archPackagesSearchURL     = "https://archlinux.org/packages/search/json/"
 	archAURSearchURL          = "https://aur.archlinux.org/rpc/v5/search/"
-	archAURInfoURL            = "https://aur.archlinux.org/rpc/v5/info"
 	archAURPKGBUILDURLPattern = "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=%s"
 	archNewsFeedURL           = "https://archlinux.org/feeds/news/"
 	archMirrorStatusURL       = "https://archlinux.org/mirrors/status/json/"
@@ -387,9 +386,7 @@ func (m *ArchModule) Tools() []registry.ToolDefinition {
 		handler.TypedHandler[ArchPkgbuildAuditInput, archPKGBuildAuditOutput](
 			"arch_pkgbuild_audit",
 			"Audit an AUR PKGBUILD or raw PKGBUILD content for risky patterns.",
-			func(ctx context.Context, input ArchPkgbuildAuditInput) (archPKGBuildAuditOutput, error) {
-				return archAuditPKGBUILD(ctx, input)
-			},
+			archAuditPKGBUILD,
 		),
 		handler.TypedHandler[ArchNewsInput, archNewsOutput](
 			"arch_news_latest",
@@ -438,9 +435,7 @@ func (m *ArchModule) Tools() []registry.ToolDefinition {
 		handler.TypedHandler[ArchMirrorStatusInput, archMirrorStatusOutput](
 			"arch_mirror_status",
 			"Return the healthiest official Arch Linux mirrors from the mirror-status JSON feed.",
-			func(ctx context.Context, input ArchMirrorStatusInput) (archMirrorStatusOutput, error) {
-				return archMirrorStatus(ctx, input)
-			},
+			archMirrorStatus,
 		),
 		handler.TypedHandler[ArchPacmanLogInput, archPacmanLogOutput](
 			"arch_pacman_log",

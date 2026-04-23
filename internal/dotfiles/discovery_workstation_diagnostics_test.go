@@ -65,22 +65,23 @@ func TestDotfilesWorkstationDiagnosticsReadyWithFixtures(t *testing.T) {
 	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "fixture-hypr")
 	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/fixture-bus")
 	t.Setenv("PATH", binDir+":/usr/bin:/bin")
-	t.Setenv("DOTFILES_TEST_PGREP_RUNNING_EXACT", "hyprland|eww|mako|swww-daemon|hypridle|hyprshell|hypr-dock|hyprdynamicmonitors|hyprland-autoname-workspaces|swaync")
+	t.Setenv("DOTFILES_TEST_PGREP_RUNNING_EXACT", "hyprland|ironbar|mako|swww-daemon|hyprshell|hypr-dock|hyprdynamicmonitors|hyprland-autoname-workspaces|swaync")
 	t.Setenv("DOTFILES_TEST_PGREP_RUNNING_PATTERN", "notification-history-listener.py")
-	t.Setenv("DOTFILES_TEST_PGREP_EWW_COUNT", "2")
+	t.Setenv("DOTFILES_TEST_PGREP_IRONBAR_COUNT", "1")
 
 	writeDesktopStatusFixtureTree(t, homeDir, dotfilesRoot, stateDir, runtimeDir)
 	writeDesktopStatusCommandFixtures(t, binDir)
 	writeSystemHealthFixtures(t, binDir)
 
 	result := callDiscoveryTool(t, "dotfiles_workstation_diagnostics", map[string]any{
-		"symptom":    "bar missing after login",
-		"rice_level": "quick",
+		"symptom":         "bar missing after login",
+		"rice_level":      "quick",
+		"warn_memory_pct": 100,
 	})
 	out := unmarshalWorkstationDiagnosticsResult(t, extractTextFromResult(t, result))
 
 	if out.Status != "ok" {
-		t.Fatalf("status = %q, want ok", out.Status)
+		t.Fatalf("status = %q, want ok; issues=%+v errors=%v capabilities=%+v", out.Status, out.Issues, out.Errors, out.Capabilities)
 	}
 	if out.Profile != "desktop" {
 		t.Fatalf("profile = %q, want desktop", out.Profile)
@@ -125,6 +126,13 @@ func TestDotfilesWorkstationDiagnosticsDegradedWhenDesktopReadinessFails(t *test
 	if err := os.MkdirAll(filepath.Join(dotfilesRoot, "scripts"), 0o755); err != nil {
 		t.Fatalf("mkdir scripts: %v", err)
 	}
+	writeTestExecutable(t, binDir, "python3", `#!/bin/sh
+if [ "$1" = "-c" ]; then
+  printf '%s\n' 'ModuleNotFoundError: No module named pyatspi' >&2
+  exit 1
+fi
+exit 1
+`)
 	writeSystemHealthFixtures(t, binDir)
 
 	result := callDiscoveryTool(t, "dotfiles_workstation_diagnostics", map[string]any{
@@ -138,8 +146,12 @@ func TestDotfilesWorkstationDiagnosticsDegradedWhenDesktopReadinessFails(t *test
 	if out.IssueCount == 0 {
 		t.Fatal("expected degraded desktop issues")
 	}
-	if !hasIssueComponent(out.Issues, "desktop.hyprland") {
-		t.Fatalf("expected desktop.hyprland issue, got %+v", out.Issues)
+	// Hyprland-readiness issues are surfaced under rice.hyprland in the
+	// diagnostic namespace — the refactor that split rice-* out from
+	// desktop-* renamed this component. The shell-level readiness still
+	// falls under desktop.shell which is also checked below.
+	if !hasIssueComponent(out.Issues, "rice.hyprland") {
+		t.Fatalf("expected rice.hyprland issue, got %+v", out.Issues)
 	}
 	if !hasIssueComponent(out.Issues, "desktop.accessibility") {
 		t.Fatalf("expected desktop.accessibility issue, got %+v", out.Issues)
