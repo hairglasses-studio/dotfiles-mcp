@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/hairglasses-studio/mcpkit/handler"
@@ -136,7 +138,7 @@ type dotfilesDesktopStatusOutput struct {
 	Input           dotfilesDesktopCapability `json:"input"`
 	Accessibility   dotfilesDesktopCapability `json:"accessibility"`
 	DesktopSession  dotfilesDesktopCapability `json:"desktop_session"`
-	Eww             dotfilesDesktopCapability `json:"eww"`
+	Ironbar         dotfilesDesktopCapability `json:"ironbar"`
 	Notifications   dotfilesDesktopCapability `json:"notifications"`
 	Terminal        dotfilesDesktopCapability `json:"terminal"`
 	Shader          dotfilesDesktopCapability `json:"shader"`
@@ -341,11 +343,12 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 
 	desktopStatus := handler.TypedHandler[dotfilesDesktopStatusInput, dotfilesDesktopStatusOutput](
 		"dotfiles_desktop_status",
-		"Report desktop control readiness, including Hyprland, AT-SPI semantic targeting, session helpers, screenshot/OCR, input injection, and the kitty-to-ghostty terminal shader pipeline.",
+		"Report desktop control readiness, including Hyprland, AT-SPI semantic targeting, session helpers, screenshot/OCR, input injection, and the kitty terminal shader pipeline.",
 		func(_ context.Context, _ dotfilesDesktopStatusInput) (dotfilesDesktopStatusOutput, error) {
-			runtimeDir := dotfilesRuntimeDir()
-			waylandDisplay := dotfilesWaylandDisplay(runtimeDir)
-			hyprSignature := dotfilesHyprlandSignature(runtimeDir)
+			desktopRuntime := dotfilesResolveDesktopRuntime()
+			runtimeDir := desktopRuntime.XDGRuntimeDir
+			waylandDisplay := desktopRuntime.WaylandDisplay
+			hyprSignature := desktopRuntime.HyprlandInstanceSignature
 			hyprSocketDir := ""
 			if runtimeDir != "" {
 				candidate := filepath.Join(runtimeDir, "hypr")
@@ -392,10 +395,10 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				name    string
 				running bool
 			}{
-				{name: "hyprshell", running: processRunningExact("hyprshell")},
-				{name: "hypr-dock", running: processRunningExact("hypr-dock")},
-				{name: "hyprdynamicmonitors", running: processRunningExact("hyprdynamicmonitors")},
-				{name: "hyprland-autoname-workspaces", running: processRunningExact("hyprland-autoname-workspaces")},
+				{name: "hyprshell", running: systemdUserUnitActive("dotfiles-hyprshell.service") || processRunningExact("hyprshell")},
+				{name: "hypr-dock", running: systemdUserUnitActive("dotfiles-hypr-dock.service") || processRunningExact("hypr-dock")},
+				{name: "hyprdynamicmonitors", running: systemdUserUnitActive("dotfiles-hyprdynamicmonitors.service") || processRunningExact("hyprdynamicmonitors")},
+				{name: "hyprland-autoname-workspaces", running: systemdUserUnitActive("dotfiles-hyprland-autoname-workspaces.service") || processRunningExact("hyprland-autoname-workspaces")},
 			} {
 				if component.running {
 					shellDetails = append(shellDetails, component.name+" running")
@@ -529,28 +532,32 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				sessionDetails = append(sessionDetails, "live Wayland session not detected")
 			}
 
-			ewwStatus := currentEwwStatus()
-			ewwMissing := make([]string, 0)
-			ewwDetails := make([]string, 0)
-			if hasCmd("eww") {
-				ewwDetails = append(ewwDetails, "eww available")
+			ironbarStatus := currentIronbarStatus()
+			ironbarMissing := make([]string, 0)
+			ironbarDetails := make([]string, 0)
+			if ironbarStatus.BinaryAvailable {
+				ironbarDetails = append(ironbarDetails, "ironbar available")
 			} else {
-				ewwMissing = append(ewwMissing, "eww")
-				missingCommands = append(missingCommands, "eww")
+				ironbarMissing = append(ironbarMissing, "ironbar")
+				missingCommands = append(missingCommands, "ironbar")
 			}
-			ewwConfig := dotfilesEwwConfigDir()
-			if pathExists(ewwConfig) {
-				ewwDetails = append(ewwDetails, "config rooted at "+ewwConfig)
+			if ironbarStatus.ConfigPresent {
+				ironbarDetails = append(ironbarDetails, "config rooted at "+ironbarStatus.ConfigPath)
 			} else {
-				ewwMissing = append(ewwMissing, "eww config")
+				ironbarMissing = append(ironbarMissing, "ironbar config")
 			}
-			if ewwStatus.DaemonRunning {
-				ewwDetails = append(ewwDetails, fmt.Sprintf("daemon running (%d processes)", ewwStatus.DaemonCount))
+			if ironbarStatus.ServiceActive {
+				ironbarDetails = append(ironbarDetails, "user service active")
+			}
+			if ironbarStatus.Running {
+				ironbarDetails = append(ironbarDetails, fmt.Sprintf("process running (%d instances)", ironbarStatus.ProcessCount))
 			} else {
-				ewwMissing = append(ewwMissing, "eww daemon")
+				ironbarMissing = append(ironbarMissing, "ironbar process")
 			}
-			ewwDetails = append(ewwDetails, fmt.Sprintf("%d active windows", len(ewwStatus.Windows)))
-			ewwDetails = append(ewwDetails, fmt.Sprintf("%d defined windows", len(ewwStatus.DefinedWindows)))
+			if ironbarStatus.IPCReady {
+				ironbarDetails = append(ironbarDetails, "ipc socket present at "+ironbarStatus.IPCSocket)
+			}
+			ironbarDetails = append(ironbarDetails, fmt.Sprintf("%d visible layer surfaces", len(ironbarStatus.Layers)))
 
 			notificationMissing := make([]string, 0)
 			notificationDetails := make([]string, 0)
@@ -587,28 +594,17 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 			}
 
 			kittyConfigPath := filepath.Join(dotfilesDir(), "kitty", "kitty.conf")
-			ghosttyConfigPath := filepath.Join(dotfilesDir(), "ghostty", "config")
 			terminalMissing := make([]string, 0)
 			terminalDetails := make([]string, 0)
 			kittyInstalled := hasCmd("kitty")
-			ghosttyInstalled := hasCmd("ghostty")
 			if kittyInstalled {
 				terminalDetails = append(terminalDetails, "kitty available")
 			} else {
 				terminalMissing = append(terminalMissing, "kitty")
 				missingCommands = append(missingCommands, "kitty")
 			}
-			if ghosttyInstalled {
-				terminalDetails = append(terminalDetails, "ghostty available")
-			} else {
-				terminalMissing = append(terminalMissing, "ghostty")
-				missingCommands = append(missingCommands, "ghostty")
-			}
 			if _, err := os.Stat(kittyConfigPath); err == nil {
 				terminalDetails = append(terminalDetails, "kitty config rooted at "+kittyConfigPath)
-			}
-			if _, err := os.Stat(ghosttyConfigPath); err == nil {
-				terminalDetails = append(terminalDetails, "ghostty state-aware config rooted at "+ghosttyConfigPath)
 			}
 
 			shaderScriptPath := filepath.Join(dotfilesDir(), "scripts", "kitty-shader-playlist.sh")
@@ -629,9 +625,6 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				shaderDetails = append(shaderDetails, "kitty is the active shader write target")
 			} else {
 				shaderMissing = append(shaderMissing, "kitty")
-			}
-			if _, err := os.Stat(ghosttyConfigPath); err == nil {
-				shaderDetails = append(shaderDetails, "ghostty config present for state-aware terminal parity")
 			}
 
 			output := dotfilesDesktopStatusOutput{
@@ -678,10 +671,10 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 					Details: sessionDetails,
 					Missing: uniqueSortedStrings(sessionMissing),
 				},
-				Eww: dotfilesDesktopCapability{
-					Ready:   len(ewwMissing) == 0,
-					Details: ewwDetails,
-					Missing: uniqueSortedStrings(ewwMissing),
+				Ironbar: dotfilesDesktopCapability{
+					Ready:   len(ironbarMissing) == 0,
+					Details: ironbarDetails,
+					Missing: uniqueSortedStrings(ironbarMissing),
 				},
 				Notifications: dotfilesDesktopCapability{
 					Ready:   len(notificationMissing) == 0,
@@ -689,7 +682,7 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 					Missing: uniqueSortedStrings(notificationMissing),
 				},
 				Terminal: dotfilesDesktopCapability{
-					Ready:   kittyInstalled || ghosttyInstalled,
+					Ready:   kittyInstalled,
 					Details: terminalDetails,
 					Missing: uniqueSortedStrings(terminalMissing),
 				},
@@ -700,7 +693,7 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 				},
 				MissingCommands: uniqueSortedStrings(missingCommands),
 			}
-			if !(output.Hyprland.Ready && output.Shell.Ready && output.Screenshot.Ready && output.OCR.Ready && output.Input.Ready && output.Accessibility.Ready && output.DesktopSession.Ready && output.Eww.Ready && output.Notifications.Ready && output.Terminal.Ready && output.Shader.Ready) {
+			if !(output.Hyprland.Ready && output.Shell.Ready && output.Screenshot.Ready && output.OCR.Ready && output.Input.Ready && output.Accessibility.Ready && output.DesktopSession.Ready && output.Ironbar.Ready && output.Notifications.Ready && output.Terminal.Ready && output.Shader.Ready) {
 				output.Status = "degraded"
 			}
 			return output, nil
@@ -711,6 +704,8 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 		"desktop status",
 		"desktop readiness",
 		"hyprland status",
+		"ironbar",
+		"menubar",
 		"hyprshell",
 		"hypr-dock",
 		"hyprdynamicmonitors",
@@ -718,10 +713,8 @@ func (m *DotfilesDiscoveryModule) Tools() []registry.ToolDefinition {
 		"wayland env",
 		"ocr readiness",
 		"click automation",
-		"eww",
 		"notification history",
 		"kitty",
-		"ghostty",
 		"terminal shader",
 	}
 
@@ -778,7 +771,6 @@ func dotfilesModules() []registry.ToolModule {
 		&BluetoothModule{},
 		&ControllerModule{},
 		&MidiModule{},
-		&JuhradialModule{},
 		&WorkflowModule{},
 		&OSSModule{},
 		&MappingEngineModule{},
@@ -789,7 +781,6 @@ func dotfilesModules() []registry.ToolModule {
 		&ClipboardModule{},
 		&NotifyModule{},
 		&NotificationModule{},
-		&EwwDesktopModule{},
 		&InputSimulateModule{},
 		&DesktopInteractModule{},
 		&DesktopSemanticModule{},
@@ -805,6 +796,12 @@ func dotfilesModules() []registry.ToolModule {
 		&SystemdModule{},
 		&TmuxModule{},
 		&ProcessModule{},
+		&HyprshadeModule{},
+		&KeybindsModule{},
+		&WaylandPerfModule{},
+		&RemediationModule{},
+		&EventsModule{},
+		&RetroArchModule{},
 	}
 }
 
@@ -866,7 +863,9 @@ func isDesktopProfileTool(name string) bool {
 		strings.HasPrefix(name, "clipboard_"),
 		strings.HasPrefix(name, "notify_"),
 		strings.HasPrefix(name, "notification_"),
-		strings.HasPrefix(name, "input_"):
+		strings.HasPrefix(name, "input_"),
+		strings.HasPrefix(name, "hyprshade_"),
+		strings.HasPrefix(name, "keybinds_"):
 		return true
 	}
 
@@ -875,12 +874,7 @@ func isDesktopProfileTool(name string) bool {
 		"dotfiles_validate_config",
 		"dotfiles_reload_service",
 		"dotfiles_cascade_reload",
-		"dotfiles_rice_check",
-		"dotfiles_eww_status",
-		"dotfiles_eww_get",
-		"dotfiles_eww_restart",
-		"dotfiles_eww_inspect",
-		"dotfiles_eww_reload":
+		"dotfiles_rice_check":
 		return true
 	default:
 		return false
@@ -888,20 +882,79 @@ func isDesktopProfileTool(name string) bool {
 }
 
 func dotfilesRuntimeDir() string {
-	if dir := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR")); dir != "" {
-		return dir
-	}
-	dir := fmt.Sprintf("/run/user/%d", os.Getuid())
-	if info, err := os.Stat(dir); err == nil && info.IsDir() {
-		return dir
-	}
-	return ""
+	return dotfilesResolveDesktopRuntime().XDGRuntimeDir
 }
 
 func dotfilesWaylandDisplay(runtimeDir string) string {
-	if display := strings.TrimSpace(os.Getenv("WAYLAND_DISPLAY")); display != "" {
-		return display
+	if runtimeDir == "" {
+		return dotfilesResolveDesktopRuntime().WaylandDisplay
 	}
+	resolved := dotfilesResolveDesktopRuntime()
+	if resolved.XDGRuntimeDir == runtimeDir && resolved.WaylandDisplay != "" {
+		return resolved.WaylandDisplay
+	}
+	envRuntime := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR"))
+	if runtimeDir == envRuntime {
+		if display := strings.TrimSpace(os.Getenv("WAYLAND_DISPLAY")); display != "" {
+			return display
+		}
+	}
+	return dotfilesWaylandDisplayInDir(runtimeDir)
+}
+
+func dotfilesHyprlandSignature(runtimeDir string) string {
+	if runtimeDir == "" {
+		return dotfilesResolveDesktopRuntime().HyprlandInstanceSignature
+	}
+	resolved := dotfilesResolveDesktopRuntime()
+	if resolved.XDGRuntimeDir == runtimeDir && resolved.HyprlandInstanceSignature != "" {
+		return resolved.HyprlandInstanceSignature
+	}
+	envRuntime := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR"))
+	if runtimeDir == envRuntime {
+		if sig := strings.TrimSpace(os.Getenv("HYPRLAND_INSTANCE_SIGNATURE")); sig != "" {
+			return sig
+		}
+	}
+	return dotfilesHyprlandSignatureInDir(runtimeDir)
+}
+
+type dotfilesDesktopRuntimeCandidate struct {
+	RuntimeDir        string
+	WaylandDisplay    string
+	HyprlandSignature string
+	UID               int
+}
+
+func dotfilesRuntimeScanRoot() string {
+	if root := strings.TrimSpace(os.Getenv("DOTFILES_RUNTIME_SCAN_ROOT")); root != "" {
+		return root
+	}
+	return "/run/user"
+}
+
+func dotfilesRuntimeDirUID(runtimeDir string) int {
+	base := filepath.Base(strings.TrimRight(runtimeDir, "/"))
+	uid, err := strconv.Atoi(base)
+	if err != nil {
+		return -1
+	}
+	return uid
+}
+
+func dotfilesRuntimeSystemdMachine(runtimeDir string) string {
+	uid := dotfilesRuntimeDirUID(runtimeDir)
+	if uid < 0 {
+		return ""
+	}
+	account, err := user.LookupId(strconv.Itoa(uid))
+	if err != nil || strings.TrimSpace(account.Username) == "" {
+		return ""
+	}
+	return account.Username + "@.host"
+}
+
+func dotfilesWaylandDisplayInDir(runtimeDir string) string {
 	if runtimeDir == "" {
 		return ""
 	}
@@ -929,10 +982,7 @@ func dotfilesWaylandDisplay(runtimeDir string) string {
 	return ""
 }
 
-func dotfilesHyprlandSignature(runtimeDir string) string {
-	if sig := strings.TrimSpace(os.Getenv("HYPRLAND_INSTANCE_SIGNATURE")); sig != "" {
-		return sig
-	}
+func dotfilesHyprlandSignatureInDir(runtimeDir string) string {
 	if runtimeDir == "" {
 		return ""
 	}
@@ -952,6 +1002,113 @@ func dotfilesHyprlandSignature(runtimeDir string) string {
 		return signatures[0]
 	}
 	return ""
+}
+
+func dotfilesRuntimeCandidate(runtimeDir string, allowEnv bool) (dotfilesDesktopRuntimeCandidate, bool) {
+	runtimeDir = strings.TrimSpace(runtimeDir)
+	if runtimeDir == "" {
+		return dotfilesDesktopRuntimeCandidate{}, false
+	}
+	info, err := os.Stat(runtimeDir)
+	if err != nil || !info.IsDir() {
+		return dotfilesDesktopRuntimeCandidate{}, false
+	}
+
+	candidate := dotfilesDesktopRuntimeCandidate{
+		RuntimeDir: runtimeDir,
+		UID:        dotfilesRuntimeDirUID(runtimeDir),
+	}
+	if allowEnv {
+		envRuntime := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR"))
+		if runtimeDir == envRuntime {
+			candidate.WaylandDisplay = strings.TrimSpace(os.Getenv("WAYLAND_DISPLAY"))
+			candidate.HyprlandSignature = strings.TrimSpace(os.Getenv("HYPRLAND_INSTANCE_SIGNATURE"))
+		}
+	}
+	if candidate.WaylandDisplay == "" {
+		candidate.WaylandDisplay = dotfilesWaylandDisplayInDir(runtimeDir)
+	}
+	if candidate.HyprlandSignature == "" {
+		candidate.HyprlandSignature = dotfilesHyprlandSignatureInDir(runtimeDir)
+	}
+	if candidate.WaylandDisplay == "" && candidate.HyprlandSignature == "" {
+		return dotfilesDesktopRuntimeCandidate{}, false
+	}
+	return candidate, true
+}
+
+func dotfilesResolveDesktopRuntime() dotfilesDesktopRuntime {
+	envRuntime := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR"))
+	if envRuntime != "" {
+		if candidate, ok := dotfilesRuntimeCandidate(envRuntime, true); ok {
+			return dotfilesDesktopRuntime{
+				XDGRuntimeDir:             candidate.RuntimeDir,
+				WaylandDisplay:            candidate.WaylandDisplay,
+				HyprlandInstanceSignature: candidate.HyprlandSignature,
+			}
+		}
+		return dotfilesDesktopRuntime{
+			XDGRuntimeDir:             envRuntime,
+			WaylandDisplay:            strings.TrimSpace(os.Getenv("WAYLAND_DISPLAY")),
+			HyprlandInstanceSignature: strings.TrimSpace(os.Getenv("HYPRLAND_INSTANCE_SIGNATURE")),
+		}
+	}
+
+	best := dotfilesDesktopRuntimeCandidate{}
+	bestScore := -1
+	if scanRoot := dotfilesRuntimeScanRoot(); scanRoot != "" {
+		entries, err := os.ReadDir(scanRoot)
+		if err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					continue
+				}
+				runtimeDir := filepath.Join(scanRoot, entry.Name())
+				candidate, ok := dotfilesRuntimeCandidate(runtimeDir, runtimeDir == envRuntime)
+				if !ok {
+					continue
+				}
+				score := 0
+				if candidate.RuntimeDir == envRuntime {
+					score += 40
+				}
+				if candidate.WaylandDisplay != "" {
+					score += 40
+				}
+				if candidate.HyprlandSignature != "" {
+					score += 30
+				}
+				if candidate.WaylandDisplay != "" && candidate.HyprlandSignature != "" {
+					score += 20
+				}
+				if candidate.UID > 0 {
+					score += 10
+				}
+				if score > bestScore {
+					best = candidate
+					bestScore = score
+				}
+			}
+		}
+	}
+	if bestScore >= 0 {
+		return dotfilesDesktopRuntime{
+			XDGRuntimeDir:             best.RuntimeDir,
+			WaylandDisplay:            best.WaylandDisplay,
+			HyprlandInstanceSignature: best.HyprlandSignature,
+		}
+	}
+
+	currentRuntime := fmt.Sprintf("%s/%d", strings.TrimRight(dotfilesRuntimeScanRoot(), "/"), os.Getuid())
+	if info, err := os.Stat(currentRuntime); err == nil && info.IsDir() {
+		return dotfilesDesktopRuntime{
+			XDGRuntimeDir:             currentRuntime,
+			WaylandDisplay:            dotfilesWaylandDisplayInDir(currentRuntime),
+			HyprlandInstanceSignature: dotfilesHyprlandSignatureInDir(currentRuntime),
+		}
+	}
+
+	return dotfilesDesktopRuntime{}
 }
 
 func schemaMap(schema any) map[string]any {

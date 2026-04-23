@@ -18,8 +18,8 @@ func TestClipboardModuleRegistration(t *testing.T) {
 	}
 
 	tools := m.Tools()
-	if len(tools) != 3 {
-		t.Fatalf("expected 3 tools, got %d", len(tools))
+	if len(tools) != 7 {
+		t.Fatalf("expected 7 tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -30,6 +30,10 @@ func TestClipboardModuleRegistration(t *testing.T) {
 		"clipboard_read",
 		"clipboard_write",
 		"clipboard_read_image",
+		"cliphist_list",
+		"cliphist_get",
+		"cliphist_delete",
+		"cliphist_clear",
 	} {
 		if !srv.HasTool(want) {
 			t.Errorf("missing tool: %s", want)

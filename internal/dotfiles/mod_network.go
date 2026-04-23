@@ -141,7 +141,9 @@ type NetworkDNSEntry struct {
 	Servers   []string `json:"servers"`
 }
 
-// Wrapper types to ensure MCP returns JSON objects (not bare arrays).
+// NetworkWifiListOutput wraps a wifi network list in an object so MCP
+// callers see a JSON object instead of a bare array (easier to extend
+// with metadata such as the active SSID).
 type NetworkWifiListOutput struct {
 	Networks []NetworkWifiEntry `json:"networks"`
 	Total    int                `json:"total"`
@@ -470,6 +472,53 @@ func (m *NetworkModule) Tools() []registry.ToolDefinition {
 		},
 	)
 
+	// ── network_dns_set ──────────────────────────────
+	networkDNSSet := handler.TypedHandler[NetworkDNSSetInput, NetworkDNSSetOutput](
+		"network_dns_set",
+		"Set DNS servers on a NetworkManager profile via `nmcli connection modify <profile> ipv4.dns`. Requires the connection to be brought back up to take effect — pass reapply=true (default) to do both steps. Passing an empty servers list clears the override so the profile falls back to the DHCP-provided DNS.",
+		func(_ context.Context, input NetworkDNSSetInput) (NetworkDNSSetOutput, error) {
+			if err := netCheckTool("nmcli"); err != nil {
+				return NetworkDNSSetOutput{}, err
+			}
+			profile := strings.TrimSpace(input.Profile)
+			if profile == "" {
+				return NetworkDNSSetOutput{}, fmt.Errorf("[%s] profile is required", handler.ErrInvalidParam)
+			}
+			// Validate each server is an IP to prevent shell-quoted injection.
+			for _, s := range input.Servers {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					continue
+				}
+				if !isIPAddress(s) {
+					return NetworkDNSSetOutput{}, fmt.Errorf("[%s] %q is not a valid IP address", handler.ErrInvalidParam, s)
+				}
+			}
+			joined := strings.Join(input.Servers, ",")
+			_, err := netRunCmdTimeout(15*time.Second, "nmcli", "connection", "modify", profile, "ipv4.dns", joined)
+			if err != nil {
+				return NetworkDNSSetOutput{Profile: profile}, fmt.Errorf("nmcli connection modify %s ipv4.dns: %w", profile, err)
+			}
+			out := NetworkDNSSetOutput{Profile: profile, Servers: input.Servers, Applied: true}
+			reapply := true
+			if input.Reapply != nil {
+				reapply = *input.Reapply
+			}
+			if reapply {
+				// `nmcli connection up` re-reads the modified settings and
+				// restarts the connection — required for DNS changes to
+				// propagate to resolvectl / resolv.conf.
+				if _, err := netRunCmdTimeout(30*time.Second, "nmcli", "connection", "up", profile); err != nil {
+					out.Reapplied = false
+					out.Notes = fmt.Sprintf("DNS saved, but reapply failed: %v", err)
+					return out, nil
+				}
+				out.Reapplied = true
+			}
+			return out, nil
+		},
+	)
+
 	return []registry.ToolDefinition{
 		networkStatus,
 		networkWifiList,
@@ -477,7 +526,23 @@ func (m *NetworkModule) Tools() []registry.ToolDefinition {
 		networkVpnToggle,
 		networkConnections,
 		networkDNS,
+		networkDNSSet,
 	}
+}
+
+// NetworkDNSSetInput configures DNS on a NetworkManager profile.
+type NetworkDNSSetInput struct {
+	Profile string   `json:"profile" jsonschema:"required,description=NetworkManager connection profile name (see network_connections)"`
+	Servers []string `json:"servers" jsonschema:"description=IPv4 addresses to set as DNS. Empty list clears the override and falls back to DHCP-provided DNS."`
+	Reapply *bool    `json:"reapply,omitempty" jsonschema:"description=After modifying, call 'nmcli connection up' so DNS takes effect immediately (default: true)"`
+}
+
+type NetworkDNSSetOutput struct {
+	Profile   string   `json:"profile"`
+	Servers   []string `json:"servers,omitempty"`
+	Applied   bool     `json:"applied"`
+	Reapplied bool     `json:"reapplied,omitempty"`
+	Notes     string   `json:"notes,omitempty"`
 }
 
 // isIPAddress checks if a string looks like an IP address (v4 or v6).

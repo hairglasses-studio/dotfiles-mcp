@@ -127,7 +127,7 @@ func (m *NotificationModule) Tools() []registry.ToolDefinition {
 
 			count := 0
 			if countRaw != "" {
-				fmt.Sscanf(countRaw, "%d", &count)
+				_, _ = fmt.Sscanf(countRaw, "%d", &count)
 			}
 
 			entries, _ := readNotificationHistoryEntries()

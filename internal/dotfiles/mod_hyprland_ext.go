@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hairglasses-studio/dotfiles-mcp/internal/remediation"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
@@ -82,9 +83,11 @@ type HyprWaitEventInput struct {
 }
 
 type hyprConfigErrorsOutput struct {
-	Healthy  bool     `json:"healthy"`
-	Messages []string `json:"messages,omitempty"`
-	Raw      string   `json:"raw,omitempty"`
+	Healthy     bool                     `json:"healthy"`
+	Messages    []string                 `json:"messages,omitempty"`
+	Raw         string                   `json:"raw,omitempty"`
+	ErrorCode   string                   `json:"error_code,omitempty"`
+	Remediation *remediation.Remediation `json:"remediation,omitempty"`
 }
 
 type hyprEventRecord struct {
@@ -133,18 +136,29 @@ func hyprExtendedToolDefinitions() []registry.ToolDefinition {
 		),
 		handler.TypedHandler[EmptyInput, hyprConfigErrorsOutput](
 			"hypr_get_config_errors",
-			"Return Hyprland config parse errors and whether the active config is healthy.",
+			"Return Hyprland config parse errors and whether the active config is healthy. When errors are present, attaches a structured Remediation record callers can dispatch directly.",
 			func(_ context.Context, _ EmptyInput) (hyprConfigErrorsOutput, error) {
 				raw, err := hyprQueryMaybeJSON("configerrors")
 				if err != nil {
 					return hyprConfigErrorsOutput{}, err
 				}
 				messages := hyprConfigErrorMessages(raw)
-				return hyprConfigErrorsOutput{
+				out := hyprConfigErrorsOutput{
 					Healthy:  len(messages) == 0,
 					Messages: messages,
 					Raw:      raw,
-				}, nil
+				}
+				if !out.Healthy {
+					// Attach the generic hypr_config_errors remediation so the
+					// model / a hook can dispatch the reload without parsing
+					// the message text. Specific codes (parse vs. option-does-
+					// not-exist) can be discriminated later as detectors land.
+					if rem, ok := remediation.Lookup(remediation.CodeHyprConfigErrors); ok {
+						out.ErrorCode = string(remediation.CodeHyprConfigErrors)
+						out.Remediation = &rem
+					}
+				}
+				return out, nil
 			},
 		),
 		handler.TypedHandler[EmptyInput, string](
@@ -424,7 +438,7 @@ func hyprSocket2Path() (string, error) {
 	}
 	socket := filepath.Join(runtimeDir, "hypr", sig, ".socket2.sock")
 	if _, err := os.Stat(socket); err != nil {
-		return "", fmt.Errorf("Hyprland event socket not found: %s", socket)
+		return "", fmt.Errorf("hyprland event socket not found: %s", socket)
 	}
 	return socket, nil
 }

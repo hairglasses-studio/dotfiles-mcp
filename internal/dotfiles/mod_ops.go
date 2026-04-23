@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hairglasses-studio/dotfiles-mcp/internal/remediation"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
 )
@@ -173,12 +174,14 @@ type TestFailure struct {
 }
 
 type AnalyzedIssue struct {
-	Category   string `json:"category"`
-	File       string `json:"file"`
-	Line       int    `json:"line,omitempty"`
-	Message    string `json:"message"`
-	Suggestion string `json:"suggestion"`
-	Severity   string `json:"severity"`
+	Category    string                   `json:"category"`
+	File        string                   `json:"file"`
+	Line        int                      `json:"line,omitempty"`
+	Message     string                   `json:"message"`
+	Suggestion  string                   `json:"suggestion"`
+	Severity    string                   `json:"severity"`
+	ErrorCode   string                   `json:"error_code,omitempty"`
+	Remediation *remediation.Remediation `json:"remediation,omitempty"`
 }
 
 type ChangedFile struct {
@@ -240,14 +243,31 @@ func opsResolveRepo(repo string) (string, error) {
 }
 
 func opsDetectLanguage(repoPath string) string {
-	if _, err := os.Stat(filepath.Join(repoPath, "go.mod")); err == nil {
-		return "go"
+	if _, err := os.Stat(repoPath); err != nil {
+		return "unknown"
 	}
-	if _, err := os.Stat(filepath.Join(repoPath, "package.json")); err == nil {
-		return "node"
+	dir, err := filepath.Abs(repoPath)
+	if err != nil {
+		dir = repoPath
 	}
-	if _, err := os.Stat(filepath.Join(repoPath, "pyproject.toml")); err == nil {
-		return "python"
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return "go"
+		}
+		if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+			return "node"
+		}
+		if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err == nil {
+			return "python"
+		}
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
 	}
 	return "unknown"
 }
@@ -503,6 +523,43 @@ func opsCategorizeError(msg string) string {
 	default:
 		return "compile_error"
 	}
+}
+
+// opsCategoryToCode maps an opsCategorizeError category to a registered
+// remediation.ErrorCode. Returns empty string when no structured remediation
+// is available for the category — callers should leave ErrorCode blank in
+// that case rather than attaching an incorrect fix.
+//
+// Categories deliberately left unmapped (require human judgment):
+//   - type_error / import_cycle / fatal_error / test_assertion: no safe auto-fix
+//   - syntax_error: goimports doesn't fix syntax; surfacing raw is the right move
+func opsCategoryToCode(category string) remediation.ErrorCode {
+	switch category {
+	case "missing_dep":
+		return remediation.CodeGoMissingDep
+	case "compile_error":
+		return remediation.CodeGoLintViolation
+	case "timeout":
+		return remediation.CodeGoTimeout
+	default:
+		return ""
+	}
+}
+
+// attachRemediation fills in Remediation + ErrorCode on an issue when the
+// issue's Category maps to a known remediation. It is a no-op when the
+// category has no registered remediation, so callers can chain it blindly.
+func attachRemediation(issue *AnalyzedIssue) {
+	code := opsCategoryToCode(issue.Category)
+	if code == "" {
+		return
+	}
+	rem, ok := remediation.Lookup(code)
+	if !ok {
+		return
+	}
+	issue.ErrorCode = string(code)
+	issue.Remediation = &rem
 }
 
 func opsChangedGoPackages(repoPath, base string) ([]string, []string, error) {
@@ -908,6 +965,8 @@ type OpsChangelogGenerateOutput struct {
 // ---------------------------------------------------------------------------
 
 // --- ops_auto_fix ---
+
+// OpsAutoFixInput is the request payload for ops_auto_fix.
 type OpsAutoFixInput struct {
 	Repo    string          `json:"repo,omitempty" jsonschema:"description=Repository path (default: cwd)"`
 	Issues  []AnalyzedIssue `json:"issues" jsonschema:"description=Issues from ops_analyze_failures"`
@@ -933,6 +992,8 @@ type OpsAutoFixOutput struct {
 }
 
 // --- ops_fleet_diff ---
+
+// OpsFleetDiffInput is the request payload for ops_fleet_diff.
 type OpsFleetDiffInput struct {
 	Dir      string `json:"dir,omitempty" jsonschema:"description=Root directory (default: ~/hairglasses-studio)"`
 	Since    string `json:"since" jsonschema:"description=Date (2024-04-01) or relative (3d/1w) or git ref"`
@@ -961,6 +1022,8 @@ type OpsFleetDiffOutput struct {
 }
 
 // --- ops_tech_debt ---
+
+// OpsTechDebtInput is the request payload for ops_tech_debt.
 type OpsTechDebtInput struct {
 	Repo  string `json:"repo,omitempty" jsonschema:"description=Single repo path (omit for fleet mode)"`
 	Dir   string `json:"dir,omitempty" jsonschema:"description=Fleet root directory (default: ~/hairglasses-studio)"`
@@ -982,6 +1045,8 @@ type OpsTechDebtOutput struct {
 }
 
 // --- ops_research_check ---
+
+// OpsResearchCheckInput is the request payload for ops_research_check.
 type OpsResearchCheckInput struct {
 	Query      string `json:"query" jsonschema:"description=Topic or keywords to search for"`
 	DocsPath   string `json:"docs_path,omitempty" jsonschema:"description=Docs repo path (default: ~/hairglasses-studio/docs)"`
@@ -1005,6 +1070,8 @@ type OpsResearchCheckOutput struct {
 }
 
 // --- ops_session_handoff ---
+
+// OpsSessionHandoffInput is the request payload for ops_session_handoff.
 type OpsSessionHandoffInput struct {
 	SessionID string `json:"session_id,omitempty" jsonschema:"description=Ops session ID (default: most recent)"`
 	Repo      string `json:"repo,omitempty" jsonschema:"description=Repository path (default: cwd)"`
@@ -1020,6 +1087,8 @@ type OpsSessionHandoffOutput struct {
 }
 
 // --- ops_iteration_patterns ---
+
+// OpsIterationPatternsInput is the request payload for ops_iteration_patterns.
 type OpsIterationPatternsInput struct {
 	Window string `json:"window,omitempty" jsonschema:"description=Time window (default: 30d)"`
 	Repo   string `json:"repo,omitempty" jsonschema:"description=Filter to specific repo"`
@@ -1442,14 +1511,16 @@ func opsAnalyze(_ context.Context, input OpsAnalyzeInput) (OpsAnalyzeOutput, err
 		cat := opsCategorizeError(ce.Message)
 		categories[cat]++
 		fileSet[ce.File] = true
-		issues = append(issues, AnalyzedIssue{
+		issue := AnalyzedIssue{
 			Category:   cat,
 			File:       ce.File,
 			Line:       ce.Line,
 			Message:    ce.Message,
 			Suggestion: suggestFix(cat, ce.Message),
 			Severity:   "blocker",
-		})
+		}
+		attachRemediation(&issue)
+		issues = append(issues, issue)
 	}
 
 	for _, tf := range input.TestFailures {
@@ -1461,13 +1532,15 @@ func opsAnalyze(_ context.Context, input OpsAnalyzeInput) (OpsAnalyzeOutput, err
 			pkgDir = pkgDir[strings.Index(pkgDir[idx+1:], "/")+idx+2:]
 		}
 		fileSet[pkgDir] = true
-		issues = append(issues, AnalyzedIssue{
+		issue := AnalyzedIssue{
 			Category:   cat,
 			File:       pkgDir,
 			Message:    fmt.Sprintf("Test %s failed", tf.Test),
 			Suggestion: suggestFix(cat, tf.Output),
 			Severity:   "blocker",
-		})
+		}
+		attachRemediation(&issue)
+		issues = append(issues, issue)
 	}
 
 	var affected []string
@@ -2437,7 +2510,7 @@ func opsRelease(_ context.Context, input OpsReleaseInput) (OpsReleaseOutput, err
 		data, err := os.ReadFile(filepath.Join(repo, "package.json"))
 		if err == nil {
 			var pkg map[string]any
-			json.Unmarshal(data, &pkg)
+			_ = json.Unmarshal(data, &pkg) // parse failure leaves pkg nil; the `ok` check below handles it
 			if v, ok := pkg["version"].(string); ok {
 				currentVersion = v
 			}
@@ -2484,15 +2557,21 @@ func opsRelease(_ context.Context, input OpsReleaseInput) (OpsReleaseOutput, err
 		}, nil
 	}
 
-	// Execute: update version files
+	// Execute: update version files.
+	// Errors from the write path are intentionally not propagated here —
+	// the caller (release tool) drives a \`git add -A && git commit\`
+	// afterward, which re-surfaces any missing/stale file via the commit
+	// diff. Leaving the \`_ =\` marker so errcheck stays clean and the
+	// intent is explicit; a future refactor should capture the error and
+	// include it in the tool result's `warnings` field.
 	switch lang {
 	case "node":
 		data, _ := os.ReadFile(filepath.Join(repo, "package.json"))
 		var pkg map[string]any
-		json.Unmarshal(data, &pkg)
+		_ = json.Unmarshal(data, &pkg)
 		pkg["version"] = version
 		updated, _ := json.MarshalIndent(pkg, "", "  ")
-		os.WriteFile(filepath.Join(repo, "package.json"), append(updated, '\n'), 0o644)
+		_ = os.WriteFile(filepath.Join(repo, "package.json"), append(updated, '\n'), 0o644)
 
 	case "python":
 		data, _ := os.ReadFile(filepath.Join(repo, "pyproject.toml"))
@@ -2503,7 +2582,7 @@ func opsRelease(_ context.Context, input OpsReleaseInput) (OpsReleaseOutput, err
 				break
 			}
 		}
-		os.WriteFile(filepath.Join(repo, "pyproject.toml"), []byte(strings.Join(lines, "\n")), 0o644)
+		_ = os.WriteFile(filepath.Join(repo, "pyproject.toml"), []byte(strings.Join(lines, "\n")), 0o644)
 	}
 
 	// Update CHANGELOG.md
@@ -2511,7 +2590,7 @@ func opsRelease(_ context.Context, input OpsReleaseInput) (OpsReleaseOutput, err
 		clPath := filepath.Join(repo, "CHANGELOG.md")
 		existing, _ := os.ReadFile(clPath)
 		newContent := changelogEntry + "\n" + string(existing)
-		os.WriteFile(clPath, []byte(newContent), 0o644)
+		_ = os.WriteFile(clPath, []byte(newContent), 0o644)
 	}
 
 	// Commit
@@ -3141,7 +3220,7 @@ func opsRepoAnalyze(_ context.Context, input OpsRepoAnalyzeInput) (OpsRepoAnalyz
 				Dependencies    map[string]string `json:"dependencies"`
 				DevDependencies map[string]string `json:"devDependencies"`
 			}
-			json.Unmarshal(data, &pkg)
+			_ = json.Unmarshal(data, &pkg) // parse failure leaves both maps nil; the range loops below no-op
 			allDeps := make(map[string]string)
 			for k, v := range pkg.Dependencies {
 				allDeps[k] = v
@@ -3776,12 +3855,13 @@ func opsScoreRepoDebt(repoPath, name string) TechDebtScore {
 
 	// 4. CI health
 	ciScore := 0
-	if sandboxFileExists(filepath.Join(repoPath, ".github", "workflows")) {
+	switch {
+	case sandboxFileExists(filepath.Join(repoPath, ".github", "workflows")):
 		ciScore = 100
-	} else if sandboxFileExists(filepath.Join(repoPath, "Makefile")) {
+	case sandboxFileExists(filepath.Join(repoPath, "Makefile")):
 		ciScore = 50
 		actions = append(actions, "Add CI workflow")
-	} else {
+	default:
 		actions = append(actions, "Add CI/CD pipeline")
 	}
 	dims["ci_health"] = ciScore

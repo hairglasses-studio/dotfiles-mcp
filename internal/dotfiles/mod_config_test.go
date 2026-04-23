@@ -3,6 +3,7 @@ package dotfiles
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -277,10 +278,34 @@ func TestListConfigs_NonexistentDir(t *testing.T) {
 
 func TestCheckSymlinks_TempDir(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("DOTFILES_DIR", dir)
+	home := filepath.Join(dir, "home")
+	srcHealthy := filepath.Join(dir, "ghostty")
+	dstHealthy := filepath.Join(home, ".config", "ghostty")
+	srcMissing := filepath.Join(dir, "kitty")
+	dstMissing := filepath.Join(home, ".config", "kitty")
 
-	// Create source dirs that expectedSymlinks() references.
-	// These will be tested by the handler even if the dst doesn't exist.
+	if err := os.MkdirAll(filepath.Dir(dstHealthy), 0o755); err != nil {
+		t.Fatalf("mkdir healthy target dir: %v", err)
+	}
+	if err := os.WriteFile(srcHealthy, []byte("ghostty"), 0o644); err != nil {
+		t.Fatalf("write healthy source: %v", err)
+	}
+	if err := os.Symlink(srcHealthy, dstHealthy); err != nil {
+		t.Fatalf("symlink healthy target: %v", err)
+	}
+
+	writeTestInstallScript(t, dir, fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" != "--print-link-specs" ]]; then
+  exit 2
+fi
+printf '%s|%s\n' %q %q
+printf '%s|%s\n' %q %q
+`, "%s", "%s", srcHealthy, dstHealthy, "%s", "%s", srcMissing, dstMissing))
+
+	t.Setenv("DOTFILES_DIR", dir)
+	t.Setenv("HOME", home)
+
 	m := &DotfilesModule{}
 	td := findTool(t, m, "dotfiles_check_symlinks")
 	req := registry.CallToolRequest{}
@@ -304,14 +329,32 @@ func TestCheckSymlinks_TempDir(t *testing.T) {
 		t.Fatal("expected non-empty symlinks list")
 	}
 
-	// All should be "missing" since we're in a temp dir with no real symlinks.
-	for _, s := range out.Symlinks {
-		if s.Status != "missing" {
-			// healthy or broken are also valid; we just verify status is set.
-			if s.Status == "" {
-				t.Errorf("symlink %q has empty status", s.Source)
-			}
-		}
+	if len(out.Symlinks) != 2 {
+		t.Fatalf("got %d symlinks, want 2", len(out.Symlinks))
+	}
+	if out.Symlinks[0].Status != "healthy" {
+		t.Fatalf("healthy symlink status = %q, want healthy", out.Symlinks[0].Status)
+	}
+	if out.Symlinks[1].Status != "missing" {
+		t.Fatalf("missing symlink status = %q, want missing", out.Symlinks[1].Status)
+	}
+}
+
+func TestCheckSymlinks_InventoryFailure(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DOTFILES_DIR", dir)
+
+	m := &DotfilesModule{}
+	td := findTool(t, m, "dotfiles_check_symlinks")
+	req := registry.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+
+	result, err := td.Handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+	if result == nil || !result.IsError {
+		t.Fatal("expected IsError result when install inventory is unavailable")
 	}
 }
 

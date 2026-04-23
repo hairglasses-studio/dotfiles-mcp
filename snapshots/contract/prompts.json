@@ -90,7 +90,7 @@
       "desktop",
       "triage",
       "hyprland",
-      "eww"
+      "ironbar"
     ]
   },
   {
@@ -121,6 +121,19 @@
       "arch",
       "troubleshooting",
       "wiki"
+    ]
+  },
+  {
+    "name": "validate-rice",
+    "description": "Comprehensive rice health check across compositor, shader, symlinks, and failed services",
+    "category": "workflow",
+    "tags": [
+      "rice",
+      "desktop",
+      "health",
+      "shader",
+      "symlinks",
+      "systemd"
     ]
   }
 ]

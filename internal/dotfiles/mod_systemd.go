@@ -196,7 +196,7 @@ type SystemdFailedOutput struct {
 // ── systemd_restart_verify (composed) ──────────────────────────────────────
 
 type SystemdRestartVerifyInput struct {
-	Unit      string `json:"unit" jsonschema:"required,description=systemd unit name (e.g. juhradialmx-daemon.service)"`
+	Unit      string `json:"unit" jsonschema:"required,description=systemd unit name (e.g. ironbar.service)"`
 	TimeoutMs int    `json:"timeout_ms,omitempty" jsonschema:"description=Max time to wait for unit to become active (default 10000ms)"`
 	Scope     string `json:"scope,omitempty" jsonschema:"description=systemd scope: user (default) or system,enum=user,enum=system"`
 }
@@ -624,6 +624,27 @@ func (m *SystemdModule) Tools() []registry.ToolDefinition {
 	restartVerify.Category = "systemd"
 	restartVerify.SearchTerms = []string{"restart verify", "restart check", "restart poll", "composed restart", "service health"}
 
+	resetFailed := handler.TypedHandler[SystemdResetFailedInput, SystemdResetFailedOutput](
+		"systemd_reset_failed",
+		"Clear the 'failed' state of a unit via `systemctl reset-failed`. Required before a unit that hit its StartLimitBurst can be restarted — otherwise systemctl restart will report 'start request repeated too quickly' and refuse.",
+		func(ctx context.Context, input SystemdResetFailedInput) (SystemdResetFailedOutput, error) {
+			user := !input.System
+			unit := strings.TrimSpace(input.Unit)
+			if unit == "" {
+				return SystemdResetFailedOutput{}, fmt.Errorf("[%s] unit is required", handler.ErrInvalidParam)
+			}
+			// Idempotent: reset-failed on a healthy unit is a no-op that
+			// returns 0. No need to pre-check state.
+			if _, err := systemdRunSystemctl(ctx, user, "reset-failed", unit); err != nil {
+				return SystemdResetFailedOutput{Unit: unit}, fmt.Errorf("[%s] %w", handler.ErrUpstreamError, err)
+			}
+			return SystemdResetFailedOutput{Unit: unit, Reset: true}, nil
+		},
+	)
+	resetFailed.IsWrite = true
+	resetFailed.Category = "systemd"
+	resetFailed.SearchTerms = []string{"reset failed", "clear failed", "start-limit", "burst"}
+
 	return []registry.ToolDefinition{
 		status,
 		start,
@@ -636,5 +657,17 @@ func (m *SystemdModule) Tools() []registry.ToolDefinition {
 		listTimers,
 		failed,
 		restartVerify,
+		resetFailed,
 	}
+}
+
+// SystemdResetFailedInput clears the failed state of a unit.
+type SystemdResetFailedInput struct {
+	Unit   string `json:"unit" jsonschema:"required,description=Unit name — e.g. dotfiles-ironbar.service"`
+	System bool   `json:"system,omitempty" jsonschema:"description=Target system scope (default: user scope)"`
+}
+
+type SystemdResetFailedOutput struct {
+	Unit  string `json:"unit"`
+	Reset bool   `json:"reset"`
 }

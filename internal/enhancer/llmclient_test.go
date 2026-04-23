@@ -192,32 +192,32 @@ func TestNewLLMClient_NoAPIKey(t *testing.T) {
 	}
 }
 
-func TestNewLLMClient_UsesConfiguredAnthropicKeyAndDefaultModel(t *testing.T) {
-	t.Setenv("ANTHROPIC_API_KEY", "anthropic-test-key")
+func TestNewLLMClient_UsesConfiguredAPIKeyEnv(t *testing.T) {
+	t.Setenv("CUSTOM_API_KEY", "custom-key")
 	client := NewLLMClient(LLMConfig{
-		APIKeyEnv: "ANTHROPIC_API_KEY",
+		APIKeyEnv: "CUSTOM_API_KEY",
+		BaseURL:   "https://api.example.invalid",
 	})
 	if client == nil {
-		t.Fatal("expected configured Anthropic client")
+		t.Fatal("expected client")
 	}
-	if client.APIKey != "anthropic-test-key" {
-		t.Fatalf("client.APIKey = %q, want %q", client.APIKey, "anthropic-test-key")
+	if client.APIKey != "custom-key" {
+		t.Fatalf("client.APIKey = %q, want %q", client.APIKey, "custom-key")
 	}
 	if client.Model != "claude-sonnet-4-6" {
 		t.Fatalf("client.Model = %q, want %q", client.Model, "claude-sonnet-4-6")
 	}
 }
 
-func TestNewLLMClient_DefaultsToAnthropicBaseURL(t *testing.T) {
-	t.Setenv("ANTHROPIC_API_KEY", "anthropic-test-key")
-
+func TestNewLLMClient_UsesAnthropicFallback(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "anthropic-key")
 	client := NewLLMClient(LLMConfig{
-		APIKeyEnv: "ANTHROPIC_API_KEY",
+		APIKeyEnv: "MISSING_KEY",
 	})
 	if client == nil {
-		t.Fatal("expected Anthropic client")
+		t.Fatal("expected client")
 	}
-	if client.BaseURL != "https://api.anthropic.com" {
-		t.Fatalf("client.BaseURL = %q, want %q", client.BaseURL, "https://api.anthropic.com")
+	if client.APIKey != "anthropic-key" {
+		t.Fatalf("client.APIKey = %q, want %q", client.APIKey, "anthropic-key")
 	}
 }

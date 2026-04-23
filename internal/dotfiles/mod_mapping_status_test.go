@@ -174,10 +174,8 @@ func TestQuickMap_Validation(t *testing.T) {
 				if !strings.Contains(text, tt.wantErr) {
 					t.Fatalf("expected error containing %q, got %q", tt.wantErr, text)
 				}
-			} else {
-				if registry.IsResultError(result) {
-					t.Fatalf("unexpected error result: %+v", result)
-				}
+			} else if registry.IsResultError(result) {
+				t.Fatalf("unexpected error result: %+v", result)
 			}
 		})
 	}

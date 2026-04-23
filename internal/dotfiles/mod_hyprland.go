@@ -27,18 +27,7 @@ func hyprInstanceSig() string {
 	if sig := os.Getenv("HYPRLAND_INSTANCE_SIGNATURE"); sig != "" {
 		return sig
 	}
-	uid := os.Getuid()
-	dir := fmt.Sprintf("/run/user/%d/hypr", uid)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return ""
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			return e.Name()
-		}
-	}
-	return ""
+	return dotfilesHyprlandSignature(dotfilesRuntimeDir())
 }
 
 // hyprctlCmd builds an exec.Cmd for hyprctl, inheriting the Wayland env.
@@ -282,7 +271,7 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 				var input ScreenshotInput
 				if req.Params.Arguments != nil {
 					b, _ := json.Marshal(req.Params.Arguments)
-					json.Unmarshal(b, &input)
+					_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 				}
 
 				raw := "/tmp/hypr-screenshot-raw.png"
@@ -971,9 +960,109 @@ func (m *HyprlandModule) Tools() []registry.ToolDefinition {
 			Handler:  handleHyprScreenshotWindow,
 			Category: "hyprland",
 		},
+
+		// ── hypr_screenshot_region ────────────────────
+		// Raw handler: returns mcp.ImageContent directly.
+		{
+			Tool: mcp.Tool{
+				Name:        "hypr_screenshot_region",
+				Description: "Capture a screenshot of a selected screen region using slurp + wayshot. Launches slurp for interactive region selection, then captures with wayshot.",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"save": map[string]any{
+							"type":        "boolean",
+							"description": "Save the screenshot to a file (default true).",
+							"default":     true,
+						},
+						"clipboard": map[string]any{
+							"type":        "boolean",
+							"description": "Copy the screenshot to the clipboard via wl-copy (default false).",
+							"default":     false,
+						},
+					},
+				},
+			},
+			Handler: func(_ context.Context, req registry.CallToolRequest) (*registry.CallToolResult, error) {
+				var input struct {
+					Save      *bool `json:"save"`
+					Clipboard bool  `json:"clipboard"`
+				}
+				// Default save to true
+				defaultSave := true
+				input.Save = &defaultSave
+				if req.Params.Arguments != nil {
+					b, _ := json.Marshal(req.Params.Arguments)
+					_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
+				}
+				doSave := input.Save == nil || *input.Save
+
+				// Run slurp to get region geometry
+				slurpCmd := exec.Command("slurp")
+				slurpOut, err := slurpCmd.Output()
+				if err != nil {
+					return handler.ErrorResult(fmt.Errorf("slurp failed (region selection cancelled or slurp not installed): %w", err)), nil
+				}
+				geometry := strings.TrimSpace(string(slurpOut))
+				if geometry == "" {
+					return handler.ErrorResult(fmt.Errorf("slurp returned empty geometry")), nil
+				}
+
+				ts := time.Now().UnixMilli()
+				outPath := fmt.Sprintf("/tmp/hypr-region-%d.png", ts)
+				if !doSave {
+					defer os.Remove(outPath)
+				}
+
+				// Capture region to file using wayshot
+				if err := screenshotCapture(outPath, geometry, ""); err != nil {
+					return handler.ErrorResult(fmt.Errorf("wayshot region capture failed: %w", err)), nil
+				}
+
+				// Optionally copy to clipboard via wl-copy
+				if input.Clipboard {
+					wlCopyCmd := exec.Command("wl-copy", "--type", "image/png")
+					f, openErr := os.Open(outPath)
+					if openErr != nil {
+						return handler.ErrorResult(fmt.Errorf("open screenshot for clipboard: %w", openErr)), nil
+					}
+					defer f.Close()
+					wlCopyCmd.Stdin = f
+					_ = wlCopyCmd.Run()
+				}
+
+				// Read and base64 encode for inline preview
+				data, err := os.ReadFile(outPath)
+				if err != nil {
+					return handler.ErrorResult(fmt.Errorf("failed to read region screenshot: %w", err)), nil
+				}
+				b64 := base64.StdEncoding.EncodeToString(data)
+
+				caption := fmt.Sprintf("Region: %s", geometry)
+				if doSave {
+					caption += fmt.Sprintf(" — saved to %s", outPath)
+				}
+				if input.Clipboard {
+					caption += " — copied to clipboard"
+				}
+
+				return &registry.CallToolResult{
+					Content: []mcp.Content{
+						mcp.TextContent{Type: "text", Text: caption},
+						mcp.ImageContent{
+							Type:     "image",
+							Data:     b64,
+							MIMEType: "image/png",
+						},
+					},
+				}, nil
+			},
+			Category: "hyprland",
+		},
 	}
 	tools = append(tools, hyprExtendedToolDefinitions()...)
 	tools = append(tools, hyprPersistenceToolDefinitions()...)
+	tools = append(tools, hyprConfigPersistenceTools()...)
 	return tools
 }
 
@@ -988,7 +1077,7 @@ func handleHyprMoveWindow(_ context.Context, req registry.CallToolRequest) (*reg
 	}
 	if req.Params.Arguments != nil {
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 	}
 
 	selector, err := resolveHyprWindow(input.Address, input.Class, "")
@@ -1018,7 +1107,7 @@ func handleHyprResizeWindow(_ context.Context, req registry.CallToolRequest) (*r
 	}
 	if req.Params.Arguments != nil {
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 	}
 
 	selector, err := resolveHyprWindow(input.Address, input.Class, "")
@@ -1046,7 +1135,7 @@ func handleHyprCloseWindow(_ context.Context, req registry.CallToolRequest) (*re
 	}
 	if req.Params.Arguments != nil {
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 	}
 
 	selector, err := resolveHyprWindow(input.Address, input.Class, "")
@@ -1073,7 +1162,7 @@ func handleHyprToggleFloating(_ context.Context, req registry.CallToolRequest) (
 	}
 	if req.Params.Arguments != nil {
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 	}
 
 	selector, err := resolveHyprWindow(input.Address, input.Class, "")
@@ -1100,7 +1189,7 @@ func handleHyprMinimizeWindow(_ context.Context, req registry.CallToolRequest) (
 	}
 	if req.Params.Arguments != nil {
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 	}
 
 	selector, err := resolveHyprWindow(input.Address, input.Class, "")
@@ -1129,7 +1218,7 @@ func handleHyprFullscreenWindow(_ context.Context, req registry.CallToolRequest)
 	}
 	if req.Params.Arguments != nil {
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 	}
 
 	selector, err := resolveHyprWindow(input.Address, input.Class, "")
@@ -1172,7 +1261,7 @@ func handleHyprScreenshotWindow(_ context.Context, req registry.CallToolRequest)
 			MaxSize float64 `json:"max_size"`
 		}
 		b, _ := json.Marshal(req.Params.Arguments)
-		json.Unmarshal(b, &input)
+		_ = json.Unmarshal(b, &input) // zero-value input on malformed args; downstream validation surfaces missing fields
 		address = input.Address
 		class = input.Class
 		if input.MaxSize > 0 {

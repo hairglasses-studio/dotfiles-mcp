@@ -30,10 +30,6 @@ func TestInputModuleRegistration(t *testing.T) {
 
 	for _, want := range []string{
 		"input_status",
-		"input_list_makima_profiles",
-		"input_get_makima_profile",
-		"input_set_makima_profile",
-		"input_delete_makima_profile",
 		"input_restart_services",
 	} {
 		if !srv.HasTool(want) {
@@ -67,39 +63,6 @@ func TestMidiModuleRegistration(t *testing.T) {
 		"midi_generate_mapping",
 		"midi_get_mapping",
 		"midi_set_mapping",
-	} {
-		if !srv.HasTool(want) {
-			t.Errorf("missing tool: %s", want)
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
-// JuhradialModule registration
-// ---------------------------------------------------------------------------
-
-func TestJuhradialModuleRegistration(t *testing.T) {
-	m := &JuhradialModule{}
-
-	if m.Name() != "juhradial" {
-		t.Fatalf("expected name juhradial, got %s", m.Name())
-	}
-
-	tools := m.Tools()
-	if len(tools) != 5 {
-		t.Fatalf("expected 5 juhradial tools, got %d", len(tools))
-	}
-
-	reg := registry.NewToolRegistry()
-	reg.RegisterModule(m)
-	srv := mcptest.NewServer(t, reg)
-
-	for _, want := range []string{
-		"input_get_juhradial_config",
-		"input_set_juhradial_config",
-		"input_get_juhradial_profiles",
-		"input_set_juhradial_profiles",
-		"input_get_juhradial_battery",
 	} {
 		if !srv.HasTool(want) {
 			t.Errorf("missing tool: %s", want)

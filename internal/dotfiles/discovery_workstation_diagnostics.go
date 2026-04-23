@@ -12,8 +12,11 @@ import (
 )
 
 type dotfilesWorkstationDiagnosticsInput struct {
-	Symptom   string `json:"symptom,omitempty" jsonschema:"description=Short description of the workstation symptom or context to anchor the report"`
-	RiceLevel string `json:"rice_level,omitempty" jsonschema:"description=Rice scan level to include,enum=quick,enum=full"`
+	Symptom       string  `json:"symptom,omitempty" jsonschema:"description=Short description of the workstation symptom or context to anchor the report"`
+	RiceLevel     string  `json:"rice_level,omitempty" jsonschema:"description=Rice scan level to include,enum=quick,enum=full"`
+	WarnCPUTemp   float64 `json:"warn_cpu_temp,omitempty" jsonschema:"description=Optional CPU temperature warning threshold in Celsius to pass through to system health"`
+	WarnDiskPct   int     `json:"warn_disk_pct,omitempty" jsonschema:"description=Optional disk usage warning threshold percentage to pass through to system health"`
+	WarnMemoryPct float64 `json:"warn_memory_pct,omitempty" jsonschema:"description=Optional memory usage warning threshold percentage to pass through to system health"`
 }
 
 type dotfilesDesktopCapabilitySummary struct {
@@ -85,7 +88,11 @@ func (m *DotfilesDiscoveryModule) buildWorkstationDiagnostics(ctx context.Contex
 		PromptName:  "dotfiles_diagnose_workstation",
 	}
 
-	systemOut, err := systemHealthCheck(ctx, SystemHealthCheckInput{})
+	systemOut, err := systemHealthCheck(ctx, SystemHealthCheckInput{
+		WarnCPUTemp:   input.WarnCPUTemp,
+		WarnDiskPct:   input.WarnDiskPct,
+		WarnMemoryPct: input.WarnMemoryPct,
+	})
 	if err != nil {
 		out.Errors = append(out.Errors, fmt.Sprintf("system_health_check: %v", err))
 	} else {
@@ -132,7 +139,7 @@ func summarizeDesktopCapabilities(out dotfilesDesktopStatusOutput) dotfilesDeskt
 		out.Input,
 		out.Accessibility,
 		out.DesktopSession,
-		out.Eww,
+		out.Ironbar,
 		out.Notifications,
 		out.Terminal,
 		out.Shader,
@@ -197,7 +204,7 @@ func collectWorkstationIssues(systemOut SystemHealthCheckOutput, desktopOut dotf
 			RecommendedTools: issueToolsForComponent("rice.compositor"),
 		})
 	}
-	if !riceOut.MonitorIncludePresent {
+	if strings.TrimSpace(riceOut.MonitorIncludePath) != "" && !riceOut.MonitorIncludePresent {
 		issues = append(issues, dotfilesWorkstationDiagnosticIssue{
 			Severity:         "warn",
 			Component:        "rice.monitors",
@@ -223,7 +230,7 @@ func collectWorkstationIssues(systemOut SystemHealthCheckOutput, desktopOut dotf
 		})
 	}
 	for _, service := range riceOut.Services {
-		if (service.Service == "hyprland" || service.Service == "eww") && service.Action != "running" {
+		if (service.Service == "hyprland" || service.Service == "ironbar") && service.Action != "running" {
 			issues = append(issues, dotfilesWorkstationDiagnosticIssue{
 				Severity:         "warn",
 				Component:        "rice." + service.Service,
@@ -301,7 +308,7 @@ func desktopCapabilitiesForDiagnostics(out dotfilesDesktopStatusOutput) []struct
 		{Name: "input", Capability: out.Input},
 		{Name: "accessibility", Capability: out.Accessibility},
 		{Name: "desktop_session", Capability: out.DesktopSession},
-		{Name: "eww", Capability: out.Eww},
+		{Name: "ironbar", Capability: out.Ironbar},
 		{Name: "notifications", Capability: out.Notifications},
 		{Name: "terminal", Capability: out.Terminal},
 		{Name: "shader", Capability: out.Shader},
@@ -332,8 +339,8 @@ func issueToolsForComponent(component string) []string {
 		return []string{"dotfiles_desktop_status", "desktop_capabilities", "desktop_snapshot"}
 	case strings.HasPrefix(component, "desktop.desktop_session"):
 		return []string{"dotfiles_desktop_status", "session_connect", "session_wayland_info"}
-	case strings.HasPrefix(component, "desktop.eww"):
-		return []string{"dotfiles_desktop_status", "dotfiles_eww_status", "dotfiles_eww_inspect"}
+	case strings.HasPrefix(component, "desktop.ironbar"):
+		return []string{"dotfiles_desktop_status", "dotfiles_reload_service", "dotfiles_rice_check"}
 	case strings.HasPrefix(component, "desktop.notifications"):
 		return []string{"dotfiles_desktop_status", "notify_history_entries", "notify_history"}
 	case strings.HasPrefix(component, "desktop.terminal"):

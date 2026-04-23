@@ -10,8 +10,8 @@ import (
 func TestDesktopSemanticModuleRegistration(t *testing.T) {
 	m := &DesktopSemanticModule{}
 	tools := m.Tools()
-	if len(tools) != 16 {
-		t.Fatalf("expected 16 semantic tools, got %d", len(tools))
+	if len(tools) != 18 {
+		t.Fatalf("expected 18 semantic tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -29,6 +29,8 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 		"desktop_read_value",
 		"desktop_set_text",
 		"desktop_set_value",
+		"desktop_form_fields",
+		"desktop_fill_form",
 		"desktop_click",
 		"desktop_act",
 		"desktop_wait_for_element",
@@ -45,8 +47,8 @@ func TestDesktopSemanticModuleRegistration(t *testing.T) {
 func TestDesktopSessionModuleRegistration(t *testing.T) {
 	m := &DesktopSessionModule{}
 	tools := m.Tools()
-	if len(tools) != 23 {
-		t.Fatalf("expected 23 session tools, got %d", len(tools))
+	if len(tools) != 30 {
+		t.Fatalf("expected 30 session tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()
@@ -54,16 +56,21 @@ func TestDesktopSessionModuleRegistration(t *testing.T) {
 	srv := mcptest.NewServer(t, reg)
 
 	for _, want := range []string{
+		"session_list",
 		"session_start",
 		"session_connect",
+		"session_wait_ready",
+		"session_status",
 		"session_stop",
 		"session_screenshot",
+		"session_list_apps",
 		"session_list_windows",
 		"session_focus_window",
 		"session_launch_app",
 		"session_clipboard_get",
 		"session_clipboard_set",
 		"session_wayland_info",
+		"session_read_log",
 		"session_read_app_log",
 		"session_accessibility_tree",
 		"session_find_ui_element",
@@ -72,6 +79,8 @@ func TestDesktopSessionModuleRegistration(t *testing.T) {
 		"session_read_value",
 		"session_set_text",
 		"session_set_value",
+		"session_form_fields",
+		"session_fill_form",
 		"session_wait_for_element",
 		"session_click_element",
 		"session_invoke_action",

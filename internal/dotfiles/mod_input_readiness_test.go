@@ -29,7 +29,6 @@ if [ "$1" = "--user" ]; then
 fi
 if [ "$1" = "is-active" ]; then
   case "$2" in
-    juhradialmx-daemon.service) exit 0 ;;
     ydotool.service) exit 3 ;;
     makima.service) exit 0 ;;
     *) exit 3 ;;
@@ -97,14 +96,11 @@ esac
 `)
 }
 
-func TestInputStatusWithFixtureServicesAndBattery(t *testing.T) {
+func TestInputStatusWithFixtureServices(t *testing.T) {
 	binDir := t.TempDir()
-	runtimeDir := t.TempDir()
 	writeInputBluetoothFixtures(t, binDir)
 
 	t.Setenv("PATH", binDir)
-	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
-	t.Setenv("DOTFILES_TEST_GDBUS_MODE", "success")
 
 	result := callNamedModuleTool(t, &InputModule{}, "input_status", map[string]any{})
 
@@ -113,8 +109,8 @@ func TestInputStatusWithFixtureServicesAndBattery(t *testing.T) {
 		t.Fatalf("unmarshal input status: %v", err)
 	}
 
-	if len(out.Services) != 3 {
-		t.Fatalf("service count = %d, want 3", len(out.Services))
+	if len(out.Services) != 2 {
+		t.Fatalf("service count = %d, want 2", len(out.Services))
 	}
 
 	serviceStates := make(map[string]bool, len(out.Services))
@@ -122,50 +118,11 @@ func TestInputStatusWithFixtureServicesAndBattery(t *testing.T) {
 		serviceStates[service.Name] = service.Active
 	}
 
-	if !serviceStates["juhradialmx-daemon"] {
-		t.Fatal("expected juhradialmx-daemon to be active")
-	}
 	if serviceStates["ydotool"] {
 		t.Fatal("expected ydotool to be inactive")
 	}
 	if !serviceStates["makima"] {
 		t.Fatal("expected makima to be active")
-	}
-	if out.Battery == nil {
-		t.Fatal("expected battery details")
-	}
-	if out.Battery.Percent != 88 || out.Battery.Source != "dbus" || out.Battery.Charging {
-		t.Fatalf("unexpected battery output: %+v", *out.Battery)
-	}
-}
-
-func TestInputGetJuhradialBatteryFallsBackToBluetooth(t *testing.T) {
-	binDir := t.TempDir()
-	runtimeDir := t.TempDir()
-	writeInputBluetoothFixtures(t, binDir)
-
-	t.Setenv("PATH", binDir)
-	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
-	t.Setenv("DOTFILES_TEST_GDBUS_MODE", "fail")
-
-	result := callNamedModuleTool(t, &JuhradialModule{}, "input_get_juhradial_battery", map[string]any{})
-	if result.IsError {
-		t.Fatalf("expected successful fallback battery result, got %q", extractTextFromResult(t, result))
-	}
-
-	var out InputGetJuhradialBatteryOutput
-	if err := json.Unmarshal([]byte(extractTextFromResult(t, result)), &out); err != nil {
-		t.Fatalf("unmarshal juhradial battery: %v", err)
-	}
-
-	if out.Source != "bluetoothctl" {
-		t.Fatalf("source = %q, want bluetoothctl", out.Source)
-	}
-	if out.Device != "MX Master 4" {
-		t.Fatalf("device = %q, want MX Master 4", out.Device)
-	}
-	if out.Percent != 67 {
-		t.Fatalf("percent = %d, want 67", out.Percent)
 	}
 }
 

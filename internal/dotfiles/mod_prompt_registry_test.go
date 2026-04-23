@@ -225,7 +225,9 @@ Return findings as a markdown table with columns: Location, Issue, Severity, Fix
 		t.Error("expected non-empty task type")
 	}
 	if report == nil {
-		t.Error("expected non-nil score report")
+		// Fatal — later assertions dereference report and would panic
+		// with an obscure nil-deref trace instead of the clearer message.
+		t.Fatal("expected non-nil score report")
 	}
 	if len(report.Dimensions) != 10 {
 		t.Errorf("expected 10 dimensions, got %d", len(report.Dimensions))

@@ -18,8 +18,8 @@ import (
 func TestShaderModuleRegistration(t *testing.T) {
 	m := &ShaderModule{}
 	tools := m.Tools()
-	if len(tools) != 18 {
-		t.Fatalf("expected 18 shader tools, got %d", len(tools))
+	if len(tools) != 21 {
+		t.Fatalf("expected 21 shader tools, got %d", len(tools))
 	}
 
 	reg := registry.NewToolRegistry()

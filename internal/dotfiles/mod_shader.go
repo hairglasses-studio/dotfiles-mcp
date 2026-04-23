@@ -16,6 +16,8 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/hairglasses-studio/mcpkit/handler"
 	"github.com/hairglasses-studio/mcpkit/registry"
+	"github.com/hairglasses-studio/mcpkit/resources"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // ---------------------------------------------------------------------------
@@ -392,6 +394,27 @@ type ShaderTestOutput struct {
 	Failed  int                `json:"failed"`
 }
 
+type ShaderBenchmarkInput struct {
+	Name string `json:"name,omitempty" jsonschema:"description=Shader to benchmark (omit to benchmark all)"`
+}
+
+type ShaderBenchResult struct {
+	Name      string  `json:"name"`
+	CompileMs float64 `json:"compile_ms"`
+	SizeBytes int64   `json:"size_bytes"`
+	Category  string  `json:"category"`
+	Passed    bool    `json:"passed"`
+}
+
+type ShaderBenchmarkOutput struct {
+	Results   []ShaderBenchResult `json:"results"`
+	Count     int                 `json:"count"`
+	AvgMs     float64             `json:"avg_compile_ms"`
+	MaxMs     float64             `json:"max_compile_ms"`
+	MaxShader string              `json:"max_shader"`
+	TotalKB   float64             `json:"total_kb"`
+}
+
 type ShaderGetStateInput struct{}
 
 type ShaderGetStateOutput struct {
@@ -576,6 +599,45 @@ func readShaderHistory(limit int, since time.Time) ([]ShaderHistoryEntry, error)
 }
 
 // ---------------------------------------------------------------------------
+// Presets
+// ---------------------------------------------------------------------------
+
+// presetsFilePath returns the path to kitty/shaders/presets.toml.
+func presetsFilePath() string {
+	if d := os.Getenv("DOTFILES_DIR"); d != "" {
+		return filepath.Join(d, "kitty", "shaders", "presets.toml")
+	}
+	return filepath.Join(os.Getenv("HOME"), "hairglasses-studio", "dotfiles", "kitty", "shaders", "presets.toml")
+}
+
+// presetsTOML mirrors the TOML structure: shaders.<name>.presets.<preset>.
+type presetsTOML struct {
+	Shaders map[string]shaderPresetsBlock `toml:"shaders"`
+}
+
+type shaderPresetsBlock struct {
+	Presets map[string]presetBlock `toml:"presets"`
+}
+
+type presetBlock struct {
+	Description string            `toml:"description"`
+	Params      map[string]string `toml:"params"`
+}
+
+// loadPresets reads and parses the presets TOML file.
+func loadPresets() (presetsTOML, error) {
+	var p presetsTOML
+	path := presetsFilePath()
+	if _, err := toml.DecodeFile(path, &p); err != nil {
+		if os.IsNotExist(err) {
+			return presetsTOML{}, fmt.Errorf("presets file not found: %s", path)
+		}
+		return presetsTOML{}, fmt.Errorf("parse presets: %w", err)
+	}
+	return p, nil
+}
+
+// ---------------------------------------------------------------------------
 // New tool I/O types
 // ---------------------------------------------------------------------------
 
@@ -584,6 +646,38 @@ type ShaderHotReloadInput struct{}
 type ShaderHotReloadOutput struct {
 	Reloaded bool   `json:"reloaded"`
 	Method   string `json:"method"` // "touch" or "sigusr1"
+}
+
+// Preset list / apply types
+
+type ShaderPresetListInput struct {
+	Shader string `json:"shader,omitempty" jsonschema:"description=Filter to a specific shader name (omit to list all presets)"`
+}
+
+type PresetEntry struct {
+	Shader      string            `json:"shader"`
+	Preset      string            `json:"preset"`
+	Description string            `json:"description"`
+	Params      map[string]string `json:"params"`
+}
+
+type ShaderPresetListOutput struct {
+	Presets []PresetEntry `json:"presets"`
+	Count   int           `json:"count"`
+}
+
+type ShaderPresetApplyInput struct {
+	Shader string `json:"shader" jsonschema:"required,description=Shader name (with or without .glsl)"`
+	Preset string `json:"preset" jsonschema:"required,description=Preset name to apply (e.g. default sharp heavy)"`
+}
+
+type ShaderPresetApplyOutput struct {
+	Shader      string            `json:"shader"`
+	Preset      string            `json:"preset"`
+	Description string            `json:"description"`
+	Params      map[string]string `json:"params"`
+	Applied     bool              `json:"applied"`
+	Note        string            `json:"note,omitempty"`
 }
 
 type ShaderDiffInput struct {
@@ -852,6 +946,81 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 					Results: results,
 					Passed:  passed,
 					Failed:  failed,
+				}, nil
+			},
+		),
+
+		// ── shader_benchmark ─────────────────────────
+		handler.TypedHandler[ShaderBenchmarkInput, ShaderBenchmarkOutput](
+			"shader_benchmark",
+			"Benchmark shader compilation time and file size via glslangValidator. Reports per-shader and aggregate stats.",
+			func(_ context.Context, input ShaderBenchmarkInput) (ShaderBenchmarkOutput, error) {
+				var targets []string
+				if input.Name != "" {
+					p, err := findShader(input.Name)
+					if err != nil {
+						return ShaderBenchmarkOutput{}, err
+					}
+					targets = append(targets, p)
+				} else {
+					files, err := listGLSL()
+					if err != nil {
+						return ShaderBenchmarkOutput{}, err
+					}
+					dir := shadersDir()
+					for _, f := range files {
+						targets = append(targets, filepath.Join(dir, f))
+					}
+				}
+
+				var results []ShaderBenchResult
+				var totalMs float64
+				var maxMs float64
+				var maxShader string
+				var totalBytes int64
+
+				for _, t := range targets {
+					name := strings.TrimSuffix(filepath.Base(t), ".glsl")
+					info, _ := os.Stat(t)
+					var sizeBytes int64
+					if info != nil {
+						sizeBytes = info.Size()
+					}
+
+					start := time.Now()
+					cmd := exec.Command("glslangValidator", "-S", "frag", t)
+					err := cmd.Run()
+					elapsed := time.Since(start).Seconds() * 1000
+
+					r := ShaderBenchResult{
+						Name:      name,
+						CompileMs: elapsed,
+						SizeBytes: sizeBytes,
+						Category:  inferCategory(name),
+						Passed:    err == nil,
+					}
+					results = append(results, r)
+					totalMs += elapsed
+					totalBytes += sizeBytes
+
+					if elapsed > maxMs {
+						maxMs = elapsed
+						maxShader = name
+					}
+				}
+
+				var avgMs float64
+				if len(results) > 0 {
+					avgMs = totalMs / float64(len(results))
+				}
+
+				return ShaderBenchmarkOutput{
+					Results:   results,
+					Count:     len(results),
+					AvgMs:     avgMs,
+					MaxMs:     maxMs,
+					MaxShader: maxShader,
+					TotalKB:   float64(totalBytes) / 1024,
 				}, nil
 			},
 		),
@@ -1333,6 +1502,143 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 			},
 		),
 
+		// ── shader_preset_list ────────────────────────
+		handler.TypedHandler[ShaderPresetListInput, ShaderPresetListOutput](
+			"shader_preset_list",
+			"List named parameter presets for DarkWindow shaders. Presets document the configurable #define values and top-level constants in each shader's GLSL source. Optionally filter to a specific shader name.",
+			func(_ context.Context, input ShaderPresetListInput) (ShaderPresetListOutput, error) {
+				p, err := loadPresets()
+				if err != nil {
+					return ShaderPresetListOutput{}, err
+				}
+				var entries []PresetEntry
+				for shaderName, block := range p.Shaders {
+					if input.Shader != "" {
+						norm := strings.TrimSuffix(input.Shader, ".glsl")
+						if !strings.EqualFold(shaderName, norm) {
+							continue
+						}
+					}
+					for presetName, preset := range block.Presets {
+						entries = append(entries, PresetEntry{
+							Shader:      shaderName,
+							Preset:      presetName,
+							Description: preset.Description,
+							Params:      preset.Params,
+						})
+					}
+				}
+				return ShaderPresetListOutput{Presets: entries, Count: len(entries)}, nil
+			},
+		),
+
+		// ── shader_preset_apply ───────────────────────
+		handler.TypedHandler[ShaderPresetApplyInput, ShaderPresetApplyOutput](
+			"shader_preset_apply",
+			"Apply a named preset to a DarkWindow shader. Reads the preset from presets.toml, rewrites matching parameter tokens in a temporary copy of the GLSL source, then applies it via shader_set. The original shader source is never modified.",
+			func(_ context.Context, input ShaderPresetApplyInput) (ShaderPresetApplyOutput, error) {
+				// Normalise shader name
+				shaderName := strings.TrimSuffix(input.Shader, ".glsl")
+
+				// Locate the source GLSL
+				srcPath, err := findShader(shaderName)
+				if err != nil {
+					return ShaderPresetApplyOutput{}, err
+				}
+
+				// Load presets and look up the requested one
+				p, err := loadPresets()
+				if err != nil {
+					return ShaderPresetApplyOutput{}, err
+				}
+				shaderBlock, ok := p.Shaders[shaderName]
+				if !ok {
+					return ShaderPresetApplyOutput{}, fmt.Errorf("[%s] no presets defined for shader %q — check kitty/shaders/presets.toml", handler.ErrNotFound, shaderName)
+				}
+				preset, ok := shaderBlock.Presets[input.Preset]
+				if !ok {
+					var available []string
+					for k := range shaderBlock.Presets {
+						available = append(available, k)
+					}
+					return ShaderPresetApplyOutput{}, fmt.Errorf("[%s] preset %q not found for shader %q; available: %s", handler.ErrNotFound, input.Preset, shaderName, strings.Join(available, ", "))
+				}
+
+				out := ShaderPresetApplyOutput{
+					Shader:      shaderName,
+					Preset:      input.Preset,
+					Description: preset.Description,
+					Params:      preset.Params,
+				}
+
+				// If no params, just apply the shader as-is and return the preset metadata.
+				if len(preset.Params) == 0 {
+					if err := atomicSetShader(srcPath, "mcp:shader_preset_apply"); err != nil {
+						return ShaderPresetApplyOutput{}, fmt.Errorf("apply shader: %w", err)
+					}
+					out.Applied = true
+					out.Note = "No parameter substitutions; shader applied without modification."
+					return out, nil
+				}
+
+				// Read GLSL source
+				src, err := os.ReadFile(srcPath)
+				if err != nil {
+					return ShaderPresetApplyOutput{}, fmt.Errorf("read shader source: %w", err)
+				}
+				glsl := string(src)
+
+				// Substitute #define and top-level float parameter values.
+				// Pattern: "#define PARAM <oldval>" → "#define PARAM <newval>"
+				//           "float param = <oldval>;" → "float param = <newval>;"
+				for param, val := range preset.Params {
+					// Try #define substitution first (matches: #define PARAM <anything>)
+					definePattern := "#define " + param + " "
+					if idx := strings.Index(glsl, definePattern); idx >= 0 {
+						lineEnd := strings.IndexByte(glsl[idx:], '\n')
+						if lineEnd < 0 {
+							lineEnd = len(glsl) - idx
+						}
+						oldLine := glsl[idx : idx+lineEnd]
+						newLine := definePattern + val
+						glsl = strings.Replace(glsl, oldLine, newLine, 1)
+						continue
+					}
+					// Try top-level float/int variable: "float param = <val>;"
+					for _, typ := range []string{"float ", "int "} {
+						varPattern := typ + param + " = "
+						if idx := strings.Index(glsl, varPattern); idx >= 0 {
+							lineEnd := strings.IndexByte(glsl[idx:], ';')
+							if lineEnd >= 0 {
+								oldDecl := glsl[idx : idx+lineEnd+1]
+								newDecl := varPattern + val + ";"
+								glsl = strings.Replace(glsl, oldDecl, newDecl, 1)
+							}
+							break
+						}
+					}
+				}
+
+				// Write to a temporary file alongside the source so the playlist
+				// script can resolve it by name within the shaders directory.
+				tmpName := shaderName + "__preset_" + input.Preset + ".glsl"
+				tmpPath := filepath.Join(filepath.Dir(srcPath), tmpName)
+				if err := os.WriteFile(tmpPath, []byte(glsl), 0o644); err != nil {
+					return ShaderPresetApplyOutput{}, fmt.Errorf("write temp shader: %w", err)
+				}
+
+				// Apply via the playlist script (uses name lookup, strips .glsl)
+				if err := atomicSetShader(tmpPath, "mcp:shader_preset_apply"); err != nil {
+					_ = os.Remove(tmpPath) // best-effort cleanup on failure
+					return ShaderPresetApplyOutput{}, fmt.Errorf("apply preset shader: %w", err)
+				}
+
+				out.Applied = true
+				out.Note = fmt.Sprintf("Applied with %d parameter substitution(s). Temp file: %s", len(preset.Params), tmpPath)
+				return out, nil
+			},
+		),
+
 		// ── shader_audit_trail ────────────────────────
 		handler.TypedHandler[ShaderAuditTrailInput, ShaderAuditTrailOutput](
 			"shader_audit_trail",
@@ -1366,6 +1672,88 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 		),
 	}
 }
+
+// Resources returns the MCP resources provided by ShaderModule.
+func (m *ShaderModule) Resources() []resources.ResourceDefinition {
+	return []resources.ResourceDefinition{
+		{
+			Resource: mcp.NewResource(
+				"shader://current",
+				"Current Shader State",
+				mcp.WithResourceDescription("Currently active kitty shader, playlist position, auto-rotate status, and kitty theme"),
+				mcp.WithMIMEType("application/json"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				state, err := readCurrentVisualState()
+				if err != nil {
+					return nil, fmt.Errorf("read shader state: %w", err)
+				}
+
+				autoRotate := false
+				cmd := exec.Command("systemctl", "--user", "is-active", "shader-rotate.timer")
+				if out, err := cmd.Output(); err == nil {
+					autoRotate = strings.TrimSpace(string(out)) == "active"
+				}
+
+				result := map[string]any{
+					"active_shader": state.ActiveShader,
+					"shader_name":   state.ShaderName,
+					"active_theme":  state.ActiveTheme,
+					"visual_label":  state.VisualLabel,
+					"playlist":      state.Playlist,
+					"position":      state.Position,
+					"total":         state.Total,
+					"auto_rotate":   autoRotate,
+				}
+				data, _ := json.MarshalIndent(result, "", "  ")
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      "shader://current",
+						MIMEType: "application/json",
+						Text:     string(data),
+					},
+				}, nil
+			},
+			Category: "shader",
+			Tags:     []string{"shader", "kitty", "theme", "state"},
+		},
+		{
+			Resource: mcp.NewResource(
+				"shader://categories",
+				"Shader Category Breakdown",
+				mcp.WithResourceDescription("Count of GLSL shaders per category (crt, neon, glitch, etc.) from the DarkWindow shader collection"),
+				mcp.WithMIMEType("application/json"),
+			),
+			Handler: func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+				shaders, err := listGLSL()
+				if err != nil {
+					return nil, fmt.Errorf("list shaders: %w", err)
+				}
+				cats := make(map[string]int)
+				for _, s := range shaders {
+					cat := inferCategory(s)
+					cats[cat]++
+				}
+				result := map[string]any{
+					"categories": cats,
+					"total":      len(shaders),
+				}
+				data, _ := json.MarshalIndent(result, "", "  ")
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      "shader://categories",
+						MIMEType: "application/json",
+						Text:     string(data),
+					},
+				}, nil
+			},
+			Category: "shader",
+			Tags:     []string{"shader", "category", "glsl"},
+		},
+	}
+}
+
+func (m *ShaderModule) Templates() []resources.TemplateDefinition { return nil }
 
 // ---------------------------------------------------------------------------
 // main

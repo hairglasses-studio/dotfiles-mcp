@@ -43,14 +43,6 @@ func audioSinkArg(sink string) string {
 	return sink
 }
 
-// audioSourceArg returns the wpctl source identifier, defaulting to @DEFAULT_AUDIO_SOURCE@.
-func audioSourceArg(source string) string {
-	if source == "" {
-		return "@DEFAULT_AUDIO_SOURCE@"
-	}
-	return source
-}
-
 // ---------------------------------------------------------------------------
 // Input types
 // ---------------------------------------------------------------------------
@@ -179,13 +171,14 @@ func (m *AudioModule) Tools() []registry.ToolDefinition {
 						return AudioResult{}, fmt.Errorf("[%s] invalid volume %q — use integer percentage (e.g. '50'), float 0-1 (e.g. '0.5'), or relative (e.g. '+5', '-10')", handler.ErrInvalidParam, vol)
 					}
 
-					if num > 1.0 && num <= 150 {
+					switch {
+					case num > 1.0 && num <= 150:
 						// Treat as percentage: "50" -> 0.50
 						wpctlVol = fmt.Sprintf("%.2f", num/100.0)
-					} else if num >= 0 && num <= 1.0 {
+					case num >= 0 && num <= 1.0:
 						// Already a float 0-1
 						wpctlVol = fmt.Sprintf("%.2f", num)
-					} else {
+					default:
 						return AudioResult{}, fmt.Errorf("[%s] volume out of range: %.0f — use 0-150 (percentage) or 0.0-1.0 (float)", handler.ErrInvalidParam, num)
 					}
 				}

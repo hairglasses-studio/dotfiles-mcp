@@ -58,17 +58,6 @@ func assertImprovementMentions(t *testing.T, improvements []string, keyword stri
 	t.Errorf("expected an improvement mentioning %q, got: %v", keyword, improvements)
 }
 
-// assertStageRun asserts that the given stage appears in the stages list.
-func assertStageRun(t *testing.T, stages []string, stage string) {
-	t.Helper()
-	for _, s := range stages {
-		if s == stage {
-			return
-		}
-	}
-	t.Errorf("expected stage %q to be run, got: %v", stage, stages)
-}
-
 // assertStageNotRun asserts that the given stage does NOT appear in the stages list.
 func assertStageNotRun(t *testing.T, stages []string, stage string) {
 	t.Helper()

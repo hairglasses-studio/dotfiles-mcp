@@ -159,59 +159,6 @@ func TestListMappingProfiles_WithProfiles(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// dotfiles_eww_restart — handler exercises (will fail gracefully without eww)
-// ---------------------------------------------------------------------------
-
-func TestEwwRestart_Handler(t *testing.T) {
-	m := &DotfilesModule{}
-	td := findTool(t, m, "dotfiles_eww_restart")
-
-	req := registry.CallToolRequest{}
-	req.Params.Arguments = map[string]any{}
-
-	result, err := td.Handler(context.Background(), req)
-	if err != nil {
-		t.Fatalf("handler error: %v", err)
-	}
-	// Handler should return a result (even if eww isn't running).
-	if result == nil {
-		t.Fatal("result is nil")
-	}
-
-	text := extractText(t, result)
-	var out EwwRestartOutput
-	if err := json.Unmarshal([]byte(text), &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// dotfiles_eww_status — handler exercises
-// ---------------------------------------------------------------------------
-
-func TestEwwStatus_Handler(t *testing.T) {
-	m := &DotfilesModule{}
-	td := findTool(t, m, "dotfiles_eww_status")
-
-	req := registry.CallToolRequest{}
-	req.Params.Arguments = map[string]any{}
-
-	result, err := td.Handler(context.Background(), req)
-	if err != nil {
-		t.Fatalf("handler error: %v", err)
-	}
-	if result == nil {
-		t.Fatal("result is nil")
-	}
-
-	text := extractText(t, result)
-	var out EwwStatusOutput
-	if err := json.Unmarshal([]byte(text), &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // JSON round-trip for additional output types
 // ---------------------------------------------------------------------------
 

@@ -31,18 +31,11 @@ func TestBuildContractSnapshotBundle(t *testing.T) {
 		t.Fatal("expected canonical snapshot to report publish_mirror=false")
 	}
 
-	seenJuhradial := false
 	seenLegacyLogiops := false
 	for _, tool := range bundle.Tools {
-		switch tool.Name {
-		case "input_get_juhradial_config":
-			seenJuhradial = true
-		case "input_get_logiops_config":
+		if tool.Name == "input_get_logiops_config" {
 			seenLegacyLogiops = true
 		}
-	}
-	if !seenJuhradial {
-		t.Fatal("expected juhradial tool in contract snapshot")
 	}
 	if seenLegacyLogiops {
 		t.Fatal("unexpected legacy logiops tool in contract snapshot")

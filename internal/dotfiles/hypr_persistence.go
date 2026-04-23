@@ -809,11 +809,12 @@ func windowMatchScore(saved hyprSavedWindow, current hyprClientState) int {
 		return -1
 	}
 	score := 0
-	if saved.Class != "" && strings.EqualFold(saved.Class, current.Class) {
+	switch {
+	case saved.Class != "" && strings.EqualFold(saved.Class, current.Class):
 		score += 50
-	} else if saved.InitialClass != "" && strings.EqualFold(saved.InitialClass, current.InitialClass) {
+	case saved.InitialClass != "" && strings.EqualFold(saved.InitialClass, current.InitialClass):
 		score += 45
-	} else {
+	default:
 		return -1
 	}
 

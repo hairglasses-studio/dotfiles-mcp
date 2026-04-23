@@ -202,28 +202,6 @@ func TestOnboardRepo_MissingRepoPath(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// dotfiles_eww_get — input validation
-// ---------------------------------------------------------------------------
-
-func TestEwwGet_MissingVariable(t *testing.T) {
-	m := &DotfilesModule{}
-	td := findTool(t, m, "dotfiles_eww_get")
-
-	req := registry.CallToolRequest{}
-	req.Params.Arguments = map[string]any{
-		"variable": "",
-	}
-
-	result, err := td.Handler(context.Background(), req)
-	if err != nil {
-		t.Fatalf("handler error: %v", err)
-	}
-	if result == nil || !result.IsError {
-		t.Fatal("expected error result for empty variable")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // JSON round-trip tests for build/pipeline output types
 // ---------------------------------------------------------------------------
 
@@ -310,7 +288,7 @@ func TestBuildOutputTypes_JSONRoundTrip(t *testing.T) {
 					Results: []ServiceReloadStatus{
 						{Service: "hyprland", Action: "reloaded"},
 						{Service: "mako", Action: "reloaded"},
-						{Service: "eww", Action: "failed", Message: "not running"},
+						{Service: "ironbar", Action: "failed", Message: "not running"},
 					},
 				}
 				data, err := json.Marshal(out)
@@ -367,51 +345,6 @@ func TestBuildOutputTypes_JSONRoundTrip(t *testing.T) {
 				}
 				if decoded.Status != "ok" {
 					t.Errorf("status = %q, want ok", decoded.Status)
-				}
-			},
-		},
-		{
-			name: "EwwRestartOutput",
-			fn: func(t *testing.T) {
-				out := EwwRestartOutput{
-					Killed:    2,
-					WaybarOff: true,
-					DaemonPID: "12345",
-					BarsOpen:  []string{"bar-left", "bar-right"},
-				}
-				data, err := json.Marshal(out)
-				if err != nil {
-					t.Fatalf("marshal: %v", err)
-				}
-				var decoded EwwRestartOutput
-				if err := json.Unmarshal(data, &decoded); err != nil {
-					t.Fatalf("unmarshal: %v", err)
-				}
-				if decoded.Killed != 2 {
-					t.Errorf("killed = %d, want 2", decoded.Killed)
-				}
-			},
-		},
-		{
-			name: "EwwStatusOutput",
-			fn: func(t *testing.T) {
-				out := EwwStatusOutput{
-					DaemonRunning: true,
-					DaemonCount:   1,
-					WaybarRunning: false,
-					Windows:       []string{"bar-left"},
-					Variables:     map[string]string{"workspace": "1"},
-				}
-				data, err := json.Marshal(out)
-				if err != nil {
-					t.Fatalf("marshal: %v", err)
-				}
-				var decoded EwwStatusOutput
-				if err := json.Unmarshal(data, &decoded); err != nil {
-					t.Fatalf("unmarshal: %v", err)
-				}
-				if !decoded.DaemonRunning {
-					t.Error("daemon_running should be true")
 				}
 			},
 		},
