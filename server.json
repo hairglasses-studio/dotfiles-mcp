@@ -11,9 +11,10 @@
   },
   "packages": [
     {
-      "registryType": "oci",
-      "identifier": "ghcr.io/hairglasses-studio/dotfiles-mcp:2.2.0",
+      "registryType": "mcpb",
+      "identifier": "https://github.com/hairglasses-studio/dotfiles-mcp/releases/download/mcpb-2.2.0/dotfiles-mcp_2.2.0_linux_amd64.mcpb",
       "version": "2.2.0",
+      "fileSha256": "59332aead499d39db9b1677ca3b39cef1f2fd8a94d401c44598d9039d5afd6d0",
       "transport": {
         "type": "stdio"
       },

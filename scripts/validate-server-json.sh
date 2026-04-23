@@ -22,7 +22,7 @@ dockerfile = dockerfile_path.read_text(encoding="utf-8")
 
 version = str(overview.get("version", ""))
 expected_name = "io.github.hairglasses-studio/dotfiles-mcp"
-expected_identifier = f"ghcr.io/hairglasses-studio/dotfiles-mcp:{version}"
+expected_identifier = f"https://github.com/hairglasses-studio/dotfiles-mcp/releases/download/mcpb-{version}/dotfiles-mcp_{version}_linux_amd64.mcpb"
 failures: list[str] = []
 
 def require(condition: bool, message: str) -> None:
@@ -40,12 +40,20 @@ require(repo.get("url") == "https://github.com/hairglasses-studio/dotfiles-mcp",
 require(repo.get("source") == "github", "server.json repository source must be github")
 
 packages = server.get("packages") or []
-oci = next((pkg for pkg in packages if pkg.get("registryType") == "oci"), None)
-require(oci is not None, "server.json must include an OCI package")
-if oci:
-    require(oci.get("identifier") == expected_identifier, f"OCI identifier must be {expected_identifier}")
-    require(oci.get("version") == version, f"OCI package version must match {version}")
-    require((oci.get("transport") or {}).get("type") == "stdio", "OCI package transport must be stdio")
+mcpb = next((pkg for pkg in packages if pkg.get("registryType") == "mcpb"), None)
+require(mcpb is not None, "server.json must include an MCPB package")
+if mcpb:
+    require(mcpb.get("identifier") == expected_identifier, f"MCPB identifier must be {expected_identifier}")
+    require(mcpb.get("version") == version, f"MCPB package version must match {version}")
+    require(bool(re.match(r"^[a-f0-9]{64}$", mcpb.get("fileSha256", ""))), "MCPB package fileSha256 must be a SHA-256 hex digest")
+    require((mcpb.get("transport") or {}).get("type") == "stdio", "MCPB package transport must be stdio")
+
+    artifact = root / "dist" / f"dotfiles-mcp_{version}_linux_amd64.mcpb"
+    if artifact.exists():
+        import hashlib
+
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        require(mcpb.get("fileSha256") == digest, "server.json fileSha256 does not match dist MCPB artifact")
 
 label = f'io.modelcontextprotocol.server.name="{expected_name}"'
 require(label in dockerfile, "Dockerfile MCP registry label must match server.json name")

@@ -14,7 +14,7 @@ Canonical development lives in [`hairglasses-studio/dotfiles`](https://github.co
 go install github.com/hairglasses-studio/dotfiles-mcp/cmd/dotfiles-mcp@latest
 ```
 
-### Official Registry / OCI
+### Official Registry / MCPB
 
 The standalone mirror also carries [`server.json`](./server.json) for the
 Official MCP Registry. The registry requires slash-separated names for GitHub
@@ -22,16 +22,22 @@ authentication, so the registry package name is
 `io.github.hairglasses-studio/dotfiles-mcp`; the checked-in MCP server card
 continues to use the canonical contract name in [`.well-known/mcp.json`](./.well-known/mcp.json).
 
-The OCI package target is:
+The public registry package is a Linux/amd64 MCPB release artifact:
 
 ```text
-ghcr.io/hairglasses-studio/dotfiles-mcp:2.2.0
+https://github.com/hairglasses-studio/dotfiles-mcp/releases/download/mcpb-2.2.0/dotfiles-mcp_2.2.0_linux_amd64.mcpb
 ```
 
-The image starts the server over stdio with `DOTFILES_MCP_PROFILE=default`.
+Build it locally with:
+
+```bash
+make mcpb
+```
+
+The bundle starts the server over stdio with `DOTFILES_MCP_PROFILE=default`.
 Desktop-control tools still need the relevant host Wayland/Hyprland
-environment and mounted sockets to work from a container; the direct
-`go install` path remains the recommended workstation install.
+environment to work; the direct `go install` path remains the recommended
+workstation install.
 
 When developing from the monorepo mirror under `dotfiles/mcp/dotfiles-mcp`, use `GOWORK=off` for direct module commands so the shared `mcp/go.work` does not inherit sibling repo-local replaces from other MCP modules.
 
@@ -164,6 +170,7 @@ The canonical source treats the committed snapshot bundle as the public surface 
 - `make contract-snapshot` regenerates [`.well-known/mcp.json`](./.well-known/mcp.json) and the JSON bundle in [`snapshots/contract`](./snapshots/contract)
 - `make contract-check` verifies the checked-in artifacts match the live registry
 - `make contract-diff` summarizes surface deltas against a base ref
+- `make mcpb` builds the Linux/amd64 MCPB artifact referenced by `server.json`
 - `make publish-check` runs vet, tests, contract validation, release-parity, and Official Registry metadata checks together
 - `make host-smoke` checks Hyprland, semantic AT-SPI, session clipboard/screenshot/runtime prerequisites, device basics, and GitHub CLI availability; `make host-smoke-strict` turns missing and skipped checks into failures for prepared runners
 - The publish-guard and release workflows emit `make contract-diff` summaries into CI step summaries and uploaded artifacts; the release workflow also appends the diff into the GitHub release body
