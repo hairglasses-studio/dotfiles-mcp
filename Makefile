@@ -1,4 +1,4 @@
-.PHONY: build test vet lint check coverage contract-snapshot contract-check contract-diff canonical-drift canonical-sync-report canonical-sync-diff host-smoke host-smoke-strict release-parity publish-check
+.PHONY: build test vet lint check coverage contract-snapshot contract-check contract-diff canonical-drift canonical-sync-report canonical-sync-diff host-smoke host-smoke-strict release-parity registry-metadata-check publish-check
 
 build:
 	go build ./...
@@ -46,7 +46,10 @@ host-smoke-strict:
 release-parity:
 	bash ./scripts/release-parity.sh
 
-publish-check: vet test contract-check release-parity
+registry-metadata-check:
+	bash ./scripts/validate-server-json.sh
+
+publish-check: vet test contract-check release-parity registry-metadata-check
 
 HG_PIPELINE_MK ?= $(or $(wildcard $(abspath $(CURDIR)/../dotfiles/make/pipeline.mk)),$(wildcard $(HOME)/hairglasses-studio/dotfiles/make/pipeline.mk))
 -include $(HG_PIPELINE_MK)

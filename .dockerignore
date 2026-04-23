@@ -1,0 +1,17 @@
+.git
+.github
+.agents
+.claude
+.codex
+.gemini
+.ralph
+.ralph-state
+coverage.out
+dotfiles-a2a
+dotfiles-mcp
+tmp
+*.log
+*.prof
+*.pprof
+debug.test
+__debug_bin*
