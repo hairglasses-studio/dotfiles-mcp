@@ -1,0 +1,30 @@
+{
+  "displayName": "dotfiles-mcp",
+  "description": "Hyprland + GitHub org + fleet-management tools for Linux workstation automation.",
+  "homepage": "https://github.com/hairglasses-studio/dotfiles-mcp",
+  "repository": "https://github.com/hairglasses-studio/dotfiles-mcp",
+  "language": "Go",
+  "license": "MIT",
+  "tags": [
+    "hyprland",
+    "wayland",
+    "linux",
+    "desktop-automation",
+    "github",
+    "fleet",
+    "systemd",
+    "bluetooth"
+  ],
+  "categories": [
+    "desktop",
+    "automation",
+    "linux",
+    "github"
+  ],
+  "transport": "stdio",
+  "installCommand": "go install github.com/hairglasses-studio/dotfiles-mcp/cmd/dotfiles-mcp@latest",
+  "author": {
+    "name": "hairglasses-studio",
+    "url": "https://github.com/hairglasses-studio"
+  }
+}
