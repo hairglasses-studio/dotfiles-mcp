@@ -11,7 +11,7 @@ Canonical development lives in [`hairglasses-studio/dotfiles`](https://github.co
 ## Install
 
 ```bash
-go install github.com/hairglasses-studio/dotfiles-mcp@latest
+go install github.com/hairglasses-studio/dotfiles-mcp/cmd/dotfiles-mcp@latest
 ```
 
 When developing from the monorepo mirror under `dotfiles/mcp/dotfiles-mcp`, use `GOWORK=off` for direct module commands so the shared `mcp/go.work` does not inherit sibling repo-local replaces from other MCP modules.
@@ -51,10 +51,10 @@ The server also exposes read-first workflow resources and prompt entrypoints for
 
 The canonical module now commits public contract snapshots under [`snapshots/contract`](./snapshots/contract) and regenerates the public server card at [`.well-known/mcp.json`](./.well-known/mcp.json). Current canonical snapshot counts:
 
-- `407` tools
-- `37` registered modules
-- `24` resources
-- `12` prompts
+- `434` tools
+- `41` registered modules
+- `25` resources
+- `13` prompts
 
 ## Quick Start
 
