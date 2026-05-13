@@ -1,5 +1,7 @@
 # dotfiles-mcp
 
+> Canonical instructions: AGENTS.md
+
 MCP server for dotfiles configuration management, GitHub org lifecycle, fleet auditing, and desktop service orchestration. Built with [mcpkit](https://github.com/hairglasses-studio/mcpkit).
 
 ## Build & Test
