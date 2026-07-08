@@ -54,7 +54,7 @@ check_wtype_help() {
 
 check_juhradial_config() {
   local base
-  for base in "${DOTFILES_DIR:-}" "$HOME/hairglasses-studio/dotfiles" "/home/hg/hairglasses-studio/dotfiles"; do
+  for base in "${DOTFILES_DIR:-}" "$HOME/hairglasses-studio/dotfiles"; do
     if [[ -n "$base" && -f "$base/juhradial/config.json" ]]; then
       echo "present:$base/juhradial/config.json"
       return 0

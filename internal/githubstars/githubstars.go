@@ -2115,13 +2115,8 @@ func detectDotfilesDir() string {
 		}
 	}
 	home, _ := os.UserHomeDir()
-	for _, candidate := range []string{
-		filepath.Join(home, "hairglasses-studio", "dotfiles"),
-		"/home/hg/hairglasses-studio/dotfiles",
-	} {
-		if root := findDotfilesRoot(candidate); root != "" {
-			return root
-		}
+	if root := findDotfilesRoot(filepath.Join(home, "hairglasses-studio", "dotfiles")); root != "" {
+		return root
 	}
 	return filepath.Join(home, "hairglasses-studio", "dotfiles")
 }

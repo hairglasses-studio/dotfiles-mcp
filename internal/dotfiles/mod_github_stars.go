@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hairglasses-studio/dotfiles-mcp/internal/githubstars"
@@ -141,7 +142,7 @@ type githubStarsTaxonomySyncInput struct {
 }
 
 type githubStarsMarkdownSyncInput struct {
-	SourceDir           string   `json:"source_dir,omitempty" jsonschema:"description=Directory containing markdown files to map into GitHub star lists. Defaults to /home/hg/github-reference-repos/index-files when present."`
+	SourceDir           string   `json:"source_dir,omitempty" jsonschema:"description=Directory containing markdown files to map into GitHub star lists. Defaults to $HOME/github-reference-repos/index-files when present."`
 	SourcePaths         []string `json:"source_paths,omitempty" jsonschema:"description=Optional explicit markdown file paths to include alongside or instead of source_dir"`
 	DescriptionTemplate string   `json:"description_template,omitempty" jsonschema:"description=Optional list description template. Use %s for the markdown stem. Defaults to Managed by docs-mcp github-reference-repos import for %s"`
 	IsPrivate           *bool    `json:"is_private,omitempty" jsonschema:"description=Create or update target lists as private. Defaults true."`
@@ -158,7 +159,7 @@ type githubStarsMarkdownSyncOutput struct {
 }
 
 type githubStarsMarkdownAuditInput struct {
-	SourceDir       string   `json:"source_dir,omitempty" jsonschema:"description=Directory containing markdown files to audit against GitHub star lists. Defaults to /home/hg/github-reference-repos/index-files when present."`
+	SourceDir       string   `json:"source_dir,omitempty" jsonschema:"description=Directory containing markdown files to audit against GitHub star lists. Defaults to $HOME/github-reference-repos/index-files when present."`
 	SourcePaths     []string `json:"source_paths,omitempty" jsonschema:"description=Optional explicit markdown file paths to include alongside or instead of source_dir"`
 	MaxItemsPerList int      `json:"max_items_per_list,omitempty" jsonschema:"description=Maximum missing or extra repos returned for each list. Default 100."`
 }
@@ -678,7 +679,11 @@ func trimTaxonomyAudit(audit githubstars.TaxonomyAudit, limit int) githubstars.T
 }
 
 func defaultGitHubReferenceSourceDir() string {
-	const candidate = "/home/hg/github-reference-repos/index-files"
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	candidate := filepath.Join(home, "github-reference-repos", "index-files")
 	if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 		return candidate
 	}
