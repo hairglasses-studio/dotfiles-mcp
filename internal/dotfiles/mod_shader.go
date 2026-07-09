@@ -610,9 +610,10 @@ func presetsFilePath() string {
 	return filepath.Join(os.Getenv("HOME"), "hairglasses-studio", "dotfiles", "kitty", "shaders", "presets.toml")
 }
 
-// presetsTOML mirrors the TOML structure: shaders.<name>.presets.<preset>.
+// presetsTOML mirrors the TOML structure: shaders.<name>.presets.<preset> and wallpapers.<name>.presets.<preset>.
 type presetsTOML struct {
-	Shaders map[string]shaderPresetsBlock `toml:"shaders"`
+	Shaders    map[string]shaderPresetsBlock `toml:"shaders"`
+	Wallpapers map[string]shaderPresetsBlock `toml:"wallpapers"`
 }
 
 type shaderPresetsBlock struct {
@@ -673,6 +674,29 @@ type ShaderPresetApplyInput struct {
 
 type ShaderPresetApplyOutput struct {
 	Shader      string            `json:"shader"`
+	Preset      string            `json:"preset"`
+	Description string            `json:"description"`
+	Params      map[string]string `json:"params"`
+	Applied     bool              `json:"applied"`
+	Note        string            `json:"note,omitempty"`
+}
+
+type WallpaperPresetListInput struct {
+	Wallpaper string `json:"wallpaper,omitempty" jsonschema:"description=Filter to a specific wallpaper shader name (omit to list all presets)"`
+}
+
+type WallpaperPresetListOutput struct {
+	Presets []PresetEntry `json:"presets"`
+	Count   int           `json:"count"`
+}
+
+type WallpaperPresetApplyInput struct {
+	Wallpaper string `json:"wallpaper" jsonschema:"required,description=Wallpaper name (with or without .frag)"`
+	Preset    string `json:"preset" jsonschema:"required,description=Preset name to apply (e.g. default fast)"`
+}
+
+type WallpaperPresetApplyOutput struct {
+	Wallpaper   string            `json:"wallpaper"`
 	Preset      string            `json:"preset"`
 	Description string            `json:"description"`
 	Params      map[string]string `json:"params"`
@@ -1631,6 +1655,132 @@ func (m *ShaderModule) Tools() []registry.ToolDefinition {
 				if err := atomicSetShader(tmpPath, "mcp:shader_preset_apply"); err != nil {
 					_ = os.Remove(tmpPath) // best-effort cleanup on failure
 					return ShaderPresetApplyOutput{}, fmt.Errorf("apply preset shader: %w", err)
+				}
+
+				out.Applied = true
+				out.Note = fmt.Sprintf("Applied with %d parameter substitution(s). Temp file: %s", len(preset.Params), tmpPath)
+				return out, nil
+			},
+		),
+
+		// ── wallpaper_preset_list ─────────────────────
+		handler.TypedHandler[WallpaperPresetListInput, WallpaperPresetListOutput](
+			"wallpaper_preset_list",
+			"List named parameter presets for wallpaper shaders. Presets document the configurable constants and parameters in each wallpaper shader's GLSL source. Optionally filter to a specific wallpaper name.",
+			func(_ context.Context, input WallpaperPresetListInput) (WallpaperPresetListOutput, error) {
+				p, err := loadPresets()
+				if err != nil {
+					return WallpaperPresetListOutput{}, err
+				}
+				var entries []PresetEntry
+				for wallpaperName, block := range p.Wallpapers {
+					if input.Wallpaper != "" {
+						norm := strings.TrimSuffix(input.Wallpaper, ".frag")
+						if !strings.EqualFold(wallpaperName, norm) {
+							continue
+						}
+					}
+					for presetName, preset := range block.Presets {
+						entries = append(entries, PresetEntry{
+							Shader:      wallpaperName,
+							Preset:      presetName,
+							Description: preset.Description,
+							Params:      preset.Params,
+						})
+					}
+				}
+				return WallpaperPresetListOutput{Presets: entries, Count: len(entries)}, nil
+			},
+		),
+
+		// ── wallpaper_preset_apply ────────────────────
+		handler.TypedHandler[WallpaperPresetApplyInput, WallpaperPresetApplyOutput](
+			"wallpaper_preset_apply",
+			"Apply a named preset to a wallpaper shader. Reads the preset from presets.toml, rewrites matching parameter tokens in a temporary copy of the GLSL source, then applies it via wallpaper_set. The original shader source is never modified.",
+			func(_ context.Context, input WallpaperPresetApplyInput) (WallpaperPresetApplyOutput, error) {
+				wallpaperName := strings.TrimSuffix(input.Wallpaper, ".frag")
+				srcPath := filepath.Join(wallpaperShadersDir(), wallpaperName+".frag")
+				if _, err := os.Stat(srcPath); err != nil {
+					return WallpaperPresetApplyOutput{}, fmt.Errorf("wallpaper shader not found: %s", srcPath)
+				}
+
+				p, err := loadPresets()
+				if err != nil {
+					return WallpaperPresetApplyOutput{}, err
+				}
+				wallpaperBlock, ok := p.Wallpapers[wallpaperName]
+				if !ok {
+					return WallpaperPresetApplyOutput{}, fmt.Errorf("[%s] no presets defined for wallpaper %q — check kitty/shaders/presets.toml", handler.ErrNotFound, wallpaperName)
+				}
+				preset, ok := wallpaperBlock.Presets[input.Preset]
+				if !ok {
+					var available []string
+					for k := range wallpaperBlock.Presets {
+						available = append(available, k)
+					}
+					return WallpaperPresetApplyOutput{}, fmt.Errorf("[%s] preset %q not found for wallpaper %q; available: %s", handler.ErrNotFound, input.Preset, wallpaperName, strings.Join(available, ", "))
+				}
+
+				out := WallpaperPresetApplyOutput{
+					Wallpaper:   wallpaperName,
+					Preset:      input.Preset,
+					Description: preset.Description,
+					Params:      preset.Params,
+				}
+
+				if len(preset.Params) == 0 {
+					cmd := exec.Command(wallpaperScript(), "set", srcPath)
+					if combined, err := cmd.CombinedOutput(); err != nil {
+						return WallpaperPresetApplyOutput{}, fmt.Errorf("apply wallpaper: %s: %w", strings.TrimSpace(string(combined)), err)
+					}
+					out.Applied = true
+					out.Note = "No parameter substitutions; wallpaper applied without modification."
+					return out, nil
+				}
+
+				src, err := os.ReadFile(srcPath)
+				if err != nil {
+					return WallpaperPresetApplyOutput{}, fmt.Errorf("read wallpaper source: %w", err)
+				}
+				glsl := string(src)
+
+				for param, val := range preset.Params {
+					definePattern := "#define " + param + " "
+					if idx := strings.Index(glsl, definePattern); idx >= 0 {
+						lineEnd := strings.IndexByte(glsl[idx:], '\n')
+						if lineEnd < 0 {
+							lineEnd = len(glsl) - idx
+						}
+						oldLine := glsl[idx : idx+lineEnd]
+						newLine := definePattern + val
+						glsl = strings.Replace(glsl, oldLine, newLine, 1)
+						continue
+					}
+					for _, typ := range []string{"float ", "int "} {
+						varPattern := typ + param + " = "
+						if idx := strings.Index(glsl, varPattern); idx >= 0 {
+							lineEnd := strings.IndexByte(glsl[idx:], ';')
+							if lineEnd >= 0 {
+								oldDecl := glsl[idx : idx+lineEnd+1]
+								newDecl := varPattern + val + ";"
+								glsl = strings.Replace(glsl, oldDecl, newDecl, 1)
+							}
+							break
+						}
+					}
+				}
+
+				tmpDir := filepath.Join(os.Getenv("HOME"), ".local", "state", "shader-wallpaper", "presets")
+				_ = os.MkdirAll(tmpDir, 0o755)
+				tmpPath := filepath.Join(tmpDir, wallpaperName+"__preset_"+input.Preset+".frag")
+				if err := os.WriteFile(tmpPath, []byte(glsl), 0o644); err != nil {
+					return WallpaperPresetApplyOutput{}, fmt.Errorf("write temp wallpaper: %w", err)
+				}
+
+				cmd := exec.Command(wallpaperScript(), "set", tmpPath)
+				if combined, err := cmd.CombinedOutput(); err != nil {
+					_ = os.Remove(tmpPath)
+					return WallpaperPresetApplyOutput{}, fmt.Errorf("apply preset wallpaper: %s: %w", strings.TrimSpace(string(combined)), err)
 				}
 
 				out.Applied = true

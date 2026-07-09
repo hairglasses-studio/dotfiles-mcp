@@ -1753,6 +1753,14 @@
       "description": "List available wallpaper shaders (GLSL fragment shaders rendered as live animated wallpapers via shaderbg)."
     },
     {
+      "name": "wallpaper_preset_apply",
+      "description": "Apply a named preset to a wallpaper shader. Reads the preset from presets.toml, rewrites matching parameter tokens in a temporary copy of the GLSL source, then applies it via wallpaper_set. The original shader source is never modified."
+    },
+    {
+      "name": "wallpaper_preset_list",
+      "description": "List named parameter presets for wallpaper shaders. Presets document the configurable constants and parameters in each wallpaper shader's GLSL source. Optionally filter to a specific wallpaper name."
+    },
+    {
       "name": "wallpaper_random",
       "description": "Set a random wallpaper shader. Picks a random GLSL fragment shader and launches it as a live animated wallpaper."
     },
@@ -1772,7 +1780,7 @@
     "fleet-management",
     "canonical-source"
   ],
-  "tool_count": 434,
+  "tool_count": 436,
   "resource_count": 25,
   "prompt_count": 13,
   "categories": [

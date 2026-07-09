@@ -3694,6 +3694,20 @@
     "deferred": true
   },
   {
+    "name": "wallpaper_preset_apply",
+    "description": "Apply a named preset to a wallpaper shader. Reads the preset from presets.toml, rewrites matching parameter tokens in a temporary copy of the GLSL source, then applies it via wallpaper_set. The original shader source is never modified.",
+    "category": "",
+    "is_write": true,
+    "deferred": true
+  },
+  {
+    "name": "wallpaper_preset_list",
+    "description": "List named parameter presets for wallpaper shaders. Presets document the configurable constants and parameters in each wallpaper shader's GLSL source. Optionally filter to a specific wallpaper name.",
+    "category": "",
+    "is_write": false,
+    "deferred": true
+  },
+  {
     "name": "wallpaper_random",
     "description": "Set a random wallpaper shader. Picks a random GLSL fragment shader and launches it as a live animated wallpaper.",
     "category": "",
