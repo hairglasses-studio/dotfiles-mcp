@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "dotfiles-mcp": {
+      "command": "/usr/bin/env",
+      "args": ["bash", "-lc", "exec go run ./cmd/dotfiles-mcp"]
+    }
+  }
+}
