@@ -1,10 +1,8 @@
 name: Publish Guard
 
+# Deprecated automation surface: run `make publish-check` and `make host-smoke`
+# locally. This compatibility workflow is intentionally manual-only.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:

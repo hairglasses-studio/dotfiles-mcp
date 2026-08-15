@@ -1,10 +1,9 @@
 name: CI
 
+# Deprecated automation surface: local CI is canonical. This compatibility
+# workflow is intentionally manual-only.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
