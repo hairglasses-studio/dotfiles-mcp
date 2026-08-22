@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "gemini-3.1-pro",
+  "model": "gemini-3.1-pro",
+  "normalized_model": "gemini-3.1-pro-high",
+  "provider": "agy",
+  "family": "gemini",
+  "context_window": 1048576,
+  "max_output_tokens": 65536,
+  "thinking": {
+    "level": "HIGH",
+    "budget_tokens": 65536,
+    "temperature": 0.2
+  },
+  "default_mode": "accept-edits",
+  "timeout_seconds": 600,
+  "description": "Gemini 3.1 Pro high-reasoning profile for deep multi-module architecture synthesis and complex refactoring"
+}

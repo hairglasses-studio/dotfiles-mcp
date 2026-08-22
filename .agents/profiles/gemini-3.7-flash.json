@@ -1,0 +1,47 @@
+{
+  "model": "gemini-3.7-flash",
+  "thinking": {
+    "supported_modes": ["dynamic", "fixed", "disabled"],
+    "presets": {
+      "instant": {
+        "budget_tokens": 0,
+        "temperature": 0.2,
+        "description": "Fast deterministic lookups, health probes, and simple file edits"
+      },
+      "standard": {
+        "budget_tokens": 8192,
+        "temperature": 0.7,
+        "description": "Default multi-step task execution, refactoring, and code generation"
+      },
+      "deep_reasoning": {
+        "budget_tokens": 32768,
+        "temperature": 0.7,
+        "description": "Complex architectural synthesis, incident triage, and cross-repo audit"
+      },
+      "max": {
+        "budget_tokens": 65536,
+        "temperature": 0.7,
+        "description": "Maximum depth verification, formal analysis, and multi-agent coordination"
+      }
+    },
+    "dynamic_budget_policy": {
+      "strategy": "complexity_adaptive",
+      "stage_budgets": {
+        "research_audit": 16384,
+        "plan_formulation": 24576,
+        "implementation": 8192,
+        "verification_gate": 32768
+      },
+      "escalation_thresholds": {
+        "on_tool_error_retry": 16384,
+        "on_contract_conflict": 32768
+      }
+    }
+  },
+  "mcp_gateway_features": {
+    "lazy_loading": true,
+    "roots_list_dynamic": true,
+    "progress_notifications": true,
+    "rfc6570_templates": true
+  }
+}

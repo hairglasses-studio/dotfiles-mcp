@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "gemini-3.7-flash-fast",
+  "model": "gemini-3.7-flash",
+  "normalized_model": "gemini-3.7-flash-low",
+  "provider": "agy",
+  "family": "gemini",
+  "context_window": 1048576,
+  "max_output_tokens": 65536,
+  "thinking": {
+    "level": "LOW",
+    "budget_tokens": 2048,
+    "temperature": 0.1
+  },
+  "default_mode": "accept-edits",
+  "timeout_seconds": 180,
+  "description": "Gemini 3.7 Flash low-latency profile for linter fixes, AST inspection, and git commit formatting"
+}

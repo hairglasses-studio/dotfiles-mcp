@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "gemini-3.7-flash-medium",
+  "model": "gemini-3.7-flash",
+  "normalized_model": "gemini-3.7-flash-medium",
+  "provider": "agy",
+  "family": "gemini",
+  "context_window": 1048576,
+  "max_output_tokens": 65536,
+  "thinking": {
+    "level": "MEDIUM",
+    "budget_tokens": 16384,
+    "temperature": 0.3
+  },
+  "default_mode": "accept-edits",
+  "timeout_seconds": 300,
+  "description": "Gemini 3.7 Flash balanced reasoning profile for routine code edits, unit tests, and tool dispatch"
+}
