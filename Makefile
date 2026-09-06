@@ -17,6 +17,8 @@ lint:
 
 check: build vet test
 
+ci: check
+
 check-dual: check
 
 coverage:

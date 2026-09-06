@@ -63,7 +63,7 @@ func main() {
 
 func renderOutputs(bundle dotfiles.ContractSnapshotBundle) (map[string][]byte, error) {
 	files := map[string]any{
-		".well-known/mcp.json":            bundle.Manifest,
+		".well-known/mcp.json":              bundle.Manifest,
 		"snapshots/contract/overview.json":  bundle.Overview,
 		"snapshots/contract/tools.json":     bundle.Tools,
 		"snapshots/contract/resources.json": bundle.Resources,

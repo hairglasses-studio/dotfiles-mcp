@@ -49,10 +49,10 @@ func ParseMappingProfile(content, sourcePath string) (*MappingProfile, error) {
 
 	// Legacy format: parse into the legacy fields.
 	type legacyProfile struct {
-		Remap    map[string][]string `toml:"remap"`
-		Commands map[string][]string `toml:"commands"`
-		Movements map[string]string  `toml:"movements"`
-		Settings map[string]string   `toml:"settings"`
+		Remap     map[string][]string `toml:"remap"`
+		Commands  map[string][]string `toml:"commands"`
+		Movements map[string]string   `toml:"movements"`
+		Settings  map[string]string   `toml:"settings"`
 	}
 	var legacy legacyProfile
 	if _, err := toml.Decode(content, &legacy); err != nil {

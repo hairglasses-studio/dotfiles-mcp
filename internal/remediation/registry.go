@@ -192,7 +192,7 @@ func seeds() map[ErrorCode]Remediation {
 			Why:        "Kitty remote-control socket is unavailable; a restart rebinds but will drop open terminal sessions.",
 		},
 		CodeMcpServerDead: {
-			Tool:       "notify_send",
+			Tool: "notify_send",
 			Args: map[string]any{
 				"title":   "MCP server is not responding",
 				"body":    "Restart Claude Code or run scripts/run-dotfiles-mcp.sh manually to see the crash.",

@@ -146,7 +146,7 @@
     },
     {
       "name": "claude_fleet_recovery",
-      "description": "Composed recovery workflow: detect dead sessions across all repos, analyze git state, generate recovery steps with resume commands. Dry-run by default \u2014 set execute=true to trigger resumes."
+      "description": "Composed recovery workflow: detect dead sessions across all repos, analyze git state, generate recovery steps with resume commands. Dry-run by default — set execute=true to trigger resumes."
     },
     {
       "name": "claude_recovery_history",
@@ -218,11 +218,11 @@
     },
     {
       "name": "cliphist_clear",
-      "description": "Clear all clipboard history via cliphist wipe. Dry-run by default \u2014 set execute to true to actually wipe. This is a destructive operation and cannot be undone."
+      "description": "Clear all clipboard history via cliphist wipe. Dry-run by default — set execute to true to actually wipe. This is a destructive operation and cannot be undone."
     },
     {
       "name": "cliphist_delete",
-      "description": "Delete clipboard history entries matching a query via cliphist delete-query. Dry-run by default \u2014 set execute to true to actually delete."
+      "description": "Delete clipboard history entries matching a query via cliphist delete-query. Dry-run by default — set execute to true to actually delete."
     },
     {
       "name": "cliphist_get",
@@ -234,7 +234,7 @@
     },
     {
       "name": "color_pipeline_apply",
-      "description": "Render all palette templates via scripts/palette-propagate.sh \u2014 fans out Hairglasses Neon to 12 consumers (5 GTK CSS + kitty + hyprland + hyprlock + btop + yazi + zsh-fzf + cava). Pass use_wallpaper=true for matugen-derived accents from current swww wallpaper."
+      "description": "Render all palette templates via scripts/palette-propagate.sh — fans out Hairglasses Neon to 12 consumers (5 GTK CSS + kitty + hyprland + hyprlock + btop + yazi + zsh-fzf + cava). Pass use_wallpaper=true for matugen-derived accents from current swww wallpaper."
     },
     {
       "name": "desktop_act",
@@ -338,7 +338,7 @@
     },
     {
       "name": "dotfiles_cascade_reload",
-      "description": "Atomic multi-service reload with health verification. Reloads services in order (default: hyprland \u2192 mako \u2192 ironbar), verifying each is healthy before proceeding to the next."
+      "description": "Atomic multi-service reload with health verification. Reloads services in order (default: hyprland → mako → ironbar), verifying each is healthy before proceeding to the next."
     },
     {
       "name": "dotfiles_changelog_gen",
@@ -742,7 +742,7 @@
     },
     {
       "name": "hypr_perf_mode",
-      "description": "Get or toggle the Hyprland perf-mode profile (quality or performance). `performance` reduces blur, disables shadows, enables VFR, and turns on the frame overlay \u2014 useful for 240Hz tuning on NVIDIA. `auto` toggles between the two. Omit `mode` to read current state."
+      "description": "Get or toggle the Hyprland perf-mode profile (quality or performance). `performance` reduces blur, disables shadows, enables VFR, and turns on the frame overlay — useful for 240Hz tuning on NVIDIA. `auto` toggles between the two. Omit `mode` to read current state."
     },
     {
       "name": "hypr_plugin",
@@ -810,7 +810,7 @@
     },
     {
       "name": "hypr_vrr_set",
-      "description": "Set per-monitor VRR mode via `hyprctl keyword monitor`. Read the current monitor spec first so mode/position/scale stay intact, then issue the full line with the new `vrr,<mode>` tail. On NVIDIA 590.48.01 this is safe at runtime (A/B tested) but not at compositor startup \u2014 see .claude/rules/nvidia-wayland.md. Watch `journalctl -k --since '10 sec ago'` for planePitch errors after each flip."
+      "description": "Set per-monitor VRR mode via `hyprctl keyword monitor`. Read the current monitor spec first so mode/position/scale stay intact, then issue the full line with the new `vrr,\u003cmode\u003e` tail. On NVIDIA 590.48.01 this is safe at runtime (A/B tested) but not at compositor startup — see .claude/rules/nvidia-wayland.md. Watch `journalctl -k --since '10 sec ago'` for planePitch errors after each flip."
     },
     {
       "name": "hypr_vrr_status",
@@ -830,7 +830,7 @@
     },
     {
       "name": "hyprshade_set",
-      "description": "Activate a Hyprshade screen shader by name. Runs `hyprshade on <shader>`."
+      "description": "Activate a Hyprshade screen shader by name. Runs `hyprshade on \u003cshader\u003e`."
     },
     {
       "name": "hyprshade_status",
@@ -838,7 +838,7 @@
     },
     {
       "name": "hyprshade_toggle",
-      "description": "Toggle a Hyprshade screen shader on or off by name. Runs `hyprshade toggle <shader>`."
+      "description": "Toggle a Hyprshade screen shader on or off by name. Runs `hyprshade toggle \u003cshader\u003e`."
     },
     {
       "name": "input_auto_setup_controller",
@@ -858,19 +858,19 @@
     },
     {
       "name": "input_key_press",
-      "description": "DESTRUCTIVE: Press a key combination (e.g. ctrl+shift+t, Return, super) using wtype -k or ydotool key. Simulates real key events \u2014 requires explicit approval."
+      "description": "DESTRUCTIVE: Press a key combination (e.g. ctrl+shift+t, Return, super) using wtype -k or ydotool key. Simulates real key events — requires explicit approval."
     },
     {
       "name": "input_mouse_click",
-      "description": "DESTRUCTIVE: Click mouse button at current or specified position using ydotool. Simulates a real mouse click \u2014 requires explicit approval."
+      "description": "DESTRUCTIVE: Click mouse button at current or specified position using ydotool. Simulates a real mouse click — requires explicit approval."
     },
     {
       "name": "input_mouse_move",
-      "description": "DESTRUCTIVE: Move mouse cursor to coordinates using ydotool mousemove. Simulates real mouse movement \u2014 requires explicit approval."
+      "description": "DESTRUCTIVE: Move mouse cursor to coordinates using ydotool mousemove. Simulates real mouse movement — requires explicit approval."
     },
     {
       "name": "input_mouse_scroll",
-      "description": "DESTRUCTIVE: Scroll the mouse wheel up or down using ydotool. Simulates real scroll events \u2014 requires explicit approval."
+      "description": "DESTRUCTIVE: Scroll the mouse wheel up or down using ydotool. Simulates real scroll events — requires explicit approval."
     },
     {
       "name": "input_restart_services",
@@ -886,7 +886,7 @@
     },
     {
       "name": "input_type_text",
-      "description": "DESTRUCTIVE: Type text as if from keyboard using wtype (Wayland) or ydotool as fallback. This simulates real keystrokes \u2014 requires explicit approval."
+      "description": "DESTRUCTIVE: Type text as if from keyboard using wtype (Wayland) or ydotool as fallback. This simulates real keystrokes — requires explicit approval."
     },
     {
       "name": "investigate_port",
@@ -898,11 +898,11 @@
     },
     {
       "name": "keybind_add",
-      "description": "Register a runtime Hyprland keybind via `hyprctl keyword bind`. Takes effect immediately without editing the config file \u2014 useful for ad-hoc demos or for a layer that is only valid while a specific app is running. The bind does NOT persist across a compositor reload; add it to hyprland/binds/*.conf for permanence."
+      "description": "Register a runtime Hyprland keybind via `hyprctl keyword bind`. Takes effect immediately without editing the config file — useful for ad-hoc demos or for a layer that is only valid while a specific app is running. The bind does NOT persist across a compositor reload; add it to hyprland/binds/*.conf for permanence."
     },
     {
       "name": "keybind_remove",
-      "description": "Unbind a runtime Hyprland keybind via `hyprctl keyword unbind`. Does not affect binds declared in the config file \u2014 a subsequent `hyprctl reload` (or PostToolUse reload hook) will bring those back."
+      "description": "Unbind a runtime Hyprland keybind via `hyprctl keyword unbind`. Does not affect binds declared in the config file — a subsequent `hyprctl reload` (or PostToolUse reload hook) will bring those back."
     },
     {
       "name": "keybinds_conflicts",
@@ -1118,7 +1118,7 @@
     },
     {
       "name": "network_dns_set",
-      "description": "Set DNS servers on a NetworkManager profile via `nmcli connection modify <profile> ipv4.dns`. Requires the connection to be brought back up to take effect \u2014 pass reapply=true (default) to do both steps. Passing an empty servers list clears the override so the profile falls back to the DHCP-provided DNS."
+      "description": "Set DNS servers on a NetworkManager profile via `nmcli connection modify \u003cprofile\u003e ipv4.dns`. Requires the connection to be brought back up to take effect — pass reapply=true (default) to do both steps. Passing an empty servers list clears the override so the profile falls back to the DHCP-provided DNS."
     },
     {
       "name": "network_status",
@@ -1174,11 +1174,11 @@
     },
     {
       "name": "ops_auto_fix",
-      "description": "Auto-fix mechanical failures from ops_analyze_failures: missing deps (go mod tidy), missing imports (goimports), unused vars (remove). Pass issues from analyze output. Dry-run by default \u2014 pass execute=true to apply patches."
+      "description": "Auto-fix mechanical failures from ops_analyze_failures: missing deps (go mod tidy), missing imports (goimports), unused vars (remove). Pass issues from analyze output. Dry-run by default — pass execute=true to apply patches."
     },
     {
       "name": "ops_branch_create",
-      "description": "Create a feature branch with conventional naming (feat/fix/chore prefix). Dry-run by default \u2014 pass execute=true to create."
+      "description": "Create a feature branch with conventional naming (feat/fix/chore prefix). Dry-run by default — pass execute=true to create."
     },
     {
       "name": "ops_build",
@@ -1198,11 +1198,11 @@
     },
     {
       "name": "ops_commit",
-      "description": "Stage changed files and create a conventional commit. Validates message format, never amends. Dry-run by default \u2014 pass execute=true to commit."
+      "description": "Stage changed files and create a conventional commit. Validates message format, never amends. Dry-run by default — pass execute=true to commit."
     },
     {
       "name": "ops_coverage_report",
-      "description": "Run test coverage and return per-package percentages. Set threshold>0 to gate on minimum overall coverage. Go: go test -coverprofile, Node: nyc/c8, Python: coverage.py."
+      "description": "Run test coverage and return per-package percentages. Set threshold\u003e0 to gate on minimum overall coverage. Go: go test -coverprofile, Node: nyc/c8, Python: coverage.py."
     },
     {
       "name": "ops_dep_graph",
@@ -1218,7 +1218,7 @@
     },
     {
       "name": "ops_iterate",
-      "description": "Core SDLC loop tool: build \u2192 test (changed packages) \u2192 analyze failures \u2192 track iteration. Call this after each round of edits. Returns structured next_actions with files to fix. Tracks iteration count and error trends for convergence detection."
+      "description": "Core SDLC loop tool: build → test (changed packages) → analyze failures → track iteration. Call this after each round of edits. Returns structured next_actions with files to fix. Tracks iteration count and error trends for convergence detection."
     },
     {
       "name": "ops_iteration_patterns",
@@ -1230,15 +1230,15 @@
     },
     {
       "name": "ops_pr_create",
-      "description": "Push branch and create a GitHub PR via gh CLI. Returns PR URL and number. Dry-run by default \u2014 pass execute=true to create."
+      "description": "Push branch and create a GitHub PR via gh CLI. Returns PR URL and number. Dry-run by default — pass execute=true to create."
     },
     {
       "name": "ops_pre_push",
-      "description": "Pre-push gate: run vet \u2192 lint \u2192 build \u2192 test (changed packages only). Short-circuits on first failure. Returns structured per-step results."
+      "description": "Pre-push gate: run vet → lint → build → test (changed packages only). Short-circuits on first failure. Returns structured per-step results."
     },
     {
       "name": "ops_release",
-      "description": "Bump version, generate changelog entry, commit, and tag. Detects language (Go/Node/Python) and updates the appropriate version file. Dry-run by default \u2014 pass execute=true."
+      "description": "Bump version, generate changelog entry, commit, and tag. Detects language (Go/Node/Python) and updates the appropriate version file. Dry-run by default — pass execute=true."
     },
     {
       "name": "ops_repo_analyze",
@@ -1250,11 +1250,11 @@
     },
     {
       "name": "ops_revert",
-      "description": "Safely undo the last commit. If unpushed: soft reset (keeps changes staged). If pushed: creates a revert commit. Never force-pushes. Dry-run by default \u2014 pass execute=true."
+      "description": "Safely undo the last commit. If unpushed: soft reset (keeps changes staged). If pushed: creates a revert commit. Never force-pushes. Dry-run by default — pass execute=true."
     },
     {
       "name": "ops_session_create",
-      "description": "Create a new SDLC session for iteration tracking. Optional \u2014 ops_iterate auto-creates one if absent."
+      "description": "Create a new SDLC session for iteration tracking. Optional — ops_iterate auto-creates one if absent."
     },
     {
       "name": "ops_session_handoff",
@@ -1270,7 +1270,7 @@
     },
     {
       "name": "ops_ship",
-      "description": "Ship changes: pre-push gate \u2192 commit \u2192 push \u2192 create PR. Only proceeds if gate passes. Dry-run by default \u2014 pass execute=true to ship."
+      "description": "Ship changes: pre-push gate → commit → push → create PR. Only proceeds if gate passes. Dry-run by default — pass execute=true to ship."
     },
     {
       "name": "ops_tech_debt",
@@ -1342,7 +1342,7 @@
     },
     {
       "name": "retroarch_now_playing",
-      "description": "Summarize the most recent RetroArch session: reads the ticker cache at /tmp/bar-retroarch.txt (written every 30s by bar-retroarch.timer) and the first entry of content_history.lpl. Returns JSON with title, core, path, mount_health, and the raw ticker label. Safe when nothing has been played yet \u2014 the fields are just empty."
+      "description": "Summarize the most recent RetroArch session: reads the ticker cache at /tmp/bar-retroarch.txt (written every 30s by bar-retroarch.timer) and the first entry of content_history.lpl. Returns JSON with title, core, path, mount_health, and the raw ticker label. Safe when nothing has been played yet — the fields are just empty."
     },
     {
       "name": "sandbox_create",
@@ -1390,7 +1390,7 @@
     },
     {
       "name": "sandbox_validate",
-      "description": "Composed: create sandbox \u2192 sync dotfiles \u2192 run all tests \u2192 capture screenshot \u2192 destroy. Returns structured results with pass/fail and screenshot. Early aborts if tests fail."
+      "description": "Composed: create sandbox → sync dotfiles → run all tests → capture screenshot → destroy. Returns structured results with pass/fail and screenshot. Early aborts if tests fail."
     },
     {
       "name": "sandbox_visual_diff",
@@ -1682,7 +1682,7 @@
     },
     {
       "name": "systemd_reset_failed",
-      "description": "Clear the 'failed' state of a unit via `systemctl reset-failed`. Required before a unit that hit its StartLimitBurst can be restarted \u2014 otherwise systemctl restart will report 'start request repeated too quickly' and refuse."
+      "description": "Clear the 'failed' state of a unit via `systemctl reset-failed`. Required before a unit that hit its StartLimitBurst can be restarted — otherwise systemctl restart will report 'start request repeated too quickly' and refuse."
     },
     {
       "name": "systemd_restart",
@@ -1690,7 +1690,7 @@
     },
     {
       "name": "systemd_restart_verify",
-      "description": "Composed workflow: restart a systemd unit, poll until active (or timeout), and return previous state, new state, and recent logs. Eliminates the multi-step restart\u2192status\u2192logs dance."
+      "description": "Composed workflow: restart a systemd unit, poll until active (or timeout), and return previous state, new state, and recent logs. Eliminates the multi-step restart→status→logs dance."
     },
     {
       "name": "systemd_start",
@@ -1793,6 +1793,5 @@
     "input_simulate",
     "systemd",
     "workflow"
-  ],
-  "protocolVersion": "2025-11-25"
+  ]
 }

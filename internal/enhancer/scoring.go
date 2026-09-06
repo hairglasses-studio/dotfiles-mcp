@@ -8,9 +8,9 @@ import (
 // DimensionScore represents a single scoring dimension with its evaluation.
 type DimensionScore struct {
 	Name        string   `json:"name"`
-	Score       int      `json:"score"`       // 0-100
-	Weight      float64  `json:"weight"`      // sums to 1.0
-	Grade       string   `json:"grade"`       // A/B/C/D/F
+	Score       int      `json:"score"`  // 0-100
+	Weight      float64  `json:"weight"` // sums to 1.0
+	Grade       string   `json:"grade"`  // A/B/C/D/F
 	Suggestions []string `json:"suggestions"`
 }
 

@@ -34,20 +34,20 @@ type EnhanceResult struct {
 
 // AnalyzeResult holds prompt quality analysis
 type AnalyzeResult struct {
-	Score              int          `json:"score"`
-	ScoreReport        *ScoreReport `json:"score_report"`
-	Suggestions        []string     `json:"suggestions"`
-	HasXML             bool         `json:"has_xml_structure"`
-	HasExamples        bool         `json:"has_examples"`
-	HasContext          bool         `json:"has_context"`
-	HasFormat          bool         `json:"has_output_format"`
-	HasNegativeFrames  bool         `json:"has_negative_framing"`
-	HasAggressiveCaps  bool         `json:"has_aggressive_caps"`
-	WordCount          int          `json:"word_count"`
-	TaskType           TaskType     `json:"task_type"`
-	EstimatedTokens    int          `json:"estimated_tokens"`
-	CostTier           string       `json:"cost_tier"`
-	RecommendedEffort  string       `json:"recommended_effort"`
+	Score             int          `json:"score"`
+	ScoreReport       *ScoreReport `json:"score_report"`
+	Suggestions       []string     `json:"suggestions"`
+	HasXML            bool         `json:"has_xml_structure"`
+	HasExamples       bool         `json:"has_examples"`
+	HasContext        bool         `json:"has_context"`
+	HasFormat         bool         `json:"has_output_format"`
+	HasNegativeFrames bool         `json:"has_negative_framing"`
+	HasAggressiveCaps bool         `json:"has_aggressive_caps"`
+	WordCount         int          `json:"word_count"`
+	TaskType          TaskType     `json:"task_type"`
+	EstimatedTokens   int          `json:"estimated_tokens"`
+	CostTier          string       `json:"cost_tier"`
+	RecommendedEffort string       `json:"recommended_effort"`
 }
 
 // EnhanceWithConfig runs the full enhancement pipeline with optional project config.

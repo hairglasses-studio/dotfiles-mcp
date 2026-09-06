@@ -28,10 +28,10 @@ func ValidMode(s string) EnhanceMode {
 
 // HybridEngine manages the LLM client, circuit breaker, and cache.
 type HybridEngine struct {
-	Client  *LLMClient
-	CB      *CircuitBreaker
-	Cache   *PromptCache
-	Cfg     LLMConfig
+	Client *LLMClient
+	CB     *CircuitBreaker
+	Cache  *PromptCache
+	Cfg    LLMConfig
 }
 
 // NewHybridEngine creates a hybrid engine from config.

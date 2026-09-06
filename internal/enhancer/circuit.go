@@ -16,12 +16,12 @@ const (
 // CircuitBreaker prevents cascading failures by short-circuiting after repeated errors.
 // 3 consecutive failures → open for 60s → half-open probe.
 type CircuitBreaker struct {
-	mu           sync.Mutex
-	state        circuitState
-	failures     int
-	maxFailures  int
-	openUntil    time.Time
-	cooldown     time.Duration
+	mu          sync.Mutex
+	state       circuitState
+	failures    int
+	maxFailures int
+	openUntil   time.Time
+	cooldown    time.Duration
 }
 
 // NewCircuitBreaker creates a circuit breaker with default settings.

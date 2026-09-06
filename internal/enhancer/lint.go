@@ -122,11 +122,11 @@ func checkNegativeFraming(lineNum int, line string) *LintResult {
 	}
 
 	return &LintResult{
-		Line:       lineNum,
-		Category:   "negative-framing",
-		Severity:   "warn",
-		Original:   line,
-		Suggestion: "Reframe as a positive instruction — tell Claude what to do, not what to avoid. Per Anthropic: negative framing can cause reverse psychology with Claude 4.x.",
+		Line:        lineNum,
+		Category:    "negative-framing",
+		Severity:    "warn",
+		Original:    line,
+		Suggestion:  "Reframe as a positive instruction — tell Claude what to do, not what to avoid. Per Anthropic: negative framing can cause reverse psychology with Claude 4.x.",
 		AutoFixable: false,
 	}
 }
