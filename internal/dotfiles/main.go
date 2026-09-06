@@ -1302,7 +1302,9 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				var stdout bytes.Buffer
 				cmd.Stdout = &stdout
 				cmd.Stderr = &stdout
-				cmd.Run()
+				if err := cmd.Run(); err != nil {
+					return WorkflowSyncOutput{Output: stdout.String()}, fmt.Errorf("hg-workflow-sync.sh failed: %w: %s", err, stdout.String())
+				}
 				return WorkflowSyncOutput{Output: stdout.String()}, nil
 			},
 		),
@@ -1325,7 +1327,11 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 				var stdout bytes.Buffer
 				cmd.Stdout = &stdout
 				cmd.Stderr = &stdout
-				cmd.Run()
+				if err := cmd.Run(); err != nil {
+					// The script's own output is the diagnostic; without it a
+					// failed sync used to be reported as a successful no-op.
+					return GoSyncOutput{Output: stdout.String()}, fmt.Errorf("hg-go-sync.sh failed: %w: %s", err, stdout.String())
+				}
 				return GoSyncOutput{Output: stdout.String()}, nil
 			},
 		),
@@ -2621,7 +2627,18 @@ func (m *DotfilesModule) Tools() []registry.ToolDefinition {
 					localDir = filepath.Join(homeDir(), "hairglasses-studio")
 				}
 
-				mcpRepos := []string{"dotfiles-mcp"}
+				// The thin MCP servers that consume mcpkit by TAG. Repos that
+				// consume it via a `replace` directive (dotfiles-mcp, hg-mcp,
+				// secretstudios-mcp, runmylife/shopp, ralphglasses) are
+				// deliberately excluded: their require line is decorative, so
+				// bumping it syncs nothing and the version probe below would
+				// read a masked pin.
+				mcpRepos := []string{
+					"github-runner-mcp",
+					"process-mcp",
+					"systemd-mcp",
+					"tmux-mcp",
+				}
 				dryRun := !input.Execute
 
 				// Get latest mcpkit version from the first repo that has it.
