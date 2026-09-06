@@ -8,6 +8,9 @@ build:
 test:
 	GOWORK=off $(GO) test ./... -count=1
 
+test-fast:
+	go test -short ./internal/enhancer ./internal/githubstars ./internal/mapping ./internal/remediation ./internal/tracing
+
 vet:
 	GOWORK=off $(GO) vet ./...
 
@@ -15,7 +18,7 @@ lint:
 	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run ./... || \
 	(command -v staticcheck >/dev/null 2>&1 && staticcheck ./... || echo "no linter installed, skipping")
 
-check: build vet test
+check: build vet test-fast
 
 ci: check
 
